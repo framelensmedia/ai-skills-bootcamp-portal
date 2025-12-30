@@ -1,0 +1,52 @@
+import "./globals.css";
+import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
+import Nav from "@/components/Nav";
+
+export const metadata: Metadata = {
+  title: "AI Skills Bootcamp",
+  description: "Learn high-value AI skills and build real projects.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-gradient-to-b from-black via-zinc-950 to-black text-white">
+        {/* Header */}
+        <header className="border-b border-white/10">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+            {/* Logo / Brand */}
+            <Link href="/" className="flex items-center gap-3">
+              <Image
+                src="/logo-symbol.png"
+                alt="AI Skills Bootcamp"
+                width={36}
+                height={36}
+                priority
+                className="h-8 w-8 sm:h-9 sm:w-9"
+              />
+
+              <span className="text-base sm:text-lg font-semibold tracking-tight">
+                <span className="text-lime-400">AI Skills</span>{" "}
+                <span className="text-white">Bootcamp</span>
+              </span>
+            </Link>
+
+            {/* Navigation */}
+            <Nav />
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="mx-auto w-full max-w-6xl px-4 py-8">
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}
