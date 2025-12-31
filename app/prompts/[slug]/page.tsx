@@ -10,11 +10,21 @@ type PromptRow = {
   title: string;
   slug: string;
   summary: string | null;
-  prompt: string | null; // ✅ Supabase column name
+
+  // prompt fields
+  prompt: string | null;
+  prompt_text: string | null;
+
+  // visuals
   image_url: string | null;
+
+  // meta
   category: string | null;
   is_published: boolean | null;
   created_at: string | null;
+
+  // gating
+  access_level: string; // free | premium
 };
 
 type MediaType = "image" | "video";
@@ -40,6 +50,10 @@ export default function PromptPage() {
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
 
+  // NEW: gating state
+  const [isPremiumUser, setIsPremiumUser] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -55,10 +69,11 @@ export default function PromptPage() {
 
       const supabase = createSupabaseBrowserClient();
 
-      const { data, error } = await supabase
+      // 1) Fetch SAFE prompt meta first (includes access_level + summary)
+      const { data: meta, error: metaError } = await supabase
         .from("prompts")
         .select(
-          "id, title, slug, summary, prompt, image_url, category, is_published, created_at"
+          "id, title, slug, summary, access_level, image_url, category, is_published, created_at"
         )
         .eq("slug", slug)
         .eq("is_published", true)
@@ -66,21 +81,73 @@ export default function PromptPage() {
 
       if (cancelled) return;
 
-      if (error) {
+      if (metaError) {
         setPromptRow(null);
-        setErrorMsg(error.message);
+        setErrorMsg(metaError.message);
         setLoading(false);
         return;
       }
 
-      if (!data) {
+      if (!meta) {
         setPromptRow(null);
         setErrorMsg("No prompt found for this slug.");
         setLoading(false);
         return;
       }
 
-      setPromptRow(data as PromptRow);
+      const promptAccess = String(meta.access_level || "free").toLowerCase();
+      const premiumPrompt = promptAccess === "premium";
+
+      // 2) Determine user plan from profiles.plan (profiles.user_id = auth.user.id)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let premiumUser = false;
+
+      if (user?.id) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("plan")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        // If profile lookup fails, we treat as free (no crash)
+        if (!profileError) {
+          premiumUser = String(profile?.plan || "free").toLowerCase() === "premium";
+        }
+      }
+
+      const locked = premiumPrompt && !premiumUser;
+
+      setIsPremiumUser(premiumUser);
+      setIsLocked(locked);
+
+      // 3) If allowed, fetch prompt text (prompt + prompt_text) by id
+      //    If locked, do NOT fetch prompt text.
+      let prompt: string | null = null;
+      let prompt_text: string | null = null;
+
+      if (!locked) {
+        const { data: body, error: bodyError } = await supabase
+          .from("prompts")
+          .select("prompt, prompt_text")
+          .eq("id", meta.id)
+          .maybeSingle();
+
+        if (!bodyError && body) {
+          prompt = body.prompt ?? null;
+          prompt_text = body.prompt_text ?? null;
+        }
+      }
+
+      // 4) Combine into a single row so the UI stays identical
+      setPromptRow({
+        ...(meta as any),
+        prompt,
+        prompt_text,
+      } as PromptRow);
+
       setLoading(false);
     }
 
@@ -92,8 +159,12 @@ export default function PromptPage() {
   }, [slug]);
 
   const fullPromptText = useMemo(() => {
-    return (promptRow?.prompt ?? "").toString(); // ✅ uses prompt column
-  }, [promptRow]);
+    if (isLocked) return "";
+    const p = (promptRow?.prompt ?? "").toString().trim();
+    if (p.length > 0) return p;
+    const legacy = (promptRow?.prompt_text ?? "").toString().trim();
+    return legacy;
+  }, [promptRow, isLocked]);
 
   const imageSrc = useMemo(() => {
     const url = (promptRow?.image_url ?? "").toString().trim();
@@ -101,6 +172,8 @@ export default function PromptPage() {
   }, [promptRow]);
 
   async function handleCopy() {
+    if (isLocked) return;
+
     try {
       await navigator.clipboard.writeText(fullPromptText || "");
       setCopied(true);
@@ -111,6 +184,11 @@ export default function PromptPage() {
   }
 
   function handleGenerate() {
+    if (isLocked) {
+      router.push("/pricing");
+      return;
+    }
+
     alert(
       `Generate clicked:\nMedia: ${mediaType}\nAspect: ${aspectRatio}\nRemix: ${
         remixInput.trim() ? remixInput.trim() : "(none)"
@@ -156,6 +234,9 @@ export default function PromptPage() {
       </main>
     );
   }
+
+  const access = String(promptRow.access_level || "free").toLowerCase();
+  const showPremiumBadge = access === "premium";
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
@@ -204,6 +285,12 @@ export default function PromptPage() {
             <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/50">
               SLUG: {promptRow.slug}
             </span>
+
+            {showPremiumBadge ? (
+              <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-[11px] text-lime-200">
+                PREMIUM
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -222,20 +309,50 @@ export default function PromptPage() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
+                className={[
+                  "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm",
+                  isLocked
+                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                    : "border-white/15 bg-black/30 hover:bg-black/50",
+                ].join(" ")}
                 onClick={handleCopy}
+                disabled={isLocked}
               >
                 {copied ? "Copied" : "Copy Prompt"}
               </button>
 
               <button
-                className="inline-flex items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                className={[
+                  "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
+                  isLocked
+                    ? "bg-white/10 text-white/40 hover:bg-white/15"
+                    : "bg-lime-400 text-black hover:bg-lime-300",
+                ].join(" ")}
                 onClick={handleGenerate}
               >
-                Generate
+                {isLocked ? "Upgrade to Generate" : "Generate"}
               </button>
             </div>
           </div>
+
+          {/* Locked notice */}
+          {isLocked ? (
+            <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
+              <div className="text-sm font-semibold text-lime-200">
+                This is a premium prompt
+              </div>
+              <p className="mt-1 text-sm text-white/70">
+                You can read the summary, but you need Premium to unlock the full prompt
+                text and generator tools.
+              </p>
+              <button
+                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                onClick={() => router.push("/pricing")}
+              >
+                Upgrade to Premium
+              </button>
+            </div>
+          ) : null}
 
           {/* Full prompt dropdown */}
           <div className="mt-4">
@@ -247,10 +364,21 @@ export default function PromptPage() {
 
               <div className="mt-3 rounded-2xl border border-white/10 bg-black/40 p-3">
                 <pre className="whitespace-pre-wrap break-words text-sm text-white/80">
-                  {fullPromptText && fullPromptText.trim().length > 0
+                  {isLocked
+                    ? "Locked. Upgrade to Premium to view this prompt."
+                    : fullPromptText && fullPromptText.trim().length > 0
                     ? fullPromptText
-                    : "No prompt text found yet. Add it to the prompt column in Supabase."}
+                    : "No prompt text found yet. Add it to the prompt or prompt_text column in Supabase."}
                 </pre>
+
+                {isLocked ? (
+                  <button
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                    onClick={() => router.push("/pricing")}
+                  >
+                    Upgrade to Premium
+                  </button>
+                ) : null}
               </div>
             </details>
           </div>
@@ -264,11 +392,17 @@ export default function PromptPage() {
             </p>
 
             <textarea
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-white/20"
+              className={[
+                "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
+                isLocked
+                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white/90",
+              ].join(" ")}
               rows={4}
               placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
               value={remixInput}
               onChange={(e) => setRemixInput(e.target.value)}
+              disabled={isLocked}
             />
           </div>
 
@@ -286,6 +420,7 @@ export default function PromptPage() {
                 label="Image"
                 selected={mediaType === "image"}
                 onClick={() => setMediaType("image")}
+                disabled={isLocked}
               />
               <SelectPill
                 label="Video"
@@ -300,21 +435,25 @@ export default function PromptPage() {
                 label="9:16"
                 selected={aspectRatio === "9:16"}
                 onClick={() => setAspectRatio("9:16")}
+                disabled={isLocked}
               />
               <SelectPill
                 label="16:9"
                 selected={aspectRatio === "16:9"}
                 onClick={() => setAspectRatio("16:9")}
+                disabled={isLocked}
               />
               <SelectPill
                 label="1:1"
                 selected={aspectRatio === "1:1"}
                 onClick={() => setAspectRatio("1:1")}
+                disabled={isLocked}
               />
               <SelectPill
                 label="4:5"
                 selected={aspectRatio === "4:5"}
                 onClick={() => setAspectRatio("4:5")}
+                disabled={isLocked}
               />
             </div>
 
@@ -341,17 +480,21 @@ function SelectPill({
   onClick?: () => void;
 }) {
   const base = "rounded-xl border px-3 py-2 text-sm text-left transition";
-  const disabledCls = "cursor-not-allowed border-white/10 bg-black/20 text-white/30";
+  const disabledCls =
+    "cursor-not-allowed border-white/10 bg-black/20 text-white/30";
   const idleCls =
     "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
-  const selectedCls = "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
+  const selectedCls =
+    "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
 
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={disabled ? undefined : onClick}
-      className={[base, disabled ? disabledCls : selected ? selectedCls : idleCls].join(" ")}
+      className={[base, disabled ? disabledCls : selected ? selectedCls : idleCls].join(
+        " "
+      )}
       aria-pressed={selected ? "true" : "false"}
     >
       {label}
