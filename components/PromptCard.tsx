@@ -1,4 +1,8 @@
-import Link from "next/link";
+"use client";
+
+import { useMemo, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 type PromptCardProps = {
   title: string;
@@ -15,15 +19,53 @@ export default function PromptCard({
   imageUrl,
   category,
 }: PromptCardProps) {
+  const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  const [isAuthed, setIsAuthed] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function check() {
+      const { data } = await supabase.auth.getUser();
+      if (!mounted) return;
+      setIsAuthed(Boolean(data?.user));
+    }
+
+    check();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      check();
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
   const safeSlug = (slug ?? "").trim().toLowerCase();
-  const href = safeSlug.length > 0 ? `/prompts/${encodeURIComponent(safeSlug)}` : "/prompts";
+
+  const promptPath =
+    safeSlug.length > 0 ? `/prompts/${encodeURIComponent(safeSlug)}` : "/prompts";
+
+  const loginPath = `/login?redirectTo=${encodeURIComponent(promptPath)}`;
+
+  const href = isAuthed ? promptPath : loginPath;
 
   const fallbackOrb = "/orb-neon.gif";
 
+  function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    router.push(href);
+  }
+
   return (
-    <Link
-      href={href}
-      className="group block overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition hover:border-white/20 hover:bg-white/10"
+    <button
+      type="button"
+      onClick={handleClick}
+      className="group block w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition hover:border-white/20 hover:bg-white/10"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-black/40">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -50,12 +92,14 @@ export default function PromptCard({
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <div className="text-xs text-white/50">Open prompt</div>
+          <div className="text-xs text-white/50">
+            {isAuthed ? "Open prompt" : "Log in to open"}
+          </div>
           <div className="text-xs text-lime-300 opacity-0 transition group-hover:opacity-100">
-            View →
+            {isAuthed ? "View →" : "Log in →"}
           </div>
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
