@@ -19,7 +19,7 @@ type PromptMetaRow = {
   is_published: boolean | null;
   created_at: string | null;
 
-  access_level: string; // free | premium
+  access_level: string; // free | premium (DB value)
 };
 
 type PromptBodyRow = {
@@ -52,9 +52,22 @@ export default function PromptPage() {
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
 
-  // gating state
+  // Make preview match the selected aspect ratio
+  const previewAspectClass = useMemo(() => {
+    if (aspectRatio === "9:16") return "aspect-[9/16]";
+    if (aspectRatio === "16:9") return "aspect-[16/9]";
+    if (aspectRatio === "1:1") return "aspect-square";
+    return "aspect-[4/5]";
+  }, [aspectRatio]);
+
   const [isLocked, setIsLocked] = useState(false);
   const [lockReason, setLockReason] = useState<"login" | "upgrade" | null>(null);
+
+  // Generation state
+  const [userId, setUserId] = useState<string | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +84,6 @@ export default function PromptPage() {
 
       const supabase = createSupabaseBrowserClient();
 
-      // 1) SAFE meta query (from view)
       const { data: meta, error: metaError } = await supabase
         .from("prompts_public")
         .select(
@@ -101,17 +113,16 @@ export default function PromptPage() {
       setMetaRow(meta as PromptMetaRow);
 
       const promptAccess = String(meta.access_level || "free").toLowerCase();
-      const premiumPrompt = promptAccess === "premium";
+      const proPrompt = promptAccess === "premium";
 
-      // 2) Determine login status
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       const isLoggedIn = Boolean(user?.id);
 
-      // Logged out users are ALWAYS locked (even for free prompts)
       if (!isLoggedIn) {
+        setUserId(null);
         setIsLocked(true);
         setLockReason("login");
         setBodyRow({ prompt: null, prompt_text: null });
@@ -119,8 +130,7 @@ export default function PromptPage() {
         return;
       }
 
-      // 3) Logged in: check plan for premium prompts
-      let premiumUser = false;
+      setUserId(user!.id);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -128,14 +138,13 @@ export default function PromptPage() {
         .eq("user_id", user!.id)
         .maybeSingle();
 
-      premiumUser = String(profile?.plan || "free").toLowerCase() === "premium";
+      const proUser = String(profile?.plan || "free").toLowerCase() === "premium";
 
-      const locked = premiumPrompt && !premiumUser;
+      const locked = proPrompt && !proUser;
 
       setIsLocked(locked);
       setLockReason(locked ? "upgrade" : null);
 
-      // 4) Only fetch prompt text if unlocked
       if (!locked) {
         const { data: body, error: bodyError } = await supabase
           .from("prompts")
@@ -169,14 +178,24 @@ export default function PromptPage() {
     return (bodyRow?.prompt_text ?? "").toString().trim();
   }, [bodyRow, isLocked]);
 
+  const fallbackOrb = "/orb-neon.gif";
+
   const imageSrc = useMemo(() => {
+    if (generatedImageUrl && generatedImageUrl.trim().length > 0) {
+      return generatedImageUrl.trim();
+    }
+
     const url =
       (metaRow?.featured_image_url ?? "").toString().trim() ||
       (metaRow?.image_url ?? "").toString().trim() ||
       (metaRow?.media_url ?? "").toString().trim();
 
-    return url.length > 0 ? url : "/orb-neon.gif";
-  }, [metaRow]);
+    return url.length > 0 ? url : fallbackOrb;
+  }, [metaRow, generatedImageUrl]);
+
+  const isFallbackOrb = useMemo(() => {
+    return imageSrc === fallbackOrb;
+  }, [imageSrc, fallbackOrb]);
 
   async function handleCopy() {
     if (isLocked) return;
@@ -190,23 +209,69 @@ export default function PromptPage() {
     }
   }
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (isLocked) {
-      if (lockReason === "login") router.push("/login");
-      else router.push("/pricing");
+      if (lockReason === "login") {
+        router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`);
+      } else {
+        router.push("/pricing");
+      }
       return;
     }
 
-    alert(
-      `Generate clicked:\nMedia: ${mediaType}\nAspect: ${aspectRatio}\nRemix: ${
-        remixInput.trim() ? remixInput.trim() : "(none)"
-      }`
-    );
+    if (mediaType === "video") {
+      setGenerateError("Video generation is disabled for V1.");
+      return;
+    }
+
+    if (!userId || !metaRow?.id) {
+      setGenerateError("Missing user info. Please refresh and try again.");
+      return;
+    }
+
+    setGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const remix = remixInput.trim();
+      const finalPrompt =
+        remix.length > 0
+          ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
+          : fullPromptText;
+
+      const res = await fetch("/api/nano-banana/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          aspectRatio,
+          userId,
+          promptId: metaRow.id,
+          promptSlug: metaRow.slug,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Generation failed");
+      }
+
+      if (!json?.imageUrl) {
+        throw new Error("No imageUrl returned from generator");
+      }
+
+      setGeneratedImageUrl(String(json.imageUrl));
+    } catch (err: any) {
+      setGenerateError(err?.message || "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
   }
 
-  function handlePrimaryCta() {
-    if (lockReason === "login") router.push("/login");
-    else router.push("/pricing");
+  function clearGenerated() {
+    setGeneratedImageUrl(null);
+    setGenerateError(null);
   }
 
   if (loading) {
@@ -243,22 +308,23 @@ export default function PromptPage() {
   }
 
   const access = String(metaRow.access_level || "free").toLowerCase();
-  const showPremiumBadge = access === "premium";
+  const showProBadge = access === "premium";
 
-  const lockedTitle = lockReason === "login" ? "Log in to view this prompt" : "This is a premium prompt";
+  const lockedTitle =
+    lockReason === "login" ? "Log in to view this prompt" : "This is a Pro prompt";
   const lockedBody =
     lockReason === "login"
       ? "Create a free account to unlock the prompt tool and start generating."
-      : "Upgrade to Premium to unlock the full prompt text and generator tools.";
-  const ctaLabel = lockReason === "login" ? "Log in / Sign up" : "Upgrade to Premium";
+      : "Upgrade to Pro to unlock the full prompt text and generator tools.";
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
-      {/* Header */}
       <div className="mb-5 sm:mb-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">{metaRow.title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">
+              {metaRow.title}
+            </h1>
             <p className="mt-2 max-w-3xl text-sm text-white/70 sm:text-base">
               {metaRow.summary && metaRow.summary.trim().length > 0
                 ? metaRow.summary
@@ -275,12 +341,26 @@ export default function PromptPage() {
         </div>
       </div>
 
-      {/* Mobile: Preview first, Tool second | Desktop: Tool left, Preview right */}
       <div className="grid gap-5 lg:grid-cols-2">
         {/* PREVIEW PANEL */}
         <section className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
-            <Image src={imageSrc} alt={metaRow.title} fill className="object-cover" priority />
+          <div
+            className={[
+              "relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black",
+              previewAspectClass,
+            ].join(" ")}
+          >
+            <Image
+              src={imageSrc}
+              alt={metaRow.title}
+              fill
+              className={isFallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
+              priority
+            />
+
+            {isFallbackOrb ? (
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
+            ) : null}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -292,17 +372,42 @@ export default function PromptPage() {
               SLUG: {metaRow.slug}
             </span>
 
-            {showPremiumBadge ? (
+            {showProBadge ? (
               <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-[11px] text-lime-200">
-                PREMIUM
+                PRO
+              </span>
+            ) : null}
+
+            {generatedImageUrl ? (
+              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
+                GENERATED
               </span>
             ) : null}
           </div>
 
+          {generateError ? (
+            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
+              {generateError}
+            </div>
+          ) : null}
+
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">Preview</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold">Preview</div>
+
+              {generatedImageUrl ? (
+                <button
+                  type="button"
+                  onClick={clearGenerated}
+                  className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/80 hover:bg-black/50"
+                >
+                  Clear output
+                </button>
+              ) : null}
+            </div>
+
             <p className="mt-2 text-sm text-white/65">
-              This panel becomes your “example output” area. For now it shows the featured image (or orb fallback).
+              This panel becomes your “example output” area. When you generate, it will show your latest output here.
             </p>
           </div>
         </section>
@@ -316,7 +421,9 @@ export default function PromptPage() {
               <button
                 className={[
                   "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm",
-                  isLocked ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30" : "border-white/15 bg-black/30 hover:bg-black/50",
+                  isLocked
+                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                    : "border-white/15 bg-black/30 hover:bg-black/50",
                 ].join(" ")}
                 onClick={handleCopy}
                 disabled={isLocked}
@@ -327,11 +434,22 @@ export default function PromptPage() {
               <button
                 className={[
                   "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
-                  isLocked ? "bg-white/10 text-white/40 hover:bg-white/15" : "bg-lime-400 text-black hover:bg-lime-300",
+                  isLocked
+                    ? "bg-white/10 text-white/40 hover:bg-white/15"
+                    : generating
+                    ? "bg-lime-400/60 text-black"
+                    : "bg-lime-400 text-black hover:bg-lime-300",
                 ].join(" ")}
                 onClick={handleGenerate}
+                disabled={isLocked || generating}
               >
-                {lockReason === "login" ? "Log in to Generate" : isLocked ? "Upgrade to Generate" : "Generate"}
+                {generating
+                  ? "Generating..."
+                  : lockReason === "login"
+                  ? "Log in to Generate"
+                  : isLocked
+                  ? "Upgrade to Pro"
+                  : "Generate"}
               </button>
             </div>
           </div>
@@ -340,20 +458,43 @@ export default function PromptPage() {
             <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
               <div className="text-sm font-semibold text-lime-200">{lockedTitle}</div>
               <p className="mt-1 text-sm text-white/70">{lockedBody}</p>
-              <button
-                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                onClick={handlePrimaryCta}
-              >
-                {ctaLabel}
-              </button>
+
+              {lockReason === "login" ? (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                    onClick={() =>
+                      router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)
+                    }
+                  >
+                    Log in
+                  </button>
+
+                  <button
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
+                    onClick={() =>
+                      router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)
+                    }
+                  >
+                    Create free account
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                  onClick={() => router.push("/pricing")}
+                >
+                  Upgrade to Pro
+                </button>
+              )}
             </div>
           ) : null}
 
-          {/* Full prompt dropdown */}
           <div className="mt-4">
             <details className="group rounded-2xl border border-white/10 bg-black/30 p-4">
               <summary className="cursor-pointer select-none list-none text-sm font-semibold text-white/85">
-                View full prompt <span className="ml-2 text-xs text-white/50">(click to expand)</span>
+                View full prompt{" "}
+                <span className="ml-2 text-xs text-white/50">(click to expand)</span>
               </summary>
 
               <div className="mt-3 rounded-2xl border border-white/10 bg-black/40 p-3">
@@ -361,25 +502,15 @@ export default function PromptPage() {
                   {isLocked
                     ? lockReason === "login"
                       ? "Locked. Log in to view this prompt."
-                      : "Locked. Upgrade to Premium to view this prompt."
+                      : "Locked. Upgrade to Pro to view this prompt."
                     : fullPromptText && fullPromptText.trim().length > 0
                     ? fullPromptText
                     : "No prompt text found yet. Add it to the prompt or prompt_text column in Supabase."}
                 </pre>
-
-                {isLocked ? (
-                  <button
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                    onClick={handlePrimaryCta}
-                  >
-                    {ctaLabel}
-                  </button>
-                ) : null}
               </div>
             </details>
           </div>
 
-          {/* Remix */}
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="text-sm font-semibold">Remix</div>
             <p className="mt-2 text-sm text-white/60">
@@ -389,7 +520,9 @@ export default function PromptPage() {
             <textarea
               className={[
                 "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
-                isLocked ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30" : "border-white/10 bg-black/40 text-white/90",
+                isLocked
+                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white/90",
               ].join(" ")}
               rows={4}
               placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
@@ -399,7 +532,6 @@ export default function PromptPage() {
             />
           </div>
 
-          {/* Generator options */}
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold">Generator Settings</div>
@@ -409,19 +541,49 @@ export default function PromptPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="Image" selected={mediaType === "image"} onClick={() => setMediaType("image")} disabled={isLocked} />
-              <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
+              <SelectPill
+                label="Image"
+                selected={mediaType === "image"}
+                onClick={() => setMediaType("image")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="Video"
+                selected={mediaType === "video"}
+                disabled
+                onClick={() => setMediaType("video")}
+              />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="9:16" selected={aspectRatio === "9:16"} onClick={() => setAspectRatio("9:16")} disabled={isLocked} />
-              <SelectPill label="16:9" selected={aspectRatio === "16:9"} onClick={() => setAspectRatio("16:9")} disabled={isLocked} />
-              <SelectPill label="1:1" selected={aspectRatio === "1:1"} onClick={() => setAspectRatio("1:1")} disabled={isLocked} />
-              <SelectPill label="4:5" selected={aspectRatio === "4:5"} onClick={() => setAspectRatio("4:5")} disabled={isLocked} />
+              <SelectPill
+                label="9:16"
+                selected={aspectRatio === "9:16"}
+                onClick={() => setAspectRatio("9:16")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="16:9"
+                selected={aspectRatio === "16:9"}
+                onClick={() => setAspectRatio("16:9")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="1:1"
+                selected={aspectRatio === "1:1"}
+                onClick={() => setAspectRatio("1:1")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="4:5"
+                selected={aspectRatio === "4:5"}
+                onClick={() => setAspectRatio("4:5")}
+                disabled={isLocked || generating}
+              />
             </div>
 
             <div className="mt-3 text-xs text-white/45">
-              Next step: Wire Nano Banana for Image generation. Video remains disabled for V1.
+              Next step: Wire Gemini (Nano Banana) for Image generation. Video remains disabled for V1.
             </div>
           </div>
         </section>
