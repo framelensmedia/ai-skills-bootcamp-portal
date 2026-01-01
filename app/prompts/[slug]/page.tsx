@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
@@ -76,13 +76,14 @@ export default function PromptPage() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  // Reference images (max 10)
+  const [refImages, setRefImages] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Remixes (per prompt) from prompt_generations
   const [remixes, setRemixes] = useState<RemixRow[]>([]);
   const [remixesLoading, setRemixesLoading] = useState(false);
   const [remixesError, setRemixesError] = useState<string | null>(null);
-
-  // Always show max 12 on this page
-  const REMIXES_PREVIEW_LIMIT = 12;
 
   // Fullscreen viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -170,7 +171,6 @@ export default function PromptPage() {
         .maybeSingle();
 
       const proUser = String(profile?.plan || "free").toLowerCase() === "premium";
-
       const locked = proPrompt && !proUser;
 
       setIsLocked(locked);
@@ -324,6 +324,30 @@ export default function PromptPage() {
     }
   }
 
+  function onPickImages(files: FileList | null) {
+    if (!files) return;
+
+    const next = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (next.length === 0) return;
+
+    setRefImages((prev) => {
+      const merged = [...prev, ...next];
+      return merged.slice(0, 10);
+    });
+
+    // allow re-selecting same file later
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeRefImage(idx: number) {
+    setRefImages((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function clearRefImages() {
+    setRefImages([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function handleGenerate() {
     if (isLocked) {
       if (lockReason === "login") {
@@ -354,17 +378,20 @@ export default function PromptPage() {
           ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
           : fullPromptText;
 
+      // multipart/form-data to include images
+      const fd = new FormData();
+      fd.append("prompt", finalPrompt);
+      fd.append("aspectRatio", aspectRatio);
+      fd.append("userId", userId);
+      fd.append("promptId", metaRow.id);
+      fd.append("promptSlug", metaRow.slug);
+
+      // max 10 images
+      refImages.slice(0, 10).forEach((f) => fd.append("images", f));
+
       const res = await fetch("/api/nano-banana/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          aspectRatio,
-          userId,
-          promptId: metaRow.id,
-          promptSlug: metaRow.slug,
-          remix,
-        }),
+        body: fd,
       });
 
       const json = await res.json();
@@ -393,20 +420,7 @@ export default function PromptPage() {
     setGenerateError(null);
   }
 
-  function goToAllRemixes() {
-    // Always take them back to the library. If your library page supports filtering by prompt, keep params.
-    if (!metaRow) {
-      router.push("/library");
-      return;
-    }
-
-    const qs = new URLSearchParams({
-      promptId: metaRow.id,
-      slug: metaRow.slug,
-    });
-
-    router.push(`/library?${qs.toString()}`);
-  }
+  const recentGridCount = 12;
 
   if (loading) {
     return (
@@ -676,15 +690,13 @@ export default function PromptPage() {
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="text-sm font-semibold">Remix</div>
             <p className="mt-2 text-sm text-white/60">
-              Describe what you want to change. We’ll use this to auto-remix the prompt.
+              Describe what you want to change. Optionally upload reference images.
             </p>
 
             <textarea
               className={[
                 "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
-                isLocked
-                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white/90",
+                isLocked ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30" : "border-white/10 bg-black/40 text-white/90",
               ].join(" ")}
               rows={4}
               placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
@@ -692,6 +704,87 @@ export default function PromptPage() {
               onChange={(e) => setRemixInput(e.target.value)}
               disabled={isLocked}
             />
+
+            {/* Reference images */}
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">Reference images</div>
+                <div className="text-xs text-white/50">{refImages.length}/10</div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => onPickImages(e.target.files)}
+                  disabled={isLocked || generating}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLocked || generating || refImages.length >= 10}
+                  className={[
+                    "rounded-xl border px-3 py-2 text-xs font-semibold",
+                    isLocked || generating || refImages.length >= 10
+                      ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                      : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
+                  ].join(" ")}
+                >
+                  Upload images
+                </button>
+
+                {refImages.length ? (
+                  <button
+                    type="button"
+                    onClick={clearRefImages}
+                    disabled={isLocked || generating}
+                    className={[
+                      "rounded-xl border px-3 py-2 text-xs font-semibold",
+                      isLocked || generating
+                        ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                        : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
+                    ].join(" ")}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+
+              {refImages.length ? (
+                <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-6">
+                  {refImages.map((f, idx) => {
+                    const url = URL.createObjectURL(f);
+                    return (
+                      <div
+                        key={`${f.name}-${idx}`}
+                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-black"
+                        title={f.name}
+                      >
+                        <div className="relative aspect-square w-full">
+                          <Image src={url} alt="Reference" fill className="object-cover" />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeRefImage(idx)}
+                          className="absolute right-1 top-1 rounded-lg border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-white/85 opacity-0 transition group-hover:opacity-100"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3 text-xs text-white/50">
+                  Tip: Use images to match style, layout, branding, or a specific reference design.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -703,53 +796,23 @@ export default function PromptPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill
-                label="Image"
-                selected={mediaType === "image"}
-                onClick={() => setMediaType("image")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="Video"
-                selected={mediaType === "video"}
-                disabled
-                onClick={() => setMediaType("video")}
-              />
+              <SelectPill label="Image" selected={mediaType === "image"} onClick={() => setMediaType("image")} disabled={isLocked || generating} />
+              <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill
-                label="9:16"
-                selected={aspectRatio === "9:16"}
-                onClick={() => setAspectRatio("9:16")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="16:9"
-                selected={aspectRatio === "16:9"}
-                onClick={() => setAspectRatio("16:9")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="1:1"
-                selected={aspectRatio === "1:1"}
-                onClick={() => setAspectRatio("1:1")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="4:5"
-                selected={aspectRatio === "4:5"}
-                onClick={() => setAspectRatio("4:5")}
-                disabled={isLocked || generating}
-              />
+              <SelectPill label="9:16" selected={aspectRatio === "9:16"} onClick={() => setAspectRatio("9:16")} disabled={isLocked || generating} />
+              <SelectPill label="16:9" selected={aspectRatio === "16:9"} onClick={() => setAspectRatio("16:9")} disabled={isLocked || generating} />
+              <SelectPill label="1:1" selected={aspectRatio === "1:1"} onClick={() => setAspectRatio("1:1")} disabled={isLocked || generating} />
+              <SelectPill label="4:5" selected={aspectRatio === "4:5"} onClick={() => setAspectRatio("4:5")} disabled={isLocked || generating} />
             </div>
 
             <div className="mt-3 text-xs text-white/45">
-              Next step: Wire Gemini (Nano Banana) for Image generation. Video remains disabled for V1.
+              Model: Nano Banana Pro (gemini-3-pro-image-preview). Video remains disabled for V1.
             </div>
           </div>
 
-          {/* Previous Generations (Remixes) */}
+          {/* Previous generations */}
           {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -768,12 +831,10 @@ export default function PromptPage() {
               {remixesLoading ? (
                 <div className="mt-3 text-sm text-white/60">Loading your generations…</div>
               ) : remixes.length === 0 ? (
-                <div className="mt-3 text-sm text-white/60">
-                  No generations yet. Generate one to start building your library.
-                </div>
+                <div className="mt-3 text-sm text-white/60">No generations yet. Generate one to start building your library.</div>
               ) : (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {remixes.slice(0, REMIXES_PREVIEW_LIMIT).map((r) => (
+                  {remixes.slice(0, recentGridCount).map((r) => (
                     <button
                       key={r.id}
                       type="button"
@@ -784,13 +845,6 @@ export default function PromptPage() {
                       <div className="relative aspect-square w-full">
                         <Image src={r.image_url} alt="Generation" fill className="object-cover" />
                       </div>
-
-                      {r.aspect_ratio ? (
-                        <div className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/10 bg-black/50 px-2 py-0.5 text-[10px] text-white/80">
-                          {String(r.aspect_ratio)}
-                        </div>
-                      ) : null}
-
                       <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
                         <div className="absolute inset-0 bg-black/20" />
                       </div>
@@ -799,19 +853,15 @@ export default function PromptPage() {
                 </div>
               )}
 
-              {/* Always present, at bottom under the generations */}
+              {/* Always present */}
               <div className="mt-4">
                 <button
                   type="button"
-                  onClick={goToAllRemixes}
+                  onClick={() => router.push("/library")}
                   className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/50"
                 >
                   View all remixes
                 </button>
-
-                <div className="mt-2 text-center text-xs text-white/45">
-                  Open your full library for this prompt to stay inspired.
-                </div>
               </div>
             </div>
           ) : null}
@@ -834,8 +884,7 @@ function SelectPill({
 }) {
   const base = "rounded-xl border px-3 py-2 text-sm text-left transition";
   const disabledCls = "cursor-not-allowed border-white/10 bg-black/20 text-white/30";
-  const idleCls =
-    "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
+  const idleCls = "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
   const selectedCls = "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
 
   return (

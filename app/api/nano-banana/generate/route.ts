@@ -6,15 +6,6 @@ export const runtime = "nodejs";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
-type ReqBody = {
-  prompt: string;
-  aspectRatio?: AspectRatio;
-  promptId?: string | null;
-  promptSlug?: string | null;
-  userId: string;
-  remix?: string | null; // optional (safe to send from client)
-};
-
 function mustEnv(name: string) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
@@ -22,8 +13,6 @@ function mustEnv(name: string) {
 }
 
 function aspectHint(aspectRatio: AspectRatio) {
-  // We can’t send width/height in generationConfig for Vertex generateContent.
-  // So we pass it as instruction text.
   switch (aspectRatio) {
     case "16:9":
       return "Output image in 16:9 landscape framing.";
@@ -37,15 +26,55 @@ function aspectHint(aspectRatio: AspectRatio) {
   }
 }
 
+async function fileToBase64(file: File) {
+  const ab = await file.arrayBuffer();
+  return Buffer.from(ab).toString("base64");
+}
+
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as ReqBody;
+    // We now accept multipart/form-data so the user can upload reference images.
+    const form = await req.formData();
 
-    const rawPrompt = (body.prompt ?? "").trim();
-    const ar = body.aspectRatio ?? "9:16";
+    const rawPrompt = String(form.get("prompt") ?? "").trim();
+    const userId = String(form.get("userId") ?? "").trim();
+    const promptId = String(form.get("promptId") ?? "").trim() || null;
+    const promptSlug = String(form.get("promptSlug") ?? "").trim() || null;
+
+    const ar = (String(form.get("aspectRatio") ?? "9:16").trim() as AspectRatio) || "9:16";
 
     if (!rawPrompt) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
-    if (!body.userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+
+    // Pull up to 10 uploaded images (Nano Banana / Vertex supports up to 10 image files per request).
+    const imageFiles = form.getAll("images").filter((v) => v instanceof File) as File[];
+    if (imageFiles.length > 10) {
+      return NextResponse.json(
+        { error: "Too many images. Max is 10 per request." },
+        { status: 400 }
+      );
+    }
+
+    // Basic guardrails to prevent huge uploads
+    const MAX_PER_FILE = 7 * 1024 * 1024; // 7MB
+    const MAX_TOTAL = 20 * 1024 * 1024; // 20MB total
+    let total = 0;
+
+    for (const f of imageFiles) {
+      total += f.size;
+      if (f.size > MAX_PER_FILE) {
+        return NextResponse.json(
+          { error: `One of your images is too large. Max per image is 7MB.` },
+          { status: 400 }
+        );
+      }
+    }
+    if (total > MAX_TOTAL) {
+      return NextResponse.json(
+        { error: `Total upload too large. Max total is 20MB.` },
+        { status: 400 }
+      );
+    }
 
     const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
     const location = (process.env.GOOGLE_CLOUD_LOCATION || "global").trim();
@@ -70,17 +99,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
     }
 
-    // Model (Vertex)
+    // Model (Vertex) aka Nano Banana Pro
     const model = "gemini-3-pro-image-preview";
 
     const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
-    // ✅ Aspect ratio guidance passed as prompt instruction
-    const finalPrompt = `${rawPrompt}\n\n${aspectHint(ar)}\nNo text overlays.`;
+    const finalPrompt = [
+      rawPrompt,
+      "",
+      aspectHint(ar),
+      "No text overlays.",
+      imageFiles.length
+        ? "Use the uploaded reference image(s) as visual guidance. Keep the composition consistent when appropriate."
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    // ✅ generationConfig only supports text-related params here (no width/height)
+    // Build multimodal parts: images first, then the text instructions
+    const imageParts = [];
+    for (const f of imageFiles) {
+      const mimeType = String(f.type || "image/png");
+      if (!mimeType.startsWith("image/")) continue;
+
+      const data = await fileToBase64(f);
+      imageParts.push({
+        inlineData: { mimeType, data },
+      });
+    }
+
     const payload = {
-      contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+      contents: [
+        {
+          role: "user",
+          parts: [
+            ...imageParts,
+            { text: finalPrompt },
+          ],
+        },
+      ],
       generationConfig: {
         temperature: 0.7,
       },
@@ -116,32 +173,19 @@ export async function POST(req: Request) {
       : null;
 
     if (!inline) {
-      return NextResponse.json(
-        { error: "No image returned", details: json },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "No image returned", details: json }, { status: 502 });
     }
 
-    const mimeType = String(inline.inlineData.mimeType);
-    const base64 = String(inline.inlineData.data);
+    const outMime = String(inline.inlineData.mimeType);
+    const outBase64 = String(inline.inlineData.data);
 
-    const bytes = Buffer.from(base64, "base64");
-    const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
-
-    // ✅ Step 1: store per-prompt folder so it’s easy to browse by prompt later
-    const safePromptSlug = String(body.promptSlug || "unknown")
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 120);
-
-    const ts = Date.now();
-    const filePath = `users/${body.userId}/prompts/${safePromptSlug}/${ts}.${ext}`;
+    const bytes = Buffer.from(outBase64, "base64");
+    const ext = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
+    const filePath = `users/${userId}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await admin.storage
       .from("generations")
-      .upload(filePath, bytes, { contentType: mimeType, upsert: false });
+      .upload(filePath, bytes, { contentType: outMime, upsert: false });
 
     if (uploadError) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
@@ -150,41 +194,23 @@ export async function POST(req: Request) {
     const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
     const imageUrl = pub.publicUrl;
 
-    // Optional history insert (keep this if you already use it)
+    // Optional history insert
     try {
       await admin.from("prompt_generations").insert({
-        user_id: body.userId,
-        prompt_id: body.promptId ?? null,
-        prompt_slug: body.promptSlug ?? null,
+        user_id: userId,
+        prompt_id: promptId,
+        prompt_slug: promptSlug,
         image_url: imageUrl,
-        settings: { aspectRatio: ar, model, provider: "vertex" },
+        settings: {
+          aspectRatio: ar,
+          model,
+          provider: "vertex",
+          // helpful for debugging
+          input_images: imageFiles.length,
+        },
       });
     } catch {
       // ignore if table isn't there yet
-    }
-
-    // ✅ Step 3: insert into remixes so the UI can display them per-prompt
-    // NOTE: this assumes you created a "remixes" table with at least:
-    // id (uuid), user_id (uuid), prompt_id (uuid), prompt_slug (text),
-    // image_url (text), aspect_ratio (text), created_at (timestamptz default now()).
-    // Extra fields are optional and safe to ignore if your table doesn't include them.
-    try {
-      await admin.from("remixes").insert({
-        user_id: body.userId,
-        prompt_id: body.promptId ?? null,
-        prompt_slug: body.promptSlug ?? null,
-        image_url: imageUrl,
-        aspect_ratio: ar,
-        model,
-        provider: "vertex",
-        storage_path: filePath,
-        remix_text: body.remix ?? null,
-      });
-    } catch (e) {
-      // If your table schema doesn't have some of these columns, this insert will fail.
-      // In that case: remove the extra fields (model/provider/storage_path/remix_text)
-      // and keep only the basics.
-      console.warn("REMIX INSERT FAILED (non-fatal):", (e as any)?.message || e);
     }
 
     return NextResponse.json({ imageUrl }, { status: 200 });
