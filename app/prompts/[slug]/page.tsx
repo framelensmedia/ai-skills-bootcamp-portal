@@ -30,12 +30,11 @@ type PromptBodyRow = {
 type MediaType = "image" | "video";
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
-// This matches what your route.ts inserts into:
 type RemixRow = {
   id: string;
   image_url: string;
   created_at: string;
-  settings: any | null; // { aspectRatio, model, provider, ... }
+  aspect_ratio: string | null;
 };
 
 export default function PromptPage() {
@@ -77,10 +76,13 @@ export default function PromptPage() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  // Remixes (per prompt)
+  // Remixes (per prompt) from prompt_generations
   const [remixes, setRemixes] = useState<RemixRow[]>([]);
   const [remixesLoading, setRemixesLoading] = useState(false);
   const [remixesError, setRemixesError] = useState<string | null>(null);
+
+  // Always show max 12 on this page
+  const REMIXES_PREVIEW_LIMIT = 12;
 
   // Fullscreen viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -168,6 +170,7 @@ export default function PromptPage() {
         .maybeSingle();
 
       const proUser = String(profile?.plan || "free").toLowerCase() === "premium";
+
       const locked = proPrompt && !proUser;
 
       setIsLocked(locked);
@@ -200,25 +203,6 @@ export default function PromptPage() {
     };
   }, [slug]);
 
-  // Helper: fetch remixes from DB
-  async function fetchRemixes(currentUserId: string, currentMeta: PromptMetaRow) {
-    const supabase = createSupabaseBrowserClient();
-
-    // IMPORTANT:
-    // Your route.ts inserts into prompt_generations, not "remixes"
-    // We treat those as "Remixes" in the UI.
-    const { data, error } = await supabase
-      .from("prompt_generations")
-      .select("id, image_url, created_at, settings")
-      .eq("user_id", currentUserId)
-      .or(`prompt_id.eq.${currentMeta.id},prompt_slug.eq.${currentMeta.slug}`)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (error) throw error;
-    return (data ?? []) as RemixRow[];
-  }
-
   // Load remixes for this prompt (even if Pro-locked), as long as logged in
   useEffect(() => {
     let cancelled = false;
@@ -231,8 +215,32 @@ export default function PromptPage() {
       setRemixesError(null);
 
       try {
-        const rows = await fetchRemixes(userId, metaRow);
+        const supabase = createSupabaseBrowserClient();
+
+        const { data, error } = await supabase
+          .from("prompt_generations")
+          .select("id, image_url, created_at, settings")
+          .eq("user_id", userId)
+          .eq("prompt_id", metaRow.id)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
         if (cancelled) return;
+
+        if (error) {
+          setRemixesError(error.message);
+          setRemixes([]);
+          setRemixesLoading(false);
+          return;
+        }
+
+        const rows: RemixRow[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          image_url: r.image_url,
+          created_at: r.created_at,
+          aspect_ratio: r?.settings?.aspectRatio ?? null,
+        }));
+
         setRemixes(rows);
       } catch (e: any) {
         if (cancelled) return;
@@ -249,7 +257,7 @@ export default function PromptPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, metaRow?.id, metaRow?.slug]);
+  }, [userId, metaRow?.id]);
 
   const fullPromptText = useMemo(() => {
     if (isLocked) return "";
@@ -290,10 +298,26 @@ export default function PromptPage() {
   }
 
   async function refreshRemixes() {
-    if (!userId || !metaRow) return;
+    if (!userId || !metaRow?.id) return;
 
     try {
-      const rows = await fetchRemixes(userId, metaRow);
+      const supabase = createSupabaseBrowserClient();
+
+      const { data } = await supabase
+        .from("prompt_generations")
+        .select("id, image_url, created_at, settings")
+        .eq("user_id", userId)
+        .eq("prompt_id", metaRow.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      const rows: RemixRow[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        image_url: r.image_url,
+        created_at: r.created_at,
+        aspect_ratio: r?.settings?.aspectRatio ?? null,
+      }));
+
       setRemixes(rows);
     } catch {
       // no-op
@@ -356,7 +380,6 @@ export default function PromptPage() {
       const newUrl = String(json.imageUrl);
       setGeneratedImageUrl(newUrl);
 
-      // Refresh remixes list from DB (source of truth)
       await refreshRemixes();
     } catch (err: any) {
       setGenerateError(err?.message || "Generation failed");
@@ -368,6 +391,21 @@ export default function PromptPage() {
   function clearGenerated() {
     setGeneratedImageUrl(null);
     setGenerateError(null);
+  }
+
+  function goToAllRemixes() {
+    // Always take them back to the library. If your library page supports filtering by prompt, keep params.
+    if (!metaRow) {
+      router.push("/library");
+      return;
+    }
+
+    const qs = new URLSearchParams({
+      promptId: metaRow.id,
+      slug: metaRow.slug,
+    });
+
+    router.push(`/library?${qs.toString()}`);
   }
 
   if (loading) {
@@ -439,13 +477,7 @@ export default function PromptPage() {
             </div>
 
             <div className="relative h-[80vh] w-full bg-black">
-              <Image
-                src={lightboxUrl}
-                alt="Full screen preview"
-                fill
-                className="object-contain"
-                priority
-              />
+              <Image src={lightboxUrl} alt="Full screen preview" fill className="object-contain" priority />
             </div>
           </div>
         </div>
@@ -454,9 +486,7 @@ export default function PromptPage() {
       <div className="mb-5 sm:mb-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">
-              {metaRow.title}
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">{metaRow.title}</h1>
             <p className="mt-2 max-w-3xl text-sm text-white/70 sm:text-base">
               {metaRow.summary && metaRow.summary.trim().length > 0
                 ? metaRow.summary
@@ -600,18 +630,14 @@ export default function PromptPage() {
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button
                     className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                    onClick={() =>
-                      router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)
-                    }
+                    onClick={() => router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
                   >
                     Log in
                   </button>
 
                   <button
                     className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
-                    onClick={() =>
-                      router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)
-                    }
+                    onClick={() => router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
                   >
                     Create free account
                   </button>
@@ -723,11 +749,11 @@ export default function PromptPage() {
             </div>
           </div>
 
-          {/* Remixes (per prompt). Show for any logged in user, even if Pro-locked */}
+          {/* Previous Generations (Remixes) */}
           {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Remixes</div>
+                <div className="text-sm font-semibold">Previous Generations</div>
                 <div className="text-xs text-white/50">
                   {remixesLoading ? "Loading..." : remixes.length ? `${remixes.length}` : "0"}
                 </div>
@@ -740,49 +766,53 @@ export default function PromptPage() {
               ) : null}
 
               {remixesLoading ? (
-                <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
+                <div className="mt-3 text-sm text-white/60">Loading your generations…</div>
               ) : remixes.length === 0 ? (
                 <div className="mt-3 text-sm text-white/60">
-                  No remixes yet. Generate one to start building your library.
+                  No generations yet. Generate one to start building your library.
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {remixes.slice(0, 12).map((r) => {
-                    const ar = (r?.settings?.aspectRatio || r?.settings?.aspect_ratio || "")
-                      .toString()
-                      .trim();
-                    return (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onClick={() => openLightbox(r.image_url)}
-                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
-                        title="Tap to view full screen"
-                      >
-                        <div className="relative aspect-square w-full">
-                          <Image src={r.image_url} alt="Remix" fill className="object-cover" />
-                        </div>
+                  {remixes.slice(0, REMIXES_PREVIEW_LIMIT).map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => openLightbox(r.image_url)}
+                      className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
+                      title="Tap to view full screen"
+                    >
+                      <div className="relative aspect-square w-full">
+                        <Image src={r.image_url} alt="Generation" fill className="object-cover" />
+                      </div>
 
-                        {ar ? (
-                          <div className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/10 bg-black/50 px-2 py-1 text-[10px] text-white/75">
-                            {ar}
-                          </div>
-                        ) : null}
-
-                        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
-                          <div className="absolute inset-0 bg-black/20" />
+                      {r.aspect_ratio ? (
+                        <div className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/10 bg-black/50 px-2 py-0.5 text-[10px] text-white/80">
+                          {String(r.aspect_ratio)}
                         </div>
-                      </button>
-                    );
-                  })}
+                      ) : null}
+
+                      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="absolute inset-0 bg-black/20" />
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
 
-              {remixes.length > 12 ? (
-                <div className="mt-3 text-xs text-white/45">
-                  Showing latest 12. Next we add “View all” to open your full library.
+              {/* Always present, at bottom under the generations */}
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={goToAllRemixes}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/50"
+                >
+                  View all remixes
+                </button>
+
+                <div className="mt-2 text-center text-xs text-white/45">
+                  Open your full library for this prompt to stay inspired.
                 </div>
-              ) : null}
+              </div>
             </div>
           ) : null}
         </section>
@@ -806,8 +836,7 @@ function SelectPill({
   const disabledCls = "cursor-not-allowed border-white/10 bg-black/20 text-white/30";
   const idleCls =
     "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
-  const selectedCls =
-    "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
+  const selectedCls = "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
 
   return (
     <button

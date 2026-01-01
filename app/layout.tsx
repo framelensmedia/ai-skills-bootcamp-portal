@@ -19,33 +19,34 @@ export default function RootLayout({
       <body className="min-h-screen bg-gradient-to-b from-black via-zinc-950 to-black text-white">
         {/* Header */}
         <header className="border-b border-white/10">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
             {/* Logo / Brand */}
-            <Link href="/" className="flex items-center gap-3">
+            <Link href="/" className="flex min-w-0 items-center gap-3">
               <Image
                 src="/logo-symbol.png"
                 alt="AI Skills Bootcamp"
                 width={36}
                 height={36}
                 priority
-                className="h-8 w-8 sm:h-9 sm:w-9"
+                className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
               />
 
-              <span className="text-base sm:text-lg font-semibold tracking-tight">
+              {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
+              <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
                 <span className="text-lime-400">AI Skills</span>{" "}
                 <span className="text-white">Bootcamp</span>
               </span>
             </Link>
 
             {/* Navigation */}
-            <Nav />
+            <div className="shrink-0">
+              <Nav />
+            </div>
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
       </body>
     </html>
   );
