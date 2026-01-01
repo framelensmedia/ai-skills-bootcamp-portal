@@ -12,6 +12,7 @@ type ReqBody = {
   promptId?: string | null;
   promptSlug?: string | null;
   userId: string;
+  remix?: string | null; // optional (safe to send from client)
 };
 
 function mustEnv(name: string) {
@@ -126,7 +127,17 @@ export async function POST(req: Request) {
 
     const bytes = Buffer.from(base64, "base64");
     const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
-    const filePath = `users/${body.userId}/${Date.now()}.${ext}`;
+
+    // ✅ Step 1: store per-prompt folder so it’s easy to browse by prompt later
+    const safePromptSlug = String(body.promptSlug || "unknown")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 120);
+
+    const ts = Date.now();
+    const filePath = `users/${body.userId}/prompts/${safePromptSlug}/${ts}.${ext}`;
 
     const { error: uploadError } = await admin.storage
       .from("generations")
@@ -139,7 +150,7 @@ export async function POST(req: Request) {
     const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
     const imageUrl = pub.publicUrl;
 
-    // Optional history insert
+    // Optional history insert (keep this if you already use it)
     try {
       await admin.from("prompt_generations").insert({
         user_id: body.userId,
@@ -150,6 +161,30 @@ export async function POST(req: Request) {
       });
     } catch {
       // ignore if table isn't there yet
+    }
+
+    // ✅ Step 3: insert into remixes so the UI can display them per-prompt
+    // NOTE: this assumes you created a "remixes" table with at least:
+    // id (uuid), user_id (uuid), prompt_id (uuid), prompt_slug (text),
+    // image_url (text), aspect_ratio (text), created_at (timestamptz default now()).
+    // Extra fields are optional and safe to ignore if your table doesn't include them.
+    try {
+      await admin.from("remixes").insert({
+        user_id: body.userId,
+        prompt_id: body.promptId ?? null,
+        prompt_slug: body.promptSlug ?? null,
+        image_url: imageUrl,
+        aspect_ratio: ar,
+        model,
+        provider: "vertex",
+        storage_path: filePath,
+        remix_text: body.remix ?? null,
+      });
+    } catch (e) {
+      // If your table schema doesn't have some of these columns, this insert will fail.
+      // In that case: remove the extra fields (model/provider/storage_path/remix_text)
+      // and keep only the basics.
+      console.warn("REMIX INSERT FAILED (non-fatal):", (e as any)?.message || e);
     }
 
     return NextResponse.json({ imageUrl }, { status: 200 });
