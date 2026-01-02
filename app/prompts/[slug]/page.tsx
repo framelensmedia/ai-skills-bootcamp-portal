@@ -1,3 +1,4 @@
+// app/prompts/[slug]/page.tsx
 "use client";
 
 import Image from "next/image";
@@ -24,6 +25,7 @@ type PromptMetaRow = {
 type PromptBodyRow = {
   prompt: string | null;
   prompt_text: string | null;
+  remix_placeholder: string | null;
 };
 
 type MediaType = "image" | "video";
@@ -35,6 +37,9 @@ type RemixRow = {
   created_at: string;
   aspect_ratio: string | null;
 };
+
+const DEFAULT_REMIX_PLACEHOLDER =
+  "Try: upload a product image, keep the layout, change the headline, match brand colors, add a logo, make it 9:16 for Reels, and add a CTA.";
 
 export default function PromptPage() {
   const params = useParams();
@@ -53,6 +58,8 @@ export default function PromptPage() {
   const [bodyRow, setBodyRow] = useState<PromptBodyRow | null>(null);
 
   const [remixInput, setRemixInput] = useState("");
+  const [remixPlaceholder, setRemixPlaceholder] = useState<string>("");
+
   const [copied, setCopied] = useState(false);
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
@@ -124,6 +131,7 @@ export default function PromptPage() {
       if (metaError) {
         setMetaRow(null);
         setBodyRow(null);
+        setRemixPlaceholder("");
         setErrorMsg(metaError.message);
         setLoading(false);
         return;
@@ -132,6 +140,7 @@ export default function PromptPage() {
       if (!meta) {
         setMetaRow(null);
         setBodyRow(null);
+        setRemixPlaceholder("");
         setErrorMsg("No prompt found for this slug.");
         setLoading(false);
         return;
@@ -152,7 +161,8 @@ export default function PromptPage() {
         setUserId(null);
         setIsLocked(true);
         setLockReason("login");
-        setBodyRow({ prompt: null, prompt_text: null });
+        setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
+        setRemixPlaceholder("");
         setLoading(false);
         return;
       }
@@ -176,17 +186,26 @@ export default function PromptPage() {
       if (!locked) {
         const { data: body, error: bodyError } = await supabase
           .from("prompts")
-          .select("prompt, prompt_text")
+          .select("prompt, prompt_text, remix_placeholder")
           .eq("id", (meta as any).id)
           .maybeSingle();
 
         if (bodyError) {
-          setBodyRow({ prompt: null, prompt_text: null });
+          setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
+          setRemixPlaceholder("");
         } else {
-          setBodyRow((body ?? { prompt: null, prompt_text: null }) as PromptBodyRow);
+          const b = (body ?? {
+            prompt: null,
+            prompt_text: null,
+            remix_placeholder: null,
+          }) as PromptBodyRow;
+
+          setBodyRow(b);
+          setRemixPlaceholder(String(b?.remix_placeholder || ""));
         }
       } else {
-        setBodyRow({ prompt: null, prompt_text: null });
+        setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
+        setRemixPlaceholder("");
       }
 
       setLoading(false);
@@ -277,10 +296,6 @@ export default function PromptPage() {
     return url.length > 0 ? url : fallbackOrb;
   }, [metaRow, generatedImageUrl]);
 
-  const isFallbackOrb = useMemo(() => {
-    return imageSrc === fallbackOrb;
-  }, [imageSrc, fallbackOrb]);
-
   async function handleCopy() {
     if (isLocked) return;
 
@@ -346,9 +361,7 @@ export default function PromptPage() {
     try {
       const remix = remixInput.trim();
       const finalPrompt =
-        remix.length > 0
-          ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
-          : fullPromptText;
+        remix.length > 0 ? `${fullPromptText}\n\nRemix instructions:\n${remix}` : fullPromptText;
 
       const res = await fetch("/api/nano-banana/generate", {
         method: "POST",
@@ -663,10 +676,14 @@ export default function PromptPage() {
             <textarea
               className={[
                 "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
-                isLocked ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30" : "border-white/10 bg-black/40 text-white/90",
+                isLocked
+                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                  : "border-white/10 bg-black/40 text-white/90",
               ].join(" ")}
               rows={4}
-              placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
+              placeholder={
+                remixPlaceholder.trim().length ? remixPlaceholder : DEFAULT_REMIX_PLACEHOLDER
+              }
               value={remixInput}
               onChange={(e) => setRemixInput(e.target.value)}
               disabled={isLocked}
@@ -682,15 +699,40 @@ export default function PromptPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="Image" selected={mediaType === "image"} onClick={() => setMediaType("image")} disabled={isLocked || generating} />
+              <SelectPill
+                label="Image"
+                selected={mediaType === "image"}
+                onClick={() => setMediaType("image")}
+                disabled={isLocked || generating}
+              />
               <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="9:16" selected={aspectRatio === "9:16"} onClick={() => setAspectRatio("9:16")} disabled={isLocked || generating} />
-              <SelectPill label="16:9" selected={aspectRatio === "16:9"} onClick={() => setAspectRatio("16:9")} disabled={isLocked || generating} />
-              <SelectPill label="1:1" selected={aspectRatio === "1:1"} onClick={() => setAspectRatio("1:1")} disabled={isLocked || generating} />
-              <SelectPill label="4:5" selected={aspectRatio === "4:5"} onClick={() => setAspectRatio("4:5")} disabled={isLocked || generating} />
+              <SelectPill
+                label="9:16"
+                selected={aspectRatio === "9:16"}
+                onClick={() => setAspectRatio("9:16")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="16:9"
+                selected={aspectRatio === "16:9"}
+                onClick={() => setAspectRatio("16:9")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="1:1"
+                selected={aspectRatio === "1:1"}
+                onClick={() => setAspectRatio("1:1")}
+                disabled={isLocked || generating}
+              />
+              <SelectPill
+                label="4:5"
+                selected={aspectRatio === "4:5"}
+                onClick={() => setAspectRatio("4:5")}
+                disabled={isLocked || generating}
+              />
             </div>
           </div>
 
@@ -713,7 +755,9 @@ export default function PromptPage() {
               {remixesLoading ? (
                 <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
               ) : remixes.length === 0 ? (
-                <div className="mt-3 text-sm text-white/60">No remixes yet. Generate one to start building your library.</div>
+                <div className="mt-3 text-sm text-white/60">
+                  No remixes yet. Generate one to start building your library.
+                </div>
               ) : (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
                   {remixes.slice(0, 12).map((r) => (

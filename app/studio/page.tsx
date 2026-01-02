@@ -1,3 +1,4 @@
+// app/studio/page.tsx
 "use client";
 
 import Image from "next/image";
@@ -14,6 +15,9 @@ type LibraryRow = {
   created_at: string;
   aspect_ratio: string | null;
 };
+
+const STUDIO_REMIX_PLACEHOLDER =
+  "Try: upload a product image, keep the style, change only the headline + colors, add your logo, make it 9:16 for Reels, simplify the background, increase contrast, and add a clear CTA.";
 
 export default function StudioPage() {
   const router = useRouter();
@@ -187,7 +191,7 @@ export default function StudioPage() {
       fd.append("aspectRatio", aspectRatio);
       fd.append("userId", userId);
 
-      // Studio does NOT have a prompt_id, but we still store prompt_slug to label it in DB if you want.
+      // Studio does NOT have a prompt_id
       fd.append("promptId", "");
       fd.append("promptSlug", "studio");
 
@@ -358,12 +362,12 @@ export default function StudioPage() {
           {/* Remix */}
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="text-sm font-semibold">Remix</div>
-            <p className="mt-2 text-sm text-white/60">Optional changes to apply. Use this like “edit notes.”</p>
+            <p className="mt-2 text-sm text-white/60">Optional changes to apply. Use this like edit notes.</p>
 
             <textarea
               className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-white/20"
               rows={4}
-              placeholder="Example: Make it more premium, add neon green accents, increase urgency, simplify background..."
+              placeholder={STUDIO_REMIX_PLACEHOLDER}
               value={remixText}
               onChange={(e) => setRemixText(e.target.value)}
               disabled={generating}
@@ -461,15 +465,40 @@ export default function StudioPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="Image" selected={mediaType === "image"} onClick={() => setMediaType("image")} disabled={generating} />
+              <SelectPill
+                label="Image"
+                selected={mediaType === "image"}
+                onClick={() => setMediaType("image")}
+                disabled={generating}
+              />
               <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill label="9:16" selected={aspectRatio === "9:16"} onClick={() => setAspectRatio("9:16")} disabled={generating} />
-              <SelectPill label="16:9" selected={aspectRatio === "16:9"} onClick={() => setAspectRatio("16:9")} disabled={generating} />
-              <SelectPill label="1:1" selected={aspectRatio === "1:1"} onClick={() => setAspectRatio("1:1")} disabled={generating} />
-              <SelectPill label="4:5" selected={aspectRatio === "4:5"} onClick={() => setAspectRatio("4:5")} disabled={generating} />
+              <SelectPill
+                label="9:16"
+                selected={aspectRatio === "9:16"}
+                onClick={() => setAspectRatio("9:16")}
+                disabled={generating}
+              />
+              <SelectPill
+                label="16:9"
+                selected={aspectRatio === "16:9"}
+                onClick={() => setAspectRatio("16:9")}
+                disabled={generating}
+              />
+              <SelectPill
+                label="1:1"
+                selected={aspectRatio === "1:1"}
+                onClick={() => setAspectRatio("1:1")}
+                disabled={generating}
+              />
+              <SelectPill
+                label="4:5"
+                selected={aspectRatio === "4:5"}
+                onClick={() => setAspectRatio("4:5")}
+                disabled={generating}
+              />
             </div>
 
             <div className="mt-3 text-xs text-white/45">
