@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
@@ -16,7 +16,6 @@ type PromptMetaRow = {
   media_url?: string | null;
 
   category: string | null;
-  is_published: boolean | null;
   created_at: string | null;
 
   access_level: string; // free | premium (DB value)
@@ -76,10 +75,6 @@ export default function PromptPage() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  // Reference images (max 10)
-  const [refImages, setRefImages] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   // Remixes (per prompt) from prompt_generations
   const [remixes, setRemixes] = useState<RemixRow[]>([]);
   const [remixesLoading, setRemixesLoading] = useState(false);
@@ -119,7 +114,7 @@ export default function PromptPage() {
       const { data: meta, error: metaError } = await supabase
         .from("prompts_public")
         .select(
-          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, is_published, created_at"
+          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at"
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -144,7 +139,7 @@ export default function PromptPage() {
 
       setMetaRow(meta as PromptMetaRow);
 
-      const promptAccess = String(meta.access_level || "free").toLowerCase();
+      const promptAccess = String((meta as any).access_level || "free").toLowerCase();
       const proPrompt = promptAccess === "premium";
 
       const {
@@ -171,6 +166,7 @@ export default function PromptPage() {
         .maybeSingle();
 
       const proUser = String(profile?.plan || "free").toLowerCase() === "premium";
+
       const locked = proPrompt && !proUser;
 
       setIsLocked(locked);
@@ -181,7 +177,7 @@ export default function PromptPage() {
         const { data: body, error: bodyError } = await supabase
           .from("prompts")
           .select("prompt, prompt_text")
-          .eq("id", meta.id)
+          .eq("id", (meta as any).id)
           .maybeSingle();
 
         if (bodyError) {
@@ -324,30 +320,6 @@ export default function PromptPage() {
     }
   }
 
-  function onPickImages(files: FileList | null) {
-    if (!files) return;
-
-    const next = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (next.length === 0) return;
-
-    setRefImages((prev) => {
-      const merged = [...prev, ...next];
-      return merged.slice(0, 10);
-    });
-
-    // allow re-selecting same file later
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  function removeRefImage(idx: number) {
-    setRefImages((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function clearRefImages() {
-    setRefImages([]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
   async function handleGenerate() {
     if (isLocked) {
       if (lockReason === "login") {
@@ -378,20 +350,17 @@ export default function PromptPage() {
           ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
           : fullPromptText;
 
-      // multipart/form-data to include images
-      const fd = new FormData();
-      fd.append("prompt", finalPrompt);
-      fd.append("aspectRatio", aspectRatio);
-      fd.append("userId", userId);
-      fd.append("promptId", metaRow.id);
-      fd.append("promptSlug", metaRow.slug);
-
-      // max 10 images
-      refImages.slice(0, 10).forEach((f) => fd.append("images", f));
-
       const res = await fetch("/api/nano-banana/generate", {
         method: "POST",
-        body: fd,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          aspectRatio,
+          userId,
+          promptId: metaRow.id,
+          promptSlug: metaRow.slug,
+          remix,
+        }),
       });
 
       const json = await res.json();
@@ -419,8 +388,6 @@ export default function PromptPage() {
     setGeneratedImageUrl(null);
     setGenerateError(null);
   }
-
-  const recentGridCount = 12;
 
   if (loading) {
     return (
@@ -536,11 +503,11 @@ export default function PromptPage() {
                 src={imageSrc}
                 alt={metaRow.title}
                 fill
-                className={isFallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
+                className={imageSrc === fallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
                 priority
               />
 
-              {isFallbackOrb ? (
+              {imageSrc === fallbackOrb ? (
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
               ) : null}
             </div>
@@ -690,7 +657,7 @@ export default function PromptPage() {
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="text-sm font-semibold">Remix</div>
             <p className="mt-2 text-sm text-white/60">
-              Describe what you want to change. Optionally upload reference images.
+              Describe what you want to change. We’ll use this to auto-remix the prompt.
             </p>
 
             <textarea
@@ -704,87 +671,6 @@ export default function PromptPage() {
               onChange={(e) => setRemixInput(e.target.value)}
               disabled={isLocked}
             />
-
-            {/* Reference images */}
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Reference images</div>
-                <div className="text-xs text-white/50">{refImages.length}/10</div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => onPickImages(e.target.files)}
-                  disabled={isLocked || generating}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLocked || generating || refImages.length >= 10}
-                  className={[
-                    "rounded-xl border px-3 py-2 text-xs font-semibold",
-                    isLocked || generating || refImages.length >= 10
-                      ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                      : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
-                  ].join(" ")}
-                >
-                  Upload images
-                </button>
-
-                {refImages.length ? (
-                  <button
-                    type="button"
-                    onClick={clearRefImages}
-                    disabled={isLocked || generating}
-                    className={[
-                      "rounded-xl border px-3 py-2 text-xs font-semibold",
-                      isLocked || generating
-                        ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                        : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
-                    ].join(" ")}
-                  >
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-
-              {refImages.length ? (
-                <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-6">
-                  {refImages.map((f, idx) => {
-                    const url = URL.createObjectURL(f);
-                    return (
-                      <div
-                        key={`${f.name}-${idx}`}
-                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-black"
-                        title={f.name}
-                      >
-                        <div className="relative aspect-square w-full">
-                          <Image src={url} alt="Reference" fill className="object-cover" />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => removeRefImage(idx)}
-                          className="absolute right-1 top-1 rounded-lg border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-white/85 opacity-0 transition group-hover:opacity-100"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="mt-3 text-xs text-white/50">
-                  Tip: Use images to match style, layout, branding, or a specific reference design.
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -806,17 +692,13 @@ export default function PromptPage() {
               <SelectPill label="1:1" selected={aspectRatio === "1:1"} onClick={() => setAspectRatio("1:1")} disabled={isLocked || generating} />
               <SelectPill label="4:5" selected={aspectRatio === "4:5"} onClick={() => setAspectRatio("4:5")} disabled={isLocked || generating} />
             </div>
-
-            <div className="mt-3 text-xs text-white/45">
-              Model: Nano Banana Pro (gemini-3-pro-image-preview). Video remains disabled for V1.
-            </div>
           </div>
 
-          {/* Previous generations */}
+          {/* Remixes for logged-in users (even if prompt is Pro-locked) */}
           {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Previous Generations</div>
+                <div className="text-sm font-semibold">Remixes</div>
                 <div className="text-xs text-white/50">
                   {remixesLoading ? "Loading..." : remixes.length ? `${remixes.length}` : "0"}
                 </div>
@@ -829,12 +711,12 @@ export default function PromptPage() {
               ) : null}
 
               {remixesLoading ? (
-                <div className="mt-3 text-sm text-white/60">Loading your generations…</div>
+                <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
               ) : remixes.length === 0 ? (
-                <div className="mt-3 text-sm text-white/60">No generations yet. Generate one to start building your library.</div>
+                <div className="mt-3 text-sm text-white/60">No remixes yet. Generate one to start building your library.</div>
               ) : (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {remixes.slice(0, recentGridCount).map((r) => (
+                  {remixes.slice(0, 12).map((r) => (
                     <button
                       key={r.id}
                       type="button"
@@ -843,7 +725,7 @@ export default function PromptPage() {
                       title="Tap to view full screen"
                     >
                       <div className="relative aspect-square w-full">
-                        <Image src={r.image_url} alt="Generation" fill className="object-cover" />
+                        <Image src={r.image_url} alt="Remix" fill className="object-cover" />
                       </div>
                       <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
                         <div className="absolute inset-0 bg-black/20" />
@@ -853,12 +735,11 @@ export default function PromptPage() {
                 </div>
               )}
 
-              {/* Always present */}
               <div className="mt-4">
                 <button
                   type="button"
                   onClick={() => router.push("/library")}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/50"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
                 >
                   View all remixes
                 </button>
