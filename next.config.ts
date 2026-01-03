@@ -3,10 +3,18 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
+      // Supabase Storage public URLs
       {
         protocol: "https",
-        hostname: "rdhsqobxynkilglrclks.supabase.co",
+        hostname: "**.supabase.co",
         pathname: "/storage/v1/object/public/**",
+      },
+
+      // Supabase Storage signed URLs (optional but safe to include)
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+        pathname: "/storage/v1/object/sign/**",
       },
     ],
   },
