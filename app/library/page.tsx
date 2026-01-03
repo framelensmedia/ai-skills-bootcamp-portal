@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import GenerationLightbox from "@/components/GenerationLightbox";
 
 type SortMode = "newest" | "oldest";
 
@@ -35,7 +36,42 @@ type LibraryItem = {
 
   promptTitle: string;
   promptCategory: string | null;
+
+  // NEW: used for lightbox action buttons
+  promptText: string;
 };
+
+function extractPromptTextFromSettings(settings: any): string {
+  const s = settings || {};
+  const candidates = [
+    s?.finalPrompt,
+    s?.prompt,
+    s?.promptText,
+    s?.fullPrompt,
+    s?.inputPrompt,
+    s?.remixPrompt,
+  ];
+
+  for (const c of candidates) {
+    const v = (c ?? "").toString().trim();
+    if (v.length) return v;
+  }
+
+  // sometimes nested
+  const nestedCandidates = [
+    s?.input?.prompt,
+    s?.input?.finalPrompt,
+    s?.payload?.prompt,
+    s?.payload?.finalPrompt,
+  ];
+
+  for (const c of nestedCandidates) {
+    const v = (c ?? "").toString().trim();
+    if (v.length) return v;
+  }
+
+  return "";
+}
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -52,19 +88,32 @@ export default function LibraryPage() {
 
   const [items, setItems] = useState<LibraryItem[]>([]);
 
-  // Lightbox
+  // Lightbox (now shared + action buttons)
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxPrompt, setLightboxPrompt] = useState<string>("");
 
-  function openLightbox(url: string) {
+  function openLightbox(url: string, promptText?: string | null) {
     if (!url) return;
     setLightboxUrl(url);
+    setLightboxPrompt((promptText || "").trim());
     setLightboxOpen(true);
   }
 
   function closeLightbox() {
     setLightboxOpen(false);
     setLightboxUrl(null);
+    setLightboxPrompt("");
+  }
+
+  function handleShare(url: string) {
+    // UI only for now
+    console.log("Share clicked (not hooked up yet):", url);
+  }
+
+  function handleRemix(promptText: string, imgUrl: string) {
+    const href = `/studio?img=${encodeURIComponent(imgUrl)}&prefill=${encodeURIComponent(promptText)}`;
+    router.push(href);
   }
 
   useEffect(() => {
@@ -91,7 +140,7 @@ export default function LibraryPage() {
       setUserId(user.id);
 
       try {
-        // 1) Pull generations for this user
+        // 1) Pull generations for this user (includes settings so we can recover prompt text)
         let q = supabase
           .from("prompt_generations")
           .select("id, image_url, created_at, prompt_id, prompt_slug, settings")
@@ -120,7 +169,7 @@ export default function LibraryPage() {
         // 2) Get prompt titles for any prompt_ids we have
         const promptIds = Array.from(new Set(genRows.map((g) => g.prompt_id).filter(Boolean))) as string[];
 
-        let promptMap = new Map<string, PromptPublicRow>();
+        const promptMap = new Map<string, PromptPublicRow>();
 
         if (promptIds.length > 0) {
           const { data: prompts, error: promptsError } = await supabase
@@ -142,6 +191,8 @@ export default function LibraryPage() {
           const createdAtMs = Date.parse(g.created_at || "") || 0;
           const aspectRatio = g?.settings?.aspectRatio ?? null;
 
+          const promptText = extractPromptTextFromSettings(g?.settings);
+
           return {
             id: g.id,
             imageUrl: g.image_url,
@@ -153,6 +204,8 @@ export default function LibraryPage() {
 
             promptTitle: p?.title || g.prompt_slug || "Unknown prompt",
             promptCategory: p?.category ?? null,
+
+            promptText,
           };
         });
 
@@ -180,35 +233,15 @@ export default function LibraryPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
-      {/* Lightbox */}
-      {lightboxOpen && lightboxUrl ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-          onClick={closeLightbox}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/60 px-4 py-3">
-              <div className="text-sm font-semibold text-white/80">Preview</div>
-              <button
-                type="button"
-                className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                onClick={closeLightbox}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="relative h-[80vh] w-full bg-black">
-              <Image src={lightboxUrl} alt="Full screen preview" fill className="object-contain" priority />
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* Lightbox (shared component with Download/Copy/Remix/Share) */}
+      <GenerationLightbox
+        open={lightboxOpen}
+        url={lightboxUrl}
+        promptText={lightboxPrompt}
+        onClose={closeLightbox}
+        onShare={handleShare}
+        onRemix={handleRemix}
+      />
 
       <div className="mb-5 sm:mb-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -246,9 +279,7 @@ export default function LibraryPage() {
           <div className="text-sm font-semibold">Controls</div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="text-xs text-white/55">
-              {loading ? "Loading..." : `${items.length} item(s)`}
-            </div>
+            <div className="text-xs text-white/55">{loading ? "Loading..." : `${items.length} item(s)`}</div>
 
             <div className="flex gap-2">
               <SelectPill label="Newest" selected={sortMode === "newest"} onClick={() => setSortMode("newest")} />
@@ -266,9 +297,7 @@ export default function LibraryPage() {
         {loading ? (
           <div className="mt-4 text-sm text-white/60">Loading your library…</div>
         ) : items.length === 0 ? (
-          <div className="mt-4 text-sm text-white/60">
-            No items yet. Go generate a few images and they will show up here.
-          </div>
+          <div className="mt-4 text-sm text-white/60">No items yet. Go generate a few images and they will show up here.</div>
         ) : (
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((it) => (
@@ -276,7 +305,7 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   className="group relative block w-full overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
-                  onClick={() => openLightbox(it.imageUrl)}
+                  onClick={() => openLightbox(it.imageUrl, it.promptText)}
                   title="Tap to view full screen"
                 >
                   <div className="relative aspect-square w-full">
@@ -309,9 +338,7 @@ export default function LibraryPage() {
                     ) : null}
                   </div>
 
-                  <div className="text-[11px] text-white/45">
-                    {it.createdAt ? new Date(it.createdAt).toLocaleString() : ""}
-                  </div>
+                  <div className="text-[11px] text-white/45">{it.createdAt ? new Date(it.createdAt).toLocaleString() : ""}</div>
                 </div>
               </div>
             ))}

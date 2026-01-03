@@ -1,9 +1,9 @@
-// app/prompts/[slug]/page.tsx
+// 1) app/prompts/[slug]/page.tsx
 "use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 type PromptMetaRow = {
@@ -25,7 +25,6 @@ type PromptMetaRow = {
 type PromptBodyRow = {
   prompt: string | null;
   prompt_text: string | null;
-  remix_placeholder: string | null;
 };
 
 type MediaType = "image" | "video";
@@ -36,14 +35,17 @@ type RemixRow = {
   image_url: string;
   created_at: string;
   aspect_ratio: string | null;
-};
 
-const DEFAULT_REMIX_PLACEHOLDER =
-  "Try: upload a product image, keep the layout, change the headline, match brand colors, add a logo, make it 9:16 for Reels, and add a CTA.";
+  // optional if present in your table
+  prompt_text?: string | null;
+  remix?: string | null;
+  prompt_slug?: string | null;
+};
 
 export default function PromptPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const rawSlug = (params?.slug ?? "") as string;
 
@@ -58,14 +60,11 @@ export default function PromptPage() {
   const [bodyRow, setBodyRow] = useState<PromptBodyRow | null>(null);
 
   const [remixInput, setRemixInput] = useState("");
-  const [remixPlaceholder, setRemixPlaceholder] = useState<string>("");
-
   const [copied, setCopied] = useState(false);
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
 
-  // Make preview match the selected aspect ratio
   const previewAspectClass = useMemo(() => {
     if (aspectRatio === "9:16") return "aspect-[9/16]";
     if (aspectRatio === "16:9") return "aspect-[16/9]";
@@ -81,6 +80,15 @@ export default function PromptPage() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+
+  // If we land here from a Remix action, we allow:
+  // - override preview image
+  // - optional prefilled prompt to generate (treated as a full prompt)
+  const [overridePreviewUrl, setOverridePreviewUrl] = useState<string | null>(null);
+  const [remixIsFullPrompt, setRemixIsFullPrompt] = useState(false);
+
+  // Track what prompt was used for the last generation
+  const [lastFinalPrompt, setLastFinalPrompt] = useState<string>("");
 
   // Remixes (per prompt) from prompt_generations
   const [remixes, setRemixes] = useState<RemixRow[]>([]);
@@ -101,6 +109,25 @@ export default function PromptPage() {
     setLightboxOpen(false);
     setLightboxUrl(null);
   }
+
+  // Apply query params once on mount
+  // /prompts/[slug]?img=...&prefill=...&remix=...
+  useEffect(() => {
+    const img = (searchParams.get("img") || "").trim();
+    const prefill = (searchParams.get("prefill") || "").trim();
+    const remix = (searchParams.get("remix") || "").trim();
+
+    if (img.length) setOverridePreviewUrl(img);
+
+    if (prefill.length) {
+      setRemixInput(prefill);
+      setRemixIsFullPrompt(true);
+    } else if (remix.length) {
+      setRemixInput(remix);
+      setRemixIsFullPrompt(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load prompt meta + auth + (if allowed) prompt body
   useEffect(() => {
@@ -131,7 +158,6 @@ export default function PromptPage() {
       if (metaError) {
         setMetaRow(null);
         setBodyRow(null);
-        setRemixPlaceholder("");
         setErrorMsg(metaError.message);
         setLoading(false);
         return;
@@ -140,7 +166,6 @@ export default function PromptPage() {
       if (!meta) {
         setMetaRow(null);
         setBodyRow(null);
-        setRemixPlaceholder("");
         setErrorMsg("No prompt found for this slug.");
         setLoading(false);
         return;
@@ -161,8 +186,7 @@ export default function PromptPage() {
         setUserId(null);
         setIsLocked(true);
         setLockReason("login");
-        setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
-        setRemixPlaceholder("");
+        setBodyRow({ prompt: null, prompt_text: null });
         setLoading(false);
         return;
       }
@@ -182,30 +206,20 @@ export default function PromptPage() {
       setIsLocked(locked);
       setLockReason(locked ? "upgrade" : null);
 
-      // Only load prompt text if not locked
       if (!locked) {
         const { data: body, error: bodyError } = await supabase
           .from("prompts")
-          .select("prompt, prompt_text, remix_placeholder")
+          .select("prompt, prompt_text")
           .eq("id", (meta as any).id)
           .maybeSingle();
 
         if (bodyError) {
-          setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
-          setRemixPlaceholder("");
+          setBodyRow({ prompt: null, prompt_text: null });
         } else {
-          const b = (body ?? {
-            prompt: null,
-            prompt_text: null,
-            remix_placeholder: null,
-          }) as PromptBodyRow;
-
-          setBodyRow(b);
-          setRemixPlaceholder(String(b?.remix_placeholder || ""));
+          setBodyRow((body ?? { prompt: null, prompt_text: null }) as PromptBodyRow);
         }
       } else {
-        setBodyRow({ prompt: null, prompt_text: null, remix_placeholder: null });
-        setRemixPlaceholder("");
+        setBodyRow({ prompt: null, prompt_text: null });
       }
 
       setLoading(false);
@@ -218,7 +232,7 @@ export default function PromptPage() {
     };
   }, [slug]);
 
-  // Load remixes for this prompt (even if Pro-locked), as long as logged in
+  // Load remixes for this prompt (as long as logged in)
   useEffect(() => {
     let cancelled = false;
 
@@ -234,7 +248,7 @@ export default function PromptPage() {
 
         const { data, error } = await supabase
           .from("prompt_generations")
-          .select("id, image_url, created_at, settings")
+          .select("*")
           .eq("user_id", userId)
           .eq("prompt_id", metaRow.id)
           .order("created_at", { ascending: false })
@@ -250,13 +264,16 @@ export default function PromptPage() {
         }
 
         const rows: RemixRow[] = (data ?? []).map((r: any) => ({
-          id: r.id,
-          image_url: r.image_url,
-          created_at: r.created_at,
+          id: String(r.id),
+          image_url: String(r.image_url || ""),
+          created_at: String(r.created_at || ""),
           aspect_ratio: r?.settings?.aspectRatio ?? null,
+          prompt_text: r?.prompt_text ?? r?.final_prompt ?? null,
+          remix: r?.remix ?? null,
+          prompt_slug: r?.prompt_slug ?? null,
         }));
 
-        setRemixes(rows);
+        setRemixes(rows.filter((r) => r.image_url.trim().length > 0));
       } catch (e: any) {
         if (cancelled) return;
         setRemixesError(e?.message || "Failed to load remixes");
@@ -284,6 +301,10 @@ export default function PromptPage() {
   const fallbackOrb = "/orb-neon.gif";
 
   const imageSrc = useMemo(() => {
+    if (overridePreviewUrl && overridePreviewUrl.trim().length > 0) {
+      return overridePreviewUrl.trim();
+    }
+
     if (generatedImageUrl && generatedImageUrl.trim().length > 0) {
       return generatedImageUrl.trim();
     }
@@ -294,9 +315,9 @@ export default function PromptPage() {
       (metaRow?.media_url ?? "").toString().trim();
 
     return url.length > 0 ? url : fallbackOrb;
-  }, [metaRow, generatedImageUrl]);
+  }, [metaRow, generatedImageUrl, overridePreviewUrl]);
 
-  async function handleCopy() {
+  async function handleCopyPromptText() {
     if (isLocked) return;
 
     try {
@@ -308,6 +329,83 @@ export default function PromptPage() {
     }
   }
 
+  function handleShare() {
+    // UI only for now
+    console.log("Share coming soon");
+  }
+
+  async function handleCopyGenerated() {
+    try {
+      const text = (lastFinalPrompt || remixInput || fullPromptText || "").trim();
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // no-op
+    }
+  }
+
+  async function handleDownloadGenerated() {
+    const url = (generatedImageUrl || overridePreviewUrl || "").trim();
+    if (!url) return;
+
+    try {
+      const res = await fetch(url, { mode: "cors" });
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = obj;
+      a.download = `prompt-generation-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(obj);
+    } catch {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  function handleRemixFocus() {
+    const el = document.getElementById("remix-input");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function handleRemixFromCard(row: RemixRow) {
+    const img = (row.image_url || "").trim();
+    const finalPrompt =
+      (row.prompt_text || "").trim() ||
+      (lastFinalPrompt || "").trim() ||
+      (fullPromptText || "").trim();
+
+    const target = `/prompts/${encodeURIComponent(slug)}?img=${encodeURIComponent(
+      img
+    )}&prefill=${encodeURIComponent(finalPrompt)}`;
+
+    router.push(target);
+  }
+
+  async function downloadAnyImage(url: string) {
+    const u = (url || "").trim();
+    if (!u) return;
+
+    try {
+      const res = await fetch(u, { mode: "cors" });
+      const blob = await res.blob();
+      const obj = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = obj;
+      a.download = `remix-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(obj);
+    } catch {
+      window.open(u, "_blank", "noopener,noreferrer");
+    }
+  }
+
   async function refreshRemixes() {
     if (!userId || !metaRow?.id) return;
 
@@ -316,20 +414,23 @@ export default function PromptPage() {
 
       const { data } = await supabase
         .from("prompt_generations")
-        .select("id, image_url, created_at, settings")
+        .select("*")
         .eq("user_id", userId)
         .eq("prompt_id", metaRow.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
       const rows: RemixRow[] = (data ?? []).map((r: any) => ({
-        id: r.id,
-        image_url: r.image_url,
-        created_at: r.created_at,
+        id: String(r.id),
+        image_url: String(r.image_url || ""),
+        created_at: String(r.created_at || ""),
         aspect_ratio: r?.settings?.aspectRatio ?? null,
+        prompt_text: r?.prompt_text ?? r?.final_prompt ?? null,
+        remix: r?.remix ?? null,
+        prompt_slug: r?.prompt_slug ?? null,
       }));
 
-      setRemixes(rows);
+      setRemixes(rows.filter((r) => r.image_url.trim().length > 0));
     } catch {
       // no-op
     }
@@ -360,8 +461,14 @@ export default function PromptPage() {
 
     try {
       const remix = remixInput.trim();
-      const finalPrompt =
-        remix.length > 0 ? `${fullPromptText}\n\nRemix instructions:\n${remix}` : fullPromptText;
+
+      const finalPrompt = remixIsFullPrompt
+        ? remix
+        : remix.length > 0
+        ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
+        : fullPromptText;
+
+      setLastFinalPrompt(finalPrompt);
 
       const res = await fetch("/api/nano-banana/generate", {
         method: "POST",
@@ -372,19 +479,14 @@ export default function PromptPage() {
           userId,
           promptId: metaRow.id,
           promptSlug: metaRow.slug,
-          remix,
+          remix: remixIsFullPrompt ? "" : remix,
         }),
       });
 
       const json = await res.json();
 
-      if (!res.ok) {
-        throw new Error(json?.error || "Generation failed");
-      }
-
-      if (!json?.imageUrl) {
-        throw new Error("No imageUrl returned from generator");
-      }
+      if (!res.ok) throw new Error(json?.error || "Generation failed");
+      if (!json?.imageUrl) throw new Error("No imageUrl returned from generator");
 
       const newUrl = String(json.imageUrl);
       setGeneratedImageUrl(newUrl);
@@ -445,6 +547,11 @@ export default function PromptPage() {
       ? "Create a free account to unlock the prompt tool and start generating."
       : "Upgrade to Pro to unlock the full prompt text and generator tools.";
 
+  const hasGeneratedForActions = Boolean(
+    (generatedImageUrl && generatedImageUrl.trim().length > 0) ||
+      (overridePreviewUrl && overridePreviewUrl.trim().length > 0)
+  );
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
       {/* Lightbox */}
@@ -461,13 +568,52 @@ export default function PromptPage() {
           >
             <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/60 px-4 py-3">
               <div className="text-sm font-semibold text-white/80">Preview</div>
-              <button
-                type="button"
-                className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                onClick={closeLightbox}
-              >
-                Close
-              </button>
+
+              <div className="flex items-center gap-2">
+                {hasGeneratedForActions ? (
+                  <>
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
+                      onClick={handleDownloadGenerated}
+                    >
+                      Download
+                    </button>
+
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
+                      onClick={handleCopyGenerated}
+                    >
+                      Copy
+                    </button>
+
+                    <button
+                      type="button"
+                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
+                      onClick={handleShare}
+                    >
+                      Share
+                    </button>
+
+                    <button
+                      type="button"
+                      className="rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
+                      onClick={handleRemixFocus}
+                    >
+                      Remix
+                    </button>
+                  </>
+                ) : null}
+
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
+                  onClick={closeLightbox}
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             <div className="relative h-[80vh] w-full bg-black">
@@ -570,6 +716,42 @@ export default function PromptPage() {
             </div>
 
             <p className="mt-2 text-sm text-white/65">Click the image to view full screen.</p>
+
+            {hasGeneratedForActions ? (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={handleDownloadGenerated}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                >
+                  Download
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyGenerated}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                >
+                  Copy
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                >
+                  Share
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRemixFocus}
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
+                >
+                  Remix
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -586,7 +768,7 @@ export default function PromptPage() {
                     ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
                     : "border-white/15 bg-black/30 hover:bg-black/50",
                 ].join(" ")}
-                onClick={handleCopy}
+                onClick={handleCopyPromptText}
                 disabled={isLocked}
               >
                 {copied ? "Copied" : "Copy Prompt"}
@@ -674,6 +856,7 @@ export default function PromptPage() {
             </p>
 
             <textarea
+              id="remix-input"
               className={[
                 "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
                 isLocked
@@ -682,7 +865,9 @@ export default function PromptPage() {
               ].join(" ")}
               rows={4}
               placeholder={
-                remixPlaceholder.trim().length ? remixPlaceholder : DEFAULT_REMIX_PLACEHOLDER
+                remixIsFullPrompt
+                  ? "Prefilled prompt loaded. Edit it and press Generate."
+                  : "Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
               }
               value={remixInput}
               onChange={(e) => setRemixInput(e.target.value)}
@@ -736,7 +921,6 @@ export default function PromptPage() {
             </div>
           </div>
 
-          {/* Remixes for logged-in users (even if prompt is Pro-locked) */}
           {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -759,22 +943,58 @@ export default function PromptPage() {
                   No remixes yet. Generate one to start building your library.
                 </div>
               ) : (
-                <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {remixes.slice(0, 12).map((r) => (
-                    <button
+                    <div
                       key={r.id}
-                      type="button"
-                      onClick={() => openLightbox(r.image_url)}
                       className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
-                      title="Tap to view full screen"
                     >
-                      <div className="relative aspect-square w-full">
-                        <Image src={r.image_url} alt="Remix" fill className="object-cover" />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openLightbox(r.image_url)}
+                        className="block w-full"
+                        title="Tap to view full screen"
+                      >
+                        <div className="relative aspect-square w-full">
+                          <Image src={r.image_url} alt="Remix" fill className="object-cover" />
+                        </div>
+                      </button>
+
+                      {/* Hover actions */}
                       <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
-                        <div className="absolute inset-0 bg-black/20" />
+                        <div className="absolute inset-0 bg-black/40" />
+                        <div className="pointer-events-auto absolute bottom-2 left-2 right-2 grid grid-cols-4 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => downloadAnyImage(r.image_url)}
+                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                          >
+                            Download
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopyGenerated}
+                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                          >
+                            Copy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleShare}
+                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                          >
+                            Share
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemixFromCard(r)}
+                            className="rounded-lg bg-lime-400 px-2 py-2 text-[11px] font-semibold text-black hover:bg-lime-300"
+                          >
+                            Remix
+                          </button>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
