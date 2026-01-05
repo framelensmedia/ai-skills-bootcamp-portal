@@ -197,7 +197,7 @@ export default function HomePage() {
             <Tag text="Prompts you can use instantly" />
 
             <h1 className="mt-4 text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              Learn Real <span className="text-[#B7FF00]">AI Skills</span>
+              Learn Real <span className="text-[#B7FF00]">AI&nbsp;Skills</span>
             </h1>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/70 md:text-base">

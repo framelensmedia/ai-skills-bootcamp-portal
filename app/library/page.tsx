@@ -15,6 +15,11 @@ type GenRow = {
   prompt_id: string | null;
   prompt_slug: string | null;
   settings: any;
+
+  // ✅ standardized columns
+  original_prompt_text: string | null;
+  remix_prompt_text: string | null;
+  combined_prompt_text: string | null;
 };
 
 type PromptPublicRow = {
@@ -37,82 +42,92 @@ type LibraryItem = {
   promptTitle: string;
   promptCategory: string | null;
 
-  // NEW: used for lightbox action buttons
-  promptText: string;
+  originalPromptText: string;
+  remixPromptText: string;
+  combinedPromptText: string;
 };
 
-function extractPromptTextFromSettings(settings: any): string {
+function normalize(v: any) {
+  return String(v ?? "").trim();
+}
+
+function fallbackFromSettings(settings: any) {
   const s = settings || {};
-  const candidates = [
-    s?.finalPrompt,
-    s?.prompt,
-    s?.promptText,
-    s?.fullPrompt,
-    s?.inputPrompt,
-    s?.remixPrompt,
-  ];
 
-  for (const c of candidates) {
-    const v = (c ?? "").toString().trim();
-    if (v.length) return v;
-  }
+  const original =
+    normalize(s?.original_prompt_text) ||
+    normalize(s?.originalPromptText) ||
+    normalize(s?.originalPrompt) ||
+    normalize(s?.prompt) ||
+    normalize(s?.promptText) ||
+    "";
 
-  // sometimes nested
-  const nestedCandidates = [
-    s?.input?.prompt,
-    s?.input?.finalPrompt,
-    s?.payload?.prompt,
-    s?.payload?.finalPrompt,
-  ];
+  const remix =
+    normalize(s?.remix_prompt_text) ||
+    normalize(s?.remixPromptText) ||
+    normalize(s?.remixAdditions) ||
+    normalize(s?.remixPrompt) ||
+    "";
 
-  for (const c of nestedCandidates) {
-    const v = (c ?? "").toString().trim();
-    if (v.length) return v;
-  }
+  const combined =
+    normalize(s?.combined_prompt_text) ||
+    normalize(s?.combinedPromptText) ||
+    normalize(s?.combinedPrompt) ||
+    normalize(s?.finalPrompt) ||
+    "";
 
-  return "";
+  return { original, remix, combined };
 }
 
 export default function LibraryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const promptSlugFilter = (searchParams?.get("promptSlug") || "").trim().toLowerCase();
-
-  const [userId, setUserId] = useState<string | null>(null);
+  const promptSlugFilter = normalize(searchParams?.get("promptSlug") || "").toLowerCase();
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const [sortMode, setSortMode] = useState<SortMode>("newest");
-
   const [items, setItems] = useState<LibraryItem[]>([]);
 
-  // Lightbox (now shared + action buttons)
+  // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [lightboxPrompt, setLightboxPrompt] = useState<string>("");
 
-  function openLightbox(url: string, promptText?: string | null) {
-    if (!url) return;
-    setLightboxUrl(url);
-    setLightboxPrompt((promptText || "").trim());
+  const [lbOriginal, setLbOriginal] = useState("");
+  const [lbRemix, setLbRemix] = useState("");
+  const [lbCombined, setLbCombined] = useState("");
+
+  function openLightbox(it: LibraryItem) {
+    setLightboxUrl(it.imageUrl);
+    setLbOriginal(it.originalPromptText);
+    setLbRemix(it.remixPromptText);
+    setLbCombined(it.combinedPromptText);
     setLightboxOpen(true);
   }
 
   function closeLightbox() {
     setLightboxOpen(false);
     setLightboxUrl(null);
-    setLightboxPrompt("");
+    setLbOriginal("");
+    setLbRemix("");
+    setLbCombined("");
   }
 
   function handleShare(url: string) {
-    // UI only for now
-    console.log("Share clicked (not hooked up yet):", url);
+    console.log("Share clicked (placeholder):", url);
   }
 
-  function handleRemix(promptText: string, imgUrl: string) {
-    const href = `/studio?img=${encodeURIComponent(imgUrl)}&prefill=${encodeURIComponent(promptText)}`;
+  function handleRemix(payload: {
+    imgUrl: string;
+    originalPromptText: string;
+    remixPromptText: string;
+    combinedPromptText: string;
+  }) {
+    const href =
+      `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
+      `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
+      `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
     router.push(href);
   }
 
@@ -130,31 +145,25 @@ export default function LibraryPage() {
       } = await supabase.auth.getUser();
 
       if (!user?.id) {
-        setUserId(null);
         setItems([]);
         setLoading(false);
         setErrorMsg("Please log in to view your library.");
         return;
       }
 
-      setUserId(user.id);
-
       try {
-        // 1) Pull generations for this user (includes settings so we can recover prompt text)
         let q = supabase
           .from("prompt_generations")
-          .select("id, image_url, created_at, prompt_id, prompt_slug, settings")
+          .select(
+            "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text"
+          )
           .eq("user_id", user.id)
           .limit(200);
 
-        if (promptSlugFilter) {
-          q = q.eq("prompt_slug", promptSlugFilter);
-        }
-
+        if (promptSlugFilter) q = q.eq("prompt_slug", promptSlugFilter);
         q = q.order("created_at", { ascending: sortMode === "oldest" });
 
         const { data: gens, error: gensError } = await q;
-
         if (cancelled) return;
 
         if (gensError) {
@@ -166,32 +175,33 @@ export default function LibraryPage() {
 
         const genRows = (gens ?? []) as GenRow[];
 
-        // 2) Get prompt titles for any prompt_ids we have
+        // Get titles for prompt_id rows
         const promptIds = Array.from(new Set(genRows.map((g) => g.prompt_id).filter(Boolean))) as string[];
-
         const promptMap = new Map<string, PromptPublicRow>();
 
-        if (promptIds.length > 0) {
-          const { data: prompts, error: promptsError } = await supabase
+        if (promptIds.length) {
+          const { data: prompts } = await supabase
             .from("prompts_public")
             .select("id, title, slug, category, access_level")
             .in("id", promptIds);
 
-          if (!cancelled && !promptsError) {
-            (prompts ?? []).forEach((p: any) => {
-              promptMap.set(p.id, p as PromptPublicRow);
-            });
-          }
+          (prompts ?? []).forEach((p: any) => promptMap.set(p.id, p as PromptPublicRow));
         }
 
-        // 3) Build view models
         const built: LibraryItem[] = genRows.map((g) => {
           const p = g.prompt_id ? promptMap.get(g.prompt_id) : null;
 
           const createdAtMs = Date.parse(g.created_at || "") || 0;
           const aspectRatio = g?.settings?.aspectRatio ?? null;
 
-          const promptText = extractPromptTextFromSettings(g?.settings);
+          const fb = fallbackFromSettings(g?.settings);
+
+          const originalPromptText = normalize(g.original_prompt_text) || fb.original;
+          const remixPromptText = normalize(g.remix_prompt_text) || fb.remix;
+          const combinedPromptText =
+            normalize(g.combined_prompt_text) ||
+            fb.combined ||
+            [originalPromptText, remixPromptText].filter(Boolean).join("\n\n");
 
           return {
             id: g.id,
@@ -205,7 +215,9 @@ export default function LibraryPage() {
             promptTitle: p?.title || g.prompt_slug || "Unknown prompt",
             promptCategory: p?.category ?? null,
 
-            promptText,
+            originalPromptText,
+            remixPromptText,
+            combinedPromptText,
           };
         });
 
@@ -220,7 +232,6 @@ export default function LibraryPage() {
     }
 
     run();
-
     return () => {
       cancelled = true;
     };
@@ -233,12 +244,13 @@ export default function LibraryPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
-      {/* Lightbox (shared component with Download/Copy/Remix/Share) */}
       <GenerationLightbox
         open={lightboxOpen}
         url={lightboxUrl}
-        promptText={lightboxPrompt}
         onClose={closeLightbox}
+        originalPromptText={lbOriginal}
+        remixPromptText={lbRemix}
+        combinedPromptText={lbCombined}
         onShare={handleShare}
         onRemix={handleRemix}
       />
@@ -305,7 +317,7 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   className="group relative block w-full overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
-                  onClick={() => openLightbox(it.imageUrl, it.promptText)}
+                  onClick={() => openLightbox(it)}
                   title="Tap to view full screen"
                 >
                   <div className="relative aspect-square w-full">

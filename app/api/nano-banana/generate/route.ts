@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
 
 function mustEnv(name: string) {
   const v = process.env[name];
@@ -20,6 +20,8 @@ function aspectHint(aspectRatio: AspectRatio) {
       return "Output image in 1:1 square framing.";
     case "4:5":
       return "Output image in 4:5 portrait framing.";
+    case "3:4":
+      return "Output image in 3:4 portrait framing.";
     case "9:16":
     default:
       return "Output image in 9:16 vertical framing (TikTok/Reels style).";
@@ -33,47 +35,50 @@ async function fileToBase64(file: File) {
 
 export async function POST(req: Request) {
   try {
-    // We now accept multipart/form-data so the user can upload reference images.
     const form = await req.formData();
 
+    // What Vertex uses
     const rawPrompt = String(form.get("prompt") ?? "").trim();
+
+    // Identity / context
     const userId = String(form.get("userId") ?? "").trim();
     const promptId = String(form.get("promptId") ?? "").trim() || null;
     const promptSlug = String(form.get("promptSlug") ?? "").trim() || null;
 
     const ar = (String(form.get("aspectRatio") ?? "9:16").trim() as AspectRatio) || "9:16";
 
+    // Standardized prompt metadata (FINAL TEXT we want to store)
+    const original_prompt_text = String(form.get("originalPrompt") ?? "").trim() || null;
+    const remix_prompt_text = String(form.get("remixAdditions") ?? "").trim() || null;
+
+    // Always store the final combined version that actually drove the generation
+    const combined_prompt_text =
+      String(form.get("combinedPromptText") ?? "").trim() ||
+      rawPrompt ||
+      null;
+
     if (!rawPrompt) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
     if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
-    // Pull up to 10 uploaded images (Nano Banana / Vertex supports up to 10 image files per request).
+    // Pull up to 10 uploaded images
     const imageFiles = form.getAll("images").filter((v) => v instanceof File) as File[];
     if (imageFiles.length > 10) {
-      return NextResponse.json(
-        { error: "Too many images. Max is 10 per request." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Too many images. Max is 10 per request." }, { status: 400 });
     }
 
-    // Basic guardrails to prevent huge uploads
-    const MAX_PER_FILE = 7 * 1024 * 1024; // 7MB
-    const MAX_TOTAL = 20 * 1024 * 1024; // 20MB total
+    // Guardrails for uploads
+    const MAX_PER_FILE = 7 * 1024 * 1024;
+    const MAX_TOTAL = 20 * 1024 * 1024;
     let total = 0;
 
     for (const f of imageFiles) {
       total += f.size;
       if (f.size > MAX_PER_FILE) {
-        return NextResponse.json(
-          { error: `One of your images is too large. Max per image is 7MB.` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "One of your images is too large. Max per image is 7MB." }, { status: 400 });
       }
     }
     if (total > MAX_TOTAL) {
-      return NextResponse.json(
-        { error: `Total upload too large. Max total is 20MB.` },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Total upload too large. Max total is 20MB." }, { status: 400 });
     }
 
     const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
@@ -82,7 +87,7 @@ export async function POST(req: Request) {
     const credsJson = mustEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
     const credentials = JSON.parse(credsJson);
 
-    // Supabase for uploads/history
+    // Supabase (service role)
     const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
     const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
     const admin = createClient(supabaseUrl, serviceRole);
@@ -99,9 +104,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
     }
 
-    // Model (Vertex) aka Nano Banana Pro
     const model = "gemini-3-pro-image-preview";
-
     const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
     const finalPrompt = [
@@ -116,31 +119,23 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join("\n");
 
-    // Build multimodal parts: images first, then the text instructions
-    const imageParts = [];
+    // Build multimodal parts
+    const imageParts: any[] = [];
     for (const f of imageFiles) {
       const mimeType = String(f.type || "image/png");
       if (!mimeType.startsWith("image/")) continue;
-
       const data = await fileToBase64(f);
-      imageParts.push({
-        inlineData: { mimeType, data },
-      });
+      imageParts.push({ inlineData: { mimeType, data } });
     }
 
     const payload = {
       contents: [
         {
           role: "user",
-          parts: [
-            ...imageParts,
-            { text: finalPrompt },
-          ],
+          parts: [...imageParts, { text: finalPrompt }],
         },
       ],
-      generationConfig: {
-        temperature: 0.7,
-      },
+      generationConfig: { temperature: 0.7 },
     };
 
     const res = await fetch(url, {
@@ -156,19 +151,14 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
-      return NextResponse.json(
-        { error: "vertex_error", status: res.status, details: json },
-        { status: res.status }
-      );
+      return NextResponse.json({ error: "vertex_error", status: res.status, details: json }, { status: res.status });
     }
 
     // Extract inline image
     const parts = json?.candidates?.[0]?.content?.parts ?? [];
     const inline = Array.isArray(parts)
       ? parts.find(
-          (p) =>
-            p?.inlineData?.data &&
-            String(p?.inlineData?.mimeType || "").startsWith("image/")
+          (p) => p?.inlineData?.data && String(p?.inlineData?.mimeType || "").startsWith("image/")
         )
       : null;
 
@@ -194,23 +184,33 @@ export async function POST(req: Request) {
     const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
     const imageUrl = pub.publicUrl;
 
-    // Optional history insert
+    // Insert history
     try {
       await admin.from("prompt_generations").insert({
         user_id: userId,
         prompt_id: promptId,
         prompt_slug: promptSlug,
         image_url: imageUrl,
+
+        // ✅ STANDARDIZED FINAL TEXT FIELDS
+        original_prompt_text,
+        remix_prompt_text,
+        combined_prompt_text: combined_prompt_text || rawPrompt,
+
         settings: {
           aspectRatio: ar,
           model,
           provider: "vertex",
-          // helpful for debugging
           input_images: imageFiles.length,
+
+          // backup copy
+          original_prompt_text,
+          remix_prompt_text,
+          combined_prompt_text: combined_prompt_text || rawPrompt,
         },
       });
-    } catch {
-      // ignore if table isn't there yet
+    } catch (e) {
+      console.error("prompt_generations insert failed:", e);
     }
 
     return NextResponse.json({ imageUrl }, { status: 200 });
