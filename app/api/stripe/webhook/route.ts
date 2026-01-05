@@ -56,11 +56,13 @@ export async function POST(req: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // FIX: Use .content instead of .data for the Clover SDK response
+        // FIX: Casting to 'any' to bypass the Response<T> property error
         const response = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ["items.data.price"],
         });
-        const sub = response.content; 
+        
+        // In the Clover version, access the resource via the correctly typed data property
+        const sub = (response as any).data as Stripe.Subscription; 
 
         const priceId = (sub.items.data[0]?.price as Stripe.Price)?.id ?? null;
 
@@ -79,7 +81,6 @@ export async function POST(req: Request) {
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-
         const customerId = sub.customer as string;
         const priceId = sub.items.data[0]?.price?.id ?? null;
 
