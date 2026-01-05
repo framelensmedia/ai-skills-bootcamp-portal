@@ -32,6 +32,11 @@ async function copyToClipboard(text: string) {
   }
 }
 
+function clampUploads(files: File[], max = 10) {
+  if (files.length <= max) return files;
+  return files.slice(0, max);
+}
+
 export default function StudioPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -52,9 +57,12 @@ export default function StudioPage() {
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("/orb-neon.gif");
 
-  // Studio prompt model
   const [originalPrompt, setOriginalPrompt] = useState<string>("");
   const [remixAdditions, setRemixAdditions] = useState<string>("");
+
+  // ✅ Uploads (up to 10)
+  const [uploads, setUploads] = useState<File[]>([]);
+  const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
 
   const combinedPrompt = useMemo(() => {
     const a = normalize(originalPrompt);
@@ -77,6 +85,7 @@ export default function StudioPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // apply prefill once on mount
     if (preImg) setPreviewImageUrl(preImg);
 
     if (preOriginal || preRemix) {
@@ -91,6 +100,20 @@ export default function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ Manage preview URLs for uploads
+  useEffect(() => {
+    // cleanup old
+    uploadPreviews.forEach((u) => URL.revokeObjectURL(u));
+
+    const next = uploads.map((f) => URL.createObjectURL(f));
+    setUploadPreviews(next);
+
+    return () => {
+      next.forEach((u) => URL.revokeObjectURL(u));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploads]);
+
   function closeLightbox() {
     setLightboxOpen(false);
   }
@@ -99,17 +122,16 @@ export default function StudioPage() {
     console.log("Share clicked (placeholder):", url);
   }
 
-  // ✅ Updated to match GenerationLightbox new onRemix payload
   function handleRemix(payload: {
     imgUrl: string;
-    originalPromptText: string;
-    remixPromptText: string;
-    combinedPromptText: string;
+    originalPrompt: string;
+    remixAdditions: string;
+    combinedPrompt: string;
   }) {
     const href =
       `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
-      `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
-      `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
+      `&original=${encodeURIComponent(payload.originalPrompt || "")}` +
+      `&remix=${encodeURIComponent(payload.remixAdditions || "")}`;
 
     router.push(href);
     setLightboxOpen(false);
@@ -119,6 +141,25 @@ export default function StudioPage() {
     await copyToClipboard(combinedPrompt || originalPrompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
+  }
+
+  function onPickUploads(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+
+    // append + clamp to 10
+    setUploads((prev) => clampUploads([...prev, ...files], 10));
+
+    // reset input so user can re-pick same file if needed
+    e.target.value = "";
+  }
+
+  function removeUpload(idx: number) {
+    setUploads((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function clearUploads() {
+    setUploads([]);
   }
 
   async function handleGenerate() {
@@ -155,10 +196,15 @@ export default function StudioPage() {
       form.append("userId", user.id);
       form.append("aspectRatio", aspectRatio);
 
-      // ✅ Persist standardized fields for DB insert in /api/generate
-      form.append("originalPrompt", normalize(originalPrompt));
-      form.append("remixAdditions", normalize(remixAdditions));
-      form.append("combinedPromptText", finalPrompt);
+      // ✅ Standardized prompt columns (server should write these to prompt_generations)
+      form.append("original_prompt_text", normalize(originalPrompt));
+      form.append("remix_prompt_text", normalize(remixAdditions));
+      form.append("combined_prompt_text", finalPrompt);
+
+      // ✅ Upload up to 10 images
+      uploads.slice(0, 10).forEach((file) => {
+        form.append("images", file, file.name);
+      });
 
       if (prePromptId) form.append("promptId", prePromptId);
       if (prePromptSlug) form.append("promptSlug", prePromptSlug);
@@ -192,17 +238,15 @@ export default function StudioPage() {
     }
   }
 
-  const combinedForUI = normalize(combinedPrompt || originalPrompt);
-
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
       <GenerationLightbox
         open={lightboxOpen}
         url={lastImageUrl}
         onClose={closeLightbox}
-        originalPromptText={normalize(originalPrompt)}
-        remixPromptText={normalize(remixAdditions)}
-        combinedPromptText={combinedForUI}
+        originalPrompt={originalPrompt}
+        remixAdditions={remixAdditions}
+        combinedPrompt={normalize(combinedPrompt || originalPrompt)}
         onShare={handleShare}
         onRemix={handleRemix}
       />
@@ -215,7 +259,7 @@ export default function StudioPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* LEFT: Prompt Tool (match Prompt Remix layout) */}
+        {/* LEFT: Prompt Tool */}
         <div className="rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div className="text-lg font-semibold">Prompt Tool</div>
@@ -242,7 +286,7 @@ export default function StudioPage() {
             </div>
           </div>
 
-          {/* View full prompt (click to expand) */}
+          {/* View full prompt */}
           <button
             type="button"
             onClick={() => setShowFullPrompt((v) => !v)}
@@ -257,7 +301,7 @@ export default function StudioPage() {
 
             {showFullPrompt ? (
               <div className="mt-3 whitespace-pre-wrap text-sm text-white/75">
-                {combinedForUI || "Nothing yet."}
+                {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
               </div>
             ) : null}
           </button>
@@ -276,6 +320,67 @@ export default function StudioPage() {
               value={remixAdditions}
               onChange={(e) => setRemixAdditions(e.target.value)}
             />
+          </div>
+
+          {/* ✅ Upload reference images */}
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">Upload images</div>
+              <div className="text-xs text-white/45">{uploads.length}/10</div>
+            </div>
+
+            <p className="mt-2 text-sm text-white/55">
+              Optional. Upload up to 10 reference images to guide the generation.
+            </p>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={onPickUploads}
+                />
+                Upload images
+              </label>
+
+              <button
+                type="button"
+                onClick={clearUploads}
+                className={[
+                  "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition",
+                  uploads.length
+                    ? "border-white/15 bg-black/40 text-white/80 hover:bg-black/60"
+                    : "cursor-not-allowed border-white/10 bg-black/20 text-white/35",
+                ].join(" ")}
+                disabled={!uploads.length}
+              >
+                Clear
+              </button>
+            </div>
+
+            {uploadPreviews.length ? (
+              <div className="mt-4 grid grid-cols-5 gap-2">
+                {uploadPreviews.map((src, idx) => (
+                  <div key={src} className="group relative overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                    <div className="relative aspect-square w-full">
+                      <Image src={src} alt={`Upload ${idx + 1}`} fill className="object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeUpload(idx)}
+                      className="absolute right-1 top-1 rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-[11px] text-white/80 opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
+                      title="Remove"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 text-xs text-white/45">No images uploaded.</div>
+            )}
           </div>
 
           {/* Generator Settings */}
@@ -305,7 +410,7 @@ export default function StudioPage() {
             </div>
           </div>
 
-          {/* Remixes (placeholder like Prompt Remix UI) */}
+          {/* Remixes placeholder */}
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Remixes</div>
@@ -327,7 +432,7 @@ export default function StudioPage() {
             </div>
           ) : null}
 
-          {/* Original prompt (kept, but not the main UI) */}
+          {/* Original prompt (kept) */}
           <div className="mt-6">
             <div className="text-xs font-semibold text-white/55">Original prompt</div>
             <textarea
@@ -340,26 +445,33 @@ export default function StudioPage() {
           </div>
         </div>
 
-        {/* RIGHT: Preview panel */}
+        {/* RIGHT: Preview */}
         <div className="rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
           <div className="text-sm font-semibold">Preview</div>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
             <div className="relative aspect-[4/5] w-full bg-black">
-              <Image src={lastImageUrl || previewImageUrl} alt="Preview" fill className="object-cover" priority={false} />
+              <Image
+                src={lastImageUrl || previewImageUrl}
+                alt="Preview"
+                fill
+                className="object-cover"
+                priority={false}
+              />
             </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
             <div className="text-xs font-semibold text-white/70">Combined prompt</div>
             <div className="mt-2 whitespace-pre-wrap text-sm text-white/80">
-              {combinedForUI || "Nothing yet."}
+              {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/50">
             <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Type: {mediaType}</div>
             <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Aspect: {aspectRatio}</div>
+            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Uploads: {uploads.length}/10</div>
           </div>
         </div>
       </section>
