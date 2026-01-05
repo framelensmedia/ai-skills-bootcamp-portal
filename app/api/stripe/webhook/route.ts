@@ -14,6 +14,16 @@ async function readRawBody(req: Request) {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * Clover typings may not expose current_period_end on Subscription.
+ * This helper safely extracts it and returns ISO string or null.
+ */
+function getCurrentPeriodEndISO(sub: Stripe.Subscription): string | null {
+  const cpe = (sub as any)?.current_period_end;
+  if (!cpe || typeof cpe !== "number") return null;
+  return new Date(cpe * 1000).toISOString();
+}
+
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
   if (!sig) return NextResponse.json({ error: "Missing signature" }, { status: 400 });
@@ -56,21 +66,20 @@ export async function POST(req: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // FIX: Casting to 'any' to bypass the Response<T> property error
-        const response = await stripe.subscriptions.retrieve(subscriptionId, {
+        // ✅ retrieve() returns the Subscription object directly (no .data)
+        const sub = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ["items.data.price"],
         });
-        
-        // In the Clover version, access the resource via the correctly typed data property
-        const sub = (response as any).data as Stripe.Subscription; 
 
-        const priceId = (sub.items.data[0]?.price as Stripe.Price)?.id ?? null;
+        const priceId =
+          ((sub.items?.data?.[0]?.price as Stripe.Price | undefined)?.id as string | undefined) ??
+          null;
 
         await updateByCustomerId(customerId, {
           plan: "premium",
           stripe_subscription_id: subscriptionId,
           subscription_status: sub.status,
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+          current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
         });
@@ -82,7 +91,7 @@ export async function POST(req: Request) {
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
-        const priceId = sub.items.data[0]?.price?.id ?? null;
+        const priceId = sub.items?.data?.[0]?.price?.id ?? null;
 
         const isActive = sub.status === "active" || sub.status === "trialing";
 
@@ -90,7 +99,7 @@ export async function POST(req: Request) {
           plan: isActive ? "premium" : "free",
           stripe_subscription_id: sub.id,
           subscription_status: sub.status,
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+          current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
         });
