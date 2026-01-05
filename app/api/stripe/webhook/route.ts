@@ -31,14 +31,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
-  // Supabase admin client (bypasses RLS)
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.SUPABASE_SERVICE_ROLE_KEY as string
   );
 
   try {
-    // Helper: update profile by Stripe customer id
     const updateByCustomerId = async (customerId: string, data: any) => {
       const { error } = await supabaseAdmin
         .from("profiles")
@@ -49,7 +47,6 @@ export async function POST(req: Request) {
     };
 
     switch (event.type) {
-      // Fired when checkout completes successfully
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
@@ -58,10 +55,11 @@ export async function POST(req: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // Fetch subscription so we can store status + period end + price id
-        const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+        // FIX: The response from retrieve() must be unwrapped via .data
+        const response = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ["items.data.price"],
         });
+        const sub = response.data; // Now 'sub' is the Subscription object
 
         const priceId = sub.items.data[0]?.price?.id ?? null;
 
@@ -77,7 +75,6 @@ export async function POST(req: Request) {
         break;
       }
 
-      // Fired anytime a subscription is created/updated (renewals, cancels at period end, etc.)
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
@@ -100,10 +97,8 @@ export async function POST(req: Request) {
         break;
       }
 
-      // Fired when subscription is fully canceled/deleted
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
-
         const customerId = sub.customer as string;
 
         await updateByCustomerId(customerId, {
@@ -116,13 +111,10 @@ export async function POST(req: Request) {
         break;
       }
 
-      // Optional: handle failed payments (usually Stripe also changes sub status)
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Don’t instantly downgrade here unless you want aggressive enforcement.
-        // Stripe will move subscription to past_due/unpaid and trigger subscription.updated.
         await updateByCustomerId(customerId, {
           updated_at: new Date().toISOString(),
         });
