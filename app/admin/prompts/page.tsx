@@ -2,7 +2,7 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export default async function AdminPromptsPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data } = await supabase
     .from("cms_prompt_queue")
