@@ -2,7 +2,7 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export default async function AdminOverviewPage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { count: pendingCount } = await supabase
     .from("cms_prompt_queue")
