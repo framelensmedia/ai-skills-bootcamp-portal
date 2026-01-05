@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
+  // Supabase admin client
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.SUPABASE_SERVICE_ROLE_KEY as string
@@ -55,13 +56,13 @@ export async function POST(req: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // FIX: The response from retrieve() must be unwrapped via .data
+        // FIX: Use .content instead of .data for the Clover SDK response
         const response = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ["items.data.price"],
         });
-        const sub = response.data; // Now 'sub' is the Subscription object
+        const sub = response.content; 
 
-        const priceId = sub.items.data[0]?.price?.id ?? null;
+        const priceId = (sub.items.data[0]?.price as Stripe.Price)?.id ?? null;
 
         await updateByCustomerId(customerId, {
           plan: "premium",
@@ -82,8 +83,7 @@ export async function POST(req: Request) {
         const customerId = sub.customer as string;
         const priceId = sub.items.data[0]?.price?.id ?? null;
 
-        const isActive =
-          sub.status === "active" || sub.status === "trialing";
+        const isActive = sub.status === "active" || sub.status === "trialing";
 
         await updateByCustomerId(customerId, {
           plan: isActive ? "premium" : "free",
