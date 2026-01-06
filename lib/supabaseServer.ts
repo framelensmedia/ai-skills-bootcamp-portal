@@ -5,8 +5,8 @@ import { createServerClient } from "@supabase/ssr";
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies(); // ✅ Next 16: cookies() is async
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
 
   return createServerClient(url, anon, {
     cookies: {
