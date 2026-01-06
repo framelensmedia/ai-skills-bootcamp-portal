@@ -133,10 +133,11 @@ export default function Nav() {
             onClick={() => setMobileOpen(false)}
           />
 
+
           {/* Dropdown panel */}
           <div className="fixed inset-x-0 top-[73px] z-[70] sm:hidden">
             <div className="mx-auto w-full max-w-6xl px-4">
-              <div className="relative rounded-2xl border border-white/10 bg-black/90 p-4 backdrop-blur">
+              <div className="relative rounded-2xl border border-white/10 bg-black p-4 shadow-2xl backdrop-blur-sm">
                 {/* X Close */}
                 <button
                   type="button"
