@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
@@ -79,7 +79,7 @@ function fallbackFromSettings(settings: any) {
   return { original, remix, combined };
 }
 
-export default function LibraryPage() {
+function LibraryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -383,5 +383,13 @@ function SelectPill({
     >
       {label}
     </button>
+  );
+}
+
+export default function LibraryPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-white">Loading library...</div>}>
+      <LibraryContent />
+    </Suspense>
   );
 }

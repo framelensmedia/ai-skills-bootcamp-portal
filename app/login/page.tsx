@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const sp = useSearchParams();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -99,5 +99,13 @@ export default function LoginPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-md px-4 py-10 text-white">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

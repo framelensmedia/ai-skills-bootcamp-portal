@@ -8,6 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 export default function SignupPage() {
   const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

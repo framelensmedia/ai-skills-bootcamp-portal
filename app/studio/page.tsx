@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
@@ -37,7 +37,7 @@ function clampUploads(files: File[], max = 10) {
   return files.slice(0, max);
 }
 
-export default function StudioPage() {
+function StudioContent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
   const sp = useSearchParams();
@@ -124,14 +124,14 @@ export default function StudioPage() {
 
   function handleRemix(payload: {
     imgUrl: string;
-    originalPrompt: string;
-    remixAdditions: string;
-    combinedPrompt: string;
+    originalPromptText: string;
+    remixPromptText: string;
+    combinedPromptText: string;
   }) {
     const href =
       `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
-      `&original=${encodeURIComponent(payload.originalPrompt || "")}` +
-      `&remix=${encodeURIComponent(payload.remixAdditions || "")}`;
+      `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
+      `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
 
     router.push(href);
     setLightboxOpen(false);
@@ -244,9 +244,9 @@ export default function StudioPage() {
         open={lightboxOpen}
         url={lastImageUrl}
         onClose={closeLightbox}
-        originalPrompt={originalPrompt}
-        remixAdditions={remixAdditions}
-        combinedPrompt={normalize(combinedPrompt || originalPrompt)}
+        originalPromptText={originalPrompt}
+        remixPromptText={remixAdditions}
+        combinedPromptText={normalize(combinedPrompt || originalPrompt)}
         onShare={handleShare}
         onRemix={handleRemix}
       />
@@ -476,5 +476,13 @@ export default function StudioPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">Loading studio...</div>}>
+      <StudioContent />
+    </Suspense>
   );
 }

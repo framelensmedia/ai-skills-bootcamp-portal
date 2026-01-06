@@ -4,9 +4,15 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: "2025-12-15.clover",
-});
+// Initialize inside handler to avoid build errors if env is missing
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is missing");
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-12-15.clover" as any, // suppressed type error for custom version
+  });
+}
 
 // IMPORTANT: webhook needs raw body
 async function readRawBody(req: Request) {
@@ -25,6 +31,7 @@ function getCurrentPeriodEndISO(sub: Stripe.Subscription): string | null {
 }
 
 export async function POST(req: Request) {
+  const stripe = getStripe();
   const sig = req.headers.get("stripe-signature");
   if (!sig) return NextResponse.json({ error: "Missing signature" }, { status: 400 });
 

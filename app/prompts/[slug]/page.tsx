@@ -1,8 +1,7 @@
-// 1) app/prompts/[slug]/page.tsx
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
@@ -50,7 +49,7 @@ type RemixRow = {
   prompt_slug?: string | null;
 };
 
-export default function PromptPage() {
+function PromptContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -506,8 +505,8 @@ export default function PromptPage() {
       const finalPrompt = remixIsFullPrompt
         ? remix
         : remix.length > 0
-        ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
-        : fullPromptText;
+          ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
+          : fullPromptText;
 
       setLastFinalPrompt(finalPrompt);
 
@@ -619,7 +618,7 @@ export default function PromptPage() {
 
   const hasGeneratedForActions = Boolean(
     (generatedImageUrl && generatedImageUrl.trim().length > 0) ||
-      (overridePreviewUrl && overridePreviewUrl.trim().length > 0)
+    (overridePreviewUrl && overridePreviewUrl.trim().length > 0)
   );
 
   return (
@@ -850,8 +849,8 @@ export default function PromptPage() {
                   isLocked
                     ? "bg-white/10 text-white/40 hover:bg-white/15"
                     : generating
-                    ? "bg-lime-400/60 text-black"
-                    : "bg-lime-400 text-black hover:bg-lime-300",
+                      ? "bg-lime-400/60 text-black"
+                      : "bg-lime-400 text-black hover:bg-lime-300",
                 ].join(" ")}
                 onClick={handleGenerate}
                 disabled={isLocked || generating}
@@ -859,10 +858,10 @@ export default function PromptPage() {
                 {generating
                   ? "Generating..."
                   : lockReason === "login"
-                  ? "Log in to Generate"
-                  : isLocked
-                  ? "Upgrade to Pro"
-                  : "Generate"}
+                    ? "Log in to Generate"
+                    : isLocked
+                      ? "Upgrade to Pro"
+                      : "Generate"}
               </button>
             </div>
           </div>
@@ -912,8 +911,8 @@ export default function PromptPage() {
                       ? "Locked. Log in to view this prompt."
                       : "Locked. Upgrade to Pro to view this prompt."
                     : fullPromptText && fullPromptText.trim().length > 0
-                    ? fullPromptText
-                    : "No prompt text found yet. Add it to the prompt or prompt_text column in Supabase."}
+                      ? fullPromptText
+                      : "No prompt text found yet. Add it to the prompt or prompt_text column in Supabase."}
                 </pre>
               </div>
             </details>
@@ -1196,5 +1195,13 @@ function SelectPill({
     >
       {label}
     </button>
+  );
+}
+
+export default function PromptPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-4 py-8 text-white">Loading prompt...</div>}>
+      <PromptContent />
+    </Suspense>
   );
 }
