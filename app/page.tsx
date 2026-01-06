@@ -189,7 +189,7 @@ export default function HomePage() {
   const trendingPrompts = useMemo(() => recentPrompts.slice(0, 4), [recentPrompts]);
 
   return (
-    <div className="bg-black text-white">
+    <>
       {/* HERO */}
       <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
@@ -219,34 +219,34 @@ export default function HomePage() {
               )}
             </div>
 
-{/* CONTROLS */}
-<div className="mt-6 max-w-xl">
-  {/* Search (full width) */}
-  <div className="mb-4 flex w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 py-3">
-    <span className="text-xs text-white/60">🔎</span>
-    <input
-      className="w-full bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
-      placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
-    />
-  </div>
+            {/* CONTROLS */}
+            <div className="mt-6 max-w-xl">
+              {/* Search (full width) */}
+              <div className="mb-4 flex w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 py-3">
+                <span className="text-xs text-white/60">🔎</span>
+                <input
+                  className="w-full bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
+                  placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
+                />
+              </div>
 
-  {/* CTA Row (matches search width exactly) */}
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <Link
-      href="/prompts"
-      className="inline-flex w-full items-center justify-center rounded-md bg-[#B7FF00] px-6 py-4 text-sm font-semibold text-black hover:opacity-90"
-    >
-      Browse Prompts →
-    </Link>
+              {/* CTA Row (matches search width exactly) */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Link
+                  href="/prompts"
+                  className="inline-flex w-full items-center justify-center rounded-md bg-[#B7FF00] px-6 py-4 text-sm font-semibold text-black hover:opacity-90"
+                >
+                  Browse Prompts →
+                </Link>
 
-    <Link
-      href="/studio"
-      className="inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-6 py-4 text-sm font-semibold text-white hover:bg-white/10"
-    >
-      Open Prompt Studio →
-    </Link>
-  </div>
-</div>
+                <Link
+                  href="/studio"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-6 py-4 text-sm font-semibold text-white hover:bg-white/10"
+                >
+                  Open Prompt Studio →
+                </Link>
+              </div>
+            </div>
 
 
             <div className="mt-5 flex items-center gap-3 text-xs text-white/60">
@@ -280,11 +280,10 @@ export default function HomePage() {
           {["All", "Flyers", "Ads", "Product", "Thumbnails", "Branding", "UGC"].map((c) => (
             <button
               key={c}
-              className={`rounded-md px-3 py-2 text-xs font-semibold ${
-                c === "All"
-                  ? "bg-white text-black"
-                  : "border border-white/10 bg-black/30 text-white/70 hover:text-white"
-              }`}
+              className={`rounded-md px-3 py-2 text-xs font-semibold ${c === "All"
+                ? "bg-white text-black"
+                : "border border-white/10 bg-black/30 text-white/70 hover:text-white"
+                }`}
             >
               {c}
             </button>
@@ -416,6 +415,6 @@ export default function HomePage() {
           <p className="mt-4 text-xs text-white/50">Free tier available. Upgrade anytime.</p>
         </div>
       </section>
-    </div>
+    </>
   );
 }

@@ -16,9 +16,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-gradient-to-b from-black via-zinc-950 to-black text-white">
+      <body className="min-h-screen bg-black text-white" suppressHydrationWarning={true}>
         {/* Header */}
-        <header className="border-b border-white/10">
+        <header className="bg-black">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
             {/* Logo / Brand */}
             <Link href="/" className="flex min-w-0 items-center gap-3">
