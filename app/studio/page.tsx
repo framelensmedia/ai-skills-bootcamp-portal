@@ -260,14 +260,14 @@ function StudioContent() {
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* LEFT: Prompt Tool */}
-        <div className="rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="flex items-center justify-between gap-3">
+        <div className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-lg font-semibold">Prompt Tool</div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleCopyPrompt}
-                className="rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60"
+                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60"
               >
                 {copied ? "Copied" : "Copy Prompt"}
               </button>
@@ -277,7 +277,7 @@ function StudioContent() {
                 onClick={handleGenerate}
                 disabled={generating}
                 className={[
-                  "rounded-xl px-5 py-2 text-sm font-semibold text-black transition",
+                  "inline-flex items-center justify-center rounded-xl px-5 py-2 text-sm font-semibold text-black transition",
                   generating ? "cursor-not-allowed bg-[#B7FF00]/50" : "bg-[#B7FF00] hover:opacity-90",
                 ].join(" ")}
               >
@@ -446,7 +446,7 @@ function StudioContent() {
         </div>
 
         {/* RIGHT: Preview */}
-        <div className="rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
+        <div className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
           <div className="text-sm font-semibold">Preview</div>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
