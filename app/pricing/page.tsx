@@ -114,9 +114,9 @@ function PricingContent() {
                 Full access to the vault, tools, and member perks.
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-3xl font-semibold">$29</div>
-              <div className="text-sm text-white/60">per month</div>
+            <div className="text-right shrink-0">
+              <div className="text-3xl font-semibold whitespace-nowrap">$29</div>
+              <div className="text-sm text-white/60 whitespace-nowrap">per month</div>
             </div>
           </div>
 
