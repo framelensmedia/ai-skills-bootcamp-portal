@@ -76,6 +76,14 @@ export default function CmsPromptEditorPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (successMsg) {
+      const t = setTimeout(() => setSuccessMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [successMsg]);
 
   // form state
   const [title, setTitle] = useState("");
@@ -222,6 +230,13 @@ export default function CmsPromptEditorPage() {
       setStatus((nextStatus || status) as any);
       setSlug(nextSlug);
 
+      setSuccessMsg(
+        nextStatus === "submitted"
+          ? "Prompt submitted for review!"
+          : nextStatus === "published"
+            ? "Prompt published!"
+            : "Draft saved!"
+      );
       router.refresh();
     } catch (e: any) {
       setError(e?.message || "Failed to save");
@@ -286,6 +301,7 @@ export default function CmsPromptEditorPage() {
 
       setStatus("published");
       setSlug(nextSlug);
+      setSuccessMsg("Approved and published!");
       router.refresh();
     } catch (e: any) {
       setError(e?.message || "Failed to publish");
@@ -302,6 +318,21 @@ export default function CmsPromptEditorPage() {
   async function handlePickFile() {
     setUploadError(null);
     fileRef.current?.click();
+  }
+
+  async function deleteDraft() {
+    if (!row?.id || status !== "draft") return;
+    if (!confirm("Are you sure you want to delete this draft? This cannot be undone.")) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("prompts").delete().eq("id", row.id);
+      if (error) throw error;
+      router.push("/dashboard/cms");
+    } catch (e: any) {
+      setError(e?.message || "Failed to delete");
+      setSaving(false);
+    }
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -338,6 +369,7 @@ export default function CmsPromptEditorPage() {
         .eq("id", row.id);
 
       if (dbErr) throw dbErr;
+      setSuccessMsg("Featured image uploaded!");
     } catch (err: any) {
       setUploadError(err?.message || "Upload failed");
     } finally {
@@ -386,6 +418,17 @@ export default function CmsPromptEditorPage() {
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
+          {/* Delete Draft Button */}
+          {status === "draft" && (
+            <button
+              disabled={saving}
+              onClick={deleteDraft}
+              className="rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-2 text-sm text-red-300 hover:bg-red-950/40"
+            >
+              Delete
+            </button>
+          )}
+
           <button
             onClick={() => router.push("/dashboard/cms")}
             className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
@@ -424,6 +467,12 @@ export default function CmsPromptEditorPage() {
       {error ? (
         <div className="mb-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
           {error}
+        </div>
+      ) : null}
+
+      {successMsg ? (
+        <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-lime-400/30 bg-lime-400/10 p-4 text-sm font-semibold text-lime-300">
+          {successMsg}
         </div>
       ) : null}
 
@@ -702,8 +751,8 @@ function Toggle({
         disabled
           ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
           : value
-          ? "border-lime-400/40 bg-lime-400/10 text-white"
-          : "border-white/10 bg-black/30 text-white/75 hover:border-white/20 hover:text-white",
+            ? "border-lime-400/40 bg-lime-400/10 text-white"
+            : "border-white/10 bg-black/30 text-white/75 hover:border-white/20 hover:text-white",
       ].join(" ")}
       aria-pressed={value ? "true" : "false"}
     >
