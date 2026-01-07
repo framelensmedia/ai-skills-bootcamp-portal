@@ -826,45 +826,8 @@ function PromptContent() {
 
         {/* TOOL PANEL */}
         <section className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-lg font-semibold">Prompt Tool</div>
+          <div className="text-lg font-semibold">Prompt Tool</div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                className={[
-                  "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm",
-                  isLocked
-                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                    : "border-white/15 bg-black/30 hover:bg-black/50",
-                ].join(" ")}
-                onClick={handleCopyPromptText}
-                disabled={isLocked}
-              >
-                {copied ? "Copied" : "Copy Prompt"}
-              </button>
-
-              <button
-                className={[
-                  "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold",
-                  isLocked
-                    ? "bg-white/10 text-white/40 hover:bg-white/15"
-                    : generating
-                      ? "bg-lime-400/60 text-black"
-                      : "bg-lime-400 text-black hover:bg-lime-300",
-                ].join(" ")}
-                onClick={handleGenerate}
-                disabled={isLocked || generating}
-              >
-                {generating
-                  ? "Generating..."
-                  : lockReason === "login"
-                    ? "Log in to Generate"
-                    : isLocked
-                      ? "Upgrade to Pro"
-                      : "Generate"}
-              </button>
-            </div>
-          </div>
 
           {isLocked ? (
             <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
@@ -1074,6 +1037,42 @@ function PromptContent() {
             </div>
           </div>
 
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              className={[
+                "inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:py-2",
+                isLocked
+                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                  : "border-white/15 bg-black/40 text-white/85 hover:bg-black/60",
+              ].join(" ")}
+              onClick={handleCopyPromptText}
+              disabled={isLocked}
+            >
+              {copied ? "Copied" : "Copy Prompt"}
+            </button>
+
+            <button
+              className={[
+                "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
+                isLocked
+                  ? "bg-white/10 text-white/40 hover:bg-white/15"
+                  : generating
+                    ? "bg-lime-400/60 text-black"
+                    : "bg-lime-400 text-black hover:bg-lime-300",
+              ].join(" ")}
+              onClick={handleGenerate}
+              disabled={isLocked || generating}
+            >
+              {generating
+                ? "Generating..."
+                : lockReason === "login"
+                  ? "Log in to Generate"
+                  : isLocked
+                    ? "Upgrade to Pro"
+                    : "Generate"}
+            </button>
+          </div>
+
           {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -1164,8 +1163,8 @@ function PromptContent() {
             </div>
           ) : null}
         </section>
-      </div>
-    </main>
+      </div >
+    </main >
   );
 }
 

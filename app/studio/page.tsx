@@ -263,27 +263,7 @@ function StudioContent() {
         <div className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-lg font-semibold">Prompt Tool</div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={handleCopyPrompt}
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60"
-              >
-                {copied ? "Copied" : "Copy Prompt"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating}
-                className={[
-                  "inline-flex items-center justify-center rounded-xl px-5 py-2 text-sm font-semibold text-black transition",
-                  generating ? "cursor-not-allowed bg-[#B7FF00]/50" : "bg-[#B7FF00] hover:opacity-90",
-                ].join(" ")}
-              >
-                {generating ? "Generating..." : "Generate"}
-              </button>
-            </div>
+            <div className="text-lg font-semibold">Prompt Tool</div>
           </div>
 
           {/* View full prompt */}
@@ -442,6 +422,28 @@ function StudioContent() {
               value={originalPrompt}
               onChange={(e) => setOriginalPrompt(e.target.value)}
             />
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={handleCopyPrompt}
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold text-white/85 hover:bg-black/60 sm:py-2"
+            >
+              {copied ? "Copied" : "Copy Prompt"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={generating}
+              className={[
+                "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
+                generating ? "cursor-not-allowed bg-[#B7FF00]/50" : "bg-[#B7FF00] hover:opacity-90",
+              ].join(" ")}
+            >
+              {generating ? "Generating..." : "Generate"}
+            </button>
           </div>
         </div>
 
