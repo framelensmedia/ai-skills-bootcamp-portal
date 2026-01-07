@@ -5,7 +5,9 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 export const runtime = "nodejs";
 
 export async function POST() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
+  }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();

@@ -36,10 +36,15 @@ function PricingContent() {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
 
       if (!res.ok) {
-        setError(data?.error ?? "Checkout error");
+        setError(data?.error || `Checkout error: ${res.status}`);
         return;
       }
 

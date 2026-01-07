@@ -33,6 +33,7 @@ export default function DashboardPage() {
 
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [pendingLoading, setPendingLoading] = useState<boolean>(false);
+  const [managingBilling, setManagingBilling] = useState(false);
 
   const isStaffPlus = useMemo(() => roleRank(role) >= roleRank("staff"), [role]);
   const isEditorPlus = useMemo(() => roleRank(role) >= roleRank("editor"), [role]);
@@ -171,16 +172,31 @@ export default function DashboardPage() {
                 <span className="text-white/40">•</span>
 
                 <button
+                  disabled={managingBilling}
                   onClick={async () => {
-                    const res = await fetch("/api/stripe/portal", { method: "POST" });
-                    const data = await res.json();
-                    if (data?.url) {
-                      window.open(data.url, "_blank", "noopener,noreferrer");
+                    try {
+                      setManagingBilling(true);
+                      const res = await fetch("/api/stripe/portal", { method: "POST" });
+                      if (!res.ok) {
+                        const json = await res.json().catch(() => ({}));
+                        alert(json.error || "Failed to load billing portal");
+                        return;
+                      }
+                      const data = await res.json();
+                      if (data?.url) {
+                        window.open(data.url, "_blank", "noopener,noreferrer");
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert("An error occurred. Please try again.");
+                    } finally {
+                      setManagingBilling(false);
                     }
                   }}
-                  className="font-medium text-indigo-400 underline underline-offset-4 hover:text-indigo-300"
+                  className={`font-medium text-indigo-400 underline underline-offset-4 hover:text-indigo-300 ${managingBilling ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                 >
-                  Manage billing
+                  {managingBilling ? "Opening..." : "Manage billing"}
                 </button>
               </>
             )}
