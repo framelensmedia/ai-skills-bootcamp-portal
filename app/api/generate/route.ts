@@ -13,12 +13,12 @@ const SYSTEM_CORE = `
 `;
 
 const SYSTEM_IDENTITY = `
-[STRICT SUBJECT REPLACEMENT & LAYOUT ADAPTATION]
+[STRICT IDENTITY LOCK]
 1. REPLACE SUBJECT: Replace the main subject in the template with the person in the Uploaded Photo.
-2. PRESERVE UPLOAD PERSPECTIVE: You MUST keep the same camera angle, perspective, and body size of the person in the Uploaded Photo.
-3. ADAPT DESIGN: Design the new image AROUND the uploaded subject and their perspective. Do NOT warp the subject to fit the template.
-4. LIKENESS LOCK: Keep the facial position, expression, and features exactly consistent with the Uploaded Photo.
-5. INTEGRATION: Blend the subject into the scene naturally (lighting/shadows) but maintain their physical integrity (clothing, body shape, head shape) as provided in the upload.
+2. ABSOLUTE LIKENESS: The face and identity MUST match the uploaded photo 100%. Do NOT "enhance", "beautify", or modify facial features.
+3. PRESERVE UPLOAD DETAILS: Maintain the exact facial structure, skin tone, and distinguishing features of the upload.
+4. ADAPT DESIGN: Build the scene around the subject. Do not warp the subject to fit the template.
+5. LIGHTING INTEGRATION: Apply scene lighting ONLY to match the environment, but NEVER alter the subject's core appearance or identity.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
