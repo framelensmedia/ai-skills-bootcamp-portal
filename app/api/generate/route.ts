@@ -14,11 +14,11 @@ const SYSTEM_CORE = `
 
 const SYSTEM_IDENTITY = `
 [STRICT IDENTITY LOCK]
-1. REPLACE SUBJECT: Replace the main subject in the template with the person in the Uploaded Photo.
-2. ABSOLUTE LIKENESS: The face and identity MUST match the uploaded photo 100%. Do NOT "enhance", "beautify", or modify facial features.
-3. PRESERVE UPLOAD DETAILS: Maintain the exact facial structure, skin tone, and distinguishing features of the upload.
-4. ADAPT DESIGN: Build the scene around the subject. Do not warp the subject to fit the template.
-5. LIGHTING INTEGRATION: Apply scene lighting ONLY to match the environment, but NEVER alter the subject's core appearance or identity.
+1. IMAGE ROLES: The FIRST image provided is the TEMPLATE. All SUBSEQUENT images are the SUBJECT REFERENCE.
+2. ACTION: You MUST replace the subject in the TEMPLATE (Image 1) with the person in the SUBJECT REFERENCE (Images 2+).
+3. ABSOLUTE LIKENESS: The new face MUST match the SUBJECT REFERENCE 100%. Use "face swap" quality.
+4. NO ENHANCEMENT: Do NOT beautify or alter the subject's features.
+5. INTEGRATION: Keep the lighting/shadows of the Template, but apply them to the new Subject's face without changing the face shape.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
         let imageFiles: File[] = [];
         let logoFile: File | null = null;
         let businessName: string | null = null;
+        let templateFile: File | null = null;
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -99,7 +100,13 @@ export async function POST(req: Request) {
                 String(form.get("combined_prompt_text") ?? "").trim() || rawPrompt || null;
 
             // New fields from form
-            template_reference_image = String(form.get("template_reference_image") ?? "").trim() || null;
+            const tmplVal = form.get("template_reference_image");
+            if (tmplVal instanceof File) {
+                templateFile = tmplVal;
+            } else {
+                template_reference_image = String(tmplVal ?? "").trim() || null;
+            }
+
             edit_instructions = String(form.get("edit_instructions") ?? "").trim() || null;
 
             logoFile = form.get("logo_image") as File | null;
@@ -188,7 +195,13 @@ export async function POST(req: Request) {
         const imageParts: any[] = [];
 
         // 1. Add Template Reference Image (if any)
-        if (template_reference_image) {
+        if (templateFile) {
+            const mimeType = String(templateFile.type || "image/png");
+            if (mimeType.startsWith("image/")) {
+                const data = await fileToBase64(templateFile);
+                imageParts.push({ inlineData: { mimeType, data } });
+            }
+        } else if (template_reference_image) {
             try {
                 // If it's a URL, fetch and convert
                 if (template_reference_image.startsWith("http")) {

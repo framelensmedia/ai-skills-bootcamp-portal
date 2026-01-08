@@ -425,6 +425,11 @@ function PromptContent() {
       form.append("edit_instructions", instruction);
       if (userId) form.append("userId", userId);
 
+      // Include original uploads for likeness maintenance
+      uploads.slice(0, MAX_UPLOADS).forEach((file) => {
+        form.append("images", file, file.name);
+      });
+
       const { data: { session } } = await createSupabaseBrowserClient().auth.getSession();
       if (!session?.access_token) throw new Error("Not authenticated");
 
