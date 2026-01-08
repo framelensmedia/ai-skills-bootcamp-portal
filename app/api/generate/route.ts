@@ -4,6 +4,23 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
+const SYSTEM_CORE = `
+[GLOBAL SYSTEM INSTRUCTIONS]
+1. Reference-First Behavior: The first image provided (the Template) is the COMPOSITION BLUEPRINT. Maintain its framing/layout. Apply user instructions as edits to this blueprint. YOU ARE ALLOWED to change subject clothing, appearance, or background if explicitly requested.
+2. Photorealism Default: Generate photorealistic, studio-quality results. Enhance texture, lighting, and detail. Avoid cartoonish or plastic looks unless requested.
+3. Safe Rules: You may change clothing, background, lighting, and style. You must NOT change face geometry or distort the subject.
+4. FRAMING ADAPTATION: If the Subject Reference pose differs significantly from the Template, you may adapt the composition/framing to fit the subject naturally.
+`;
+
+const SYSTEM_IDENTITY = `
+[STRICT SUBJECT REPLACEMENT & LAYOUT ADAPTATION]
+1. REPLACE SUBJECT: Replace the main subject in the template with the person in the Uploaded Photo.
+2. PRESERVE UPLOAD PERSPECTIVE: You MUST keep the same camera angle, perspective, and body size of the person in the Uploaded Photo.
+3. ADAPT DESIGN: Design the new image AROUND the uploaded subject and their perspective. Do NOT warp the subject to fit the template.
+4. LIKENESS LOCK: Keep the facial position, expression, and features exactly consistent with the Uploaded Photo.
+5. INTEGRATION: Blend the subject into the scene naturally (lighting/shadows) but maintain their physical integrity (clothing, body shape, head shape) as provided in the upload.
+`;
+
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
 
 function mustEnv(name: string) {
@@ -33,6 +50,17 @@ async function fileToBase64(file: File) {
     return Buffer.from(ab).toString("base64");
 }
 
+// Helper to convert URL to base64
+async function urlToBase64(url: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    const ab = await res.arrayBuffer();
+    return {
+        data: Buffer.from(ab).toString("base64"),
+        mimeType: res.headers.get("content-type") || "image/png"
+    };
+}
+
 export async function POST(req: Request) {
     try {
         const contentType = req.headers.get("content-type") || "";
@@ -47,12 +75,18 @@ export async function POST(req: Request) {
         let remix_prompt_text: string | null = null;
         let combined_prompt_text: string | null = null;
 
+        // New fields
+        let template_reference_image: string | null = null;
+        let edit_instructions: string | null = null;
         let imageFiles: File[] = [];
+        let logoFile: File | null = null;
+        let businessName: string | null = null;
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
             const form = await req.formData();
 
+            // rawPrompt is likely the edit_instructions in the new flow
             rawPrompt = String(form.get("prompt") ?? "").trim();
             userId = String(form.get("userId") ?? "").trim();
             promptId = String(form.get("promptId") ?? "").trim() || null;
@@ -64,7 +98,15 @@ export async function POST(req: Request) {
             combined_prompt_text =
                 String(form.get("combined_prompt_text") ?? "").trim() || rawPrompt || null;
 
-            imageFiles = form.getAll("images").filter((v) => v instanceof File) as File[];
+            // New fields from form
+            template_reference_image = String(form.get("template_reference_image") ?? "").trim() || null;
+            edit_instructions = String(form.get("edit_instructions") ?? "").trim() || null;
+
+            logoFile = form.get("logo_image") as File | null;
+            businessName = String(form.get("business_name") ?? "").trim() || null;
+            if (!businessName) businessName = null;
+
+            imageFiles = form.getAll("images") as File[];
         } else {
             // JSON Handling
             const body = await req.json();
@@ -142,26 +184,60 @@ export async function POST(req: Request) {
         const model = "gemini-3-pro-image-preview";
         const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
-        // 5. Construct Prompt
-        const finalPrompt = [
-            rawPrompt,
-            "",
-            aspectHint(ar),
-            "No text overlays.",
-            imageFiles.length
-                ? "Use the uploaded reference image(s) as visual guidance. Keep the composition consistent when appropriate."
-                : "",
-        ]
-            .filter(Boolean)
-            .join("\n");
 
         const imageParts: any[] = [];
+
+        // 1. Add Template Reference Image (if any)
+        if (template_reference_image) {
+            try {
+                // If it's a URL, fetch and convert
+                if (template_reference_image.startsWith("http")) {
+                    const { data, mimeType } = await urlToBase64(template_reference_image);
+                    imageParts.push({ inlineData: { mimeType, data } });
+                }
+            } catch (e: any) {
+                console.error("Failed to process template_reference_image:", e);
+                return NextResponse.json(
+                    { error: `Failed to load template image: ${e.message}` },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // 2. Add Uploaded Images (Subjects)
         for (const f of imageFiles) {
             const mimeType = String(f.type || "image/png");
             if (!mimeType.startsWith("image/")) continue;
             const data = await fileToBase64(f);
             imageParts.push({ inlineData: { mimeType, data } });
         }
+
+        // 3. Add Logo Image (if present)
+        let logoInstruction = "";
+        if (logoFile) {
+            const mimeType = String(logoFile.type || "image/png");
+            if (mimeType.startsWith("image/")) {
+                const data = await fileToBase64(logoFile);
+                imageParts.push({ inlineData: { mimeType, data } });
+                logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
+            }
+        } else if (businessName) {
+            logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
+        }
+
+        const finalPrompt = [
+            SYSTEM_CORE,
+            imageFiles.length ? SYSTEM_IDENTITY : "",
+            logoInstruction,
+            "---",
+            "USER INSTRUCTIONS:",
+            rawPrompt,
+            "---",
+            aspectHint(ar),
+            "No text overlays.",
+        ]
+            .filter(Boolean)
+            .join("\n\n");
 
         const payload = {
             contents: [
@@ -244,6 +320,8 @@ export async function POST(req: Request) {
                     original_prompt_text,
                     remix_prompt_text,
                     combined_prompt_text: combined_prompt_text || rawPrompt,
+                    edit_instructions,
+                    template_reference_image,
                 },
             });
         } catch (e) {

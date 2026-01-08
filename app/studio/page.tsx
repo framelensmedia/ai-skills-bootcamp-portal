@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 
 type MediaType = "image" | "video";
@@ -32,11 +33,6 @@ async function copyToClipboard(text: string) {
   }
 }
 
-function clampUploads(files: File[], max = 10) {
-  if (files.length <= max) return files;
-  return files.slice(0, max);
-}
-
 function StudioContent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -44,9 +40,7 @@ function StudioContent() {
 
   // Prefill from Remix flow
   const preImg = normalize(sp?.get("img"));
-  const preOriginal = normalize(sp?.get("original"));
-  const preRemix = normalize(sp?.get("remix"));
-  const legacyPrefill = normalize(sp?.get("prefill"));
+  // Legacy params kept for compatibility, but mainly we use the wizard now
 
   // Optional context
   const prePromptId = normalize(sp?.get("promptId"));
@@ -57,18 +51,17 @@ function StudioContent() {
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("/orb-neon.gif");
 
-  const [originalPrompt, setOriginalPrompt] = useState<string>("");
-  const [remixAdditions, setRemixAdditions] = useState<string>("");
+  // ✅ New flow state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
+  const [editSummary, setEditSummary] = useState<string>("");
+
+  // Kept for fallback copy? Or should I just use editSummary?
+  // "The prompt field... edit-instruction summary". So editSummary is the source of truth.
 
   // ✅ Uploads (up to 10)
   const [uploads, setUploads] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
-
-  const combinedPrompt = useMemo(() => {
-    const a = normalize(originalPrompt);
-    const b = normalize(remixAdditions);
-    return [a, b].filter(Boolean).join("\n\n");
-  }, [originalPrompt, remixAdditions]);
 
   // Output
   const [generating, setGenerating] = useState(false);
@@ -87,16 +80,6 @@ function StudioContent() {
   useEffect(() => {
     // apply prefill once on mount
     if (preImg) setPreviewImageUrl(preImg);
-
-    if (preOriginal || preRemix) {
-      setOriginalPrompt(preOriginal);
-      setRemixAdditions(preRemix);
-      return;
-    }
-
-    if (legacyPrefill) {
-      setOriginalPrompt(legacyPrefill);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -138,28 +121,15 @@ function StudioContent() {
   }
 
   async function handleCopyPrompt() {
-    await copyToClipboard(combinedPrompt || originalPrompt);
+    await copyToClipboard(editSummary);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   }
 
-  function onPickUploads(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
-
-    // append + clamp to 10
-    setUploads((prev) => clampUploads([...prev, ...files], 10));
-
-    // reset input so user can re-pick same file if needed
-    e.target.value = "";
-  }
-
-  function removeUpload(idx: number) {
-    setUploads((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function clearUploads() {
-    setUploads([]);
+  function handleWizardComplete(summary: string, ans: RemixAnswers) {
+    setEditSummary(summary);
+    setRemixAnswers(ans);
+    setWizardOpen(false);
   }
 
   async function handleGenerate() {
@@ -170,9 +140,8 @@ function StudioContent() {
       return;
     }
 
-    const finalPrompt = normalize(combinedPrompt || originalPrompt);
-    if (!finalPrompt) {
-      setGenError("Add an original prompt and optionally remix additions first.");
+    if (!editSummary) {
+      setGenError("Please use Remix to create your edit instructions first.");
       return;
     }
 
@@ -191,15 +160,14 @@ function StudioContent() {
 
       const form = new FormData();
 
-      // What Vertex uses
-      form.append("prompt", finalPrompt);
+      form.append("prompt", editSummary); // Using edit summary as the main prompt
       form.append("userId", user.id);
       form.append("aspectRatio", aspectRatio);
 
-      // ✅ Standardized prompt columns (server should write these to prompt_generations)
-      form.append("original_prompt_text", normalize(originalPrompt));
-      form.append("remix_prompt_text", normalize(remixAdditions));
-      form.append("combined_prompt_text", finalPrompt);
+      // ✅ Standardized prompt columns
+      form.append("combined_prompt_text", editSummary);
+      form.append("edit_instructions", editSummary);
+      form.append("template_reference_image", previewImageUrl);
 
       // ✅ Upload up to 10 images
       uploads.slice(0, 10).forEach((file) => {
@@ -230,6 +198,14 @@ function StudioContent() {
       }
 
       setLastImageUrl(imageUrl);
+      // We don't open lightbox automatically anymore? "Post-generation buttons... after generation completes, show two buttons: Edit Remix... New Remix".
+      // But usually we show the result.
+      // I'll leave lightbox logic, but maybe update content?
+      // Actually the lightbox is the "Preview" in the requirement?
+      // No, requirement says "After a generation completes, show two buttons...".
+      // Lightbox currently shows buttons. I can add "Edit Remix" button TO the Lightbox?
+      // Or simply show the new image in the 'Preview' panel on the right.
+      // For now, I'll keep lightbox open behavior as it's good UX.
       setLightboxOpen(true);
     } catch (e: any) {
       setGenError(e?.message || "Failed to generate.");
@@ -238,17 +214,37 @@ function StudioContent() {
     }
   }
 
+  function handleRemixFromLightbox() {
+    // lightbox "Remix" button now triggers "Edit Remix" flow?
+    // Or "New Remix".
+    // Requirement: "Edit Remix" opens new chat with previous values.
+    setWizardOpen(true);
+    setLightboxOpen(false);
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
+      <RemixChatWizard
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onComplete={handleWizardComplete}
+        templatePreviewUrl={previewImageUrl}
+        initialValues={remixAnswers}
+        uploads={uploads}
+        onUploadsChange={setUploads}
+        logo={null}
+        onLogoChange={() => { }}
+        businessName=""
+        onBusinessNameChange={() => { }}
+      />
       <GenerationLightbox
         open={lightboxOpen}
         url={lastImageUrl}
         onClose={closeLightbox}
-        originalPromptText={originalPrompt}
-        remixPromptText={remixAdditions}
-        combinedPromptText={normalize(combinedPrompt || originalPrompt)}
+        // Legacy props might be empty now, using editSummary
+        combinedPromptText={editSummary}
         onShare={handleShare}
-        onRemix={handleRemix}
+        onRemix={handleRemixFromLightbox}
       />
 
       <div className="mb-6">
@@ -266,102 +262,34 @@ function StudioContent() {
             <div className="text-lg font-semibold">Prompt Tool</div>
           </div>
 
-          {/* View full prompt */}
-          <button
-            type="button"
-            onClick={() => setShowFullPrompt((v) => !v)}
-            className="mt-5 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-4 text-left hover:border-white/20"
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-white/80">
-                View full prompt <span className="ml-2 text-xs font-normal text-white/40">(click to expand)</span>
-              </div>
-              <div className="text-xs text-white/50">{showFullPrompt ? "Hide" : "Show"}</div>
-            </div>
-
-            {showFullPrompt ? (
-              <div className="mt-3 whitespace-pre-wrap text-sm text-white/75">
-                {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
-              </div>
-            ) : null}
-          </button>
-
-          {/* Remix */}
+          {/* Edit Summary Display */}
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">Remix</div>
-            <p className="mt-2 text-sm text-white/55">
-              Describe what you want to change. We’ll use this to auto-remix the prompt.
-            </p>
-
+            <div className="text-sm font-semibold">Prompt</div>
             <textarea
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none placeholder:text-white/35 focus:border-white/25"
+              readOnly
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none focus:border-white/20"
               rows={6}
-              placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
-              value={remixAdditions}
-              onChange={(e) => setRemixAdditions(e.target.value)}
+              placeholder="Use 'Remix' to key in your changes..."
+              value={editSummary}
             />
           </div>
 
-          {/* ✅ Upload reference images */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Upload images</div>
-              <div className="text-xs text-white/45">{uploads.length}/10</div>
-            </div>
-
-            <p className="mt-2 text-sm text-white/55">
-              Optional. Upload up to 10 reference images to guide the generation.
-            </p>
-
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={onPickUploads}
-                />
-                Upload images
-              </label>
-
-              <button
-                type="button"
-                onClick={clearUploads}
-                className={[
-                  "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition",
-                  uploads.length
-                    ? "border-white/15 bg-black/40 text-white/80 hover:bg-black/60"
-                    : "cursor-not-allowed border-white/10 bg-black/20 text-white/35",
-                ].join(" ")}
-                disabled={!uploads.length}
-              >
-                Clear
-              </button>
-            </div>
-
-            {uploadPreviews.length ? (
-              <div className="mt-4 grid grid-cols-5 gap-2">
+          {/* Reference Uploads Preview (Read only view of what's in the wizard) */}
+          {uploads.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Subject References</div>
+                <div className="text-xs text-white/45">{uploads.length}</div>
+              </div>
+              <div className="mt-3 grid grid-cols-5 gap-2">
                 {uploadPreviews.map((src, idx) => (
-                  <div key={src} className="group relative overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                    <div className="relative aspect-square w-full">
-                      <Image src={src} alt={`Upload ${idx + 1}`} fill className="object-cover" />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeUpload(idx)}
-                      className="absolute right-1 top-1 rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-[11px] text-white/80 opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
-                      title="Remove"
-                    >
-                      Remove
-                    </button>
+                  <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                    <Image src={src} alt="Ref" fill className="object-cover" />
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="mt-4 text-xs text-white/45">No images uploaded.</div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Generator Settings */}
           <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -412,18 +340,6 @@ function StudioContent() {
             </div>
           ) : null}
 
-          {/* Original prompt (kept) */}
-          <div className="mt-6">
-            <div className="text-xs font-semibold text-white/55">Original prompt</div>
-            <textarea
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none placeholder:text-white/35 focus:border-white/25"
-              rows={5}
-              placeholder="Paste the original prompt here..."
-              value={originalPrompt}
-              onChange={(e) => setOriginalPrompt(e.target.value)}
-            />
-          </div>
-
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
@@ -431,6 +347,14 @@ function StudioContent() {
               className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold text-white/85 hover:bg-black/60 sm:py-2"
             >
               {copied ? "Copied" : "Copy Prompt"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWizardOpen(true)}
+              className="inline-flex items-center justify-center rounded-xl border border-lime-400/30 bg-lime-400/10 px-5 py-3 text-sm font-semibold text-lime-200 transition hover:bg-lime-400/20 sm:py-2"
+            >
+              Remix
             </button>
 
             <button
@@ -464,9 +388,9 @@ function StudioContent() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-xs font-semibold text-white/70">Combined prompt</div>
+            <div className="text-xs font-semibold text-white/70">Prompt Summary</div>
             <div className="mt-2 whitespace-pre-wrap text-sm text-white/80">
-              {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
+              {normalize(editSummary) || "Nothing yet."}
             </div>
           </div>
 

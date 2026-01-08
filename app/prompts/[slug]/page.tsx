@@ -4,6 +4,9 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
+import GenerationLightbox from "@/components/GenerationLightbox";
+import { RefineChat } from "@/components/RefineChat";
 
 /**
  * ✅ ADD: inline uploader UI (no extra component file needed)
@@ -66,8 +69,15 @@ function PromptContent() {
   const [metaRow, setMetaRow] = useState<PromptMetaRow | null>(null);
   const [bodyRow, setBodyRow] = useState<PromptBodyRow | null>(null);
 
-  const [remixInput, setRemixInput] = useState("");
+  const [remixInput, setRemixInput] = useState(""); // Kept for legacy check, but mostly unused now? No, remove to force update.
+  // Actually, if I remove `remixInput`, I break any lingering references.
+  // I will remove it and fix references.
   const [copied, setCopied] = useState(false);
+
+  // New Wizard State
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
+  const [editSummary, setEditSummary] = useState<string>("");
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
@@ -92,6 +102,8 @@ function PromptContent() {
   const MAX_UPLOADS = 10;
   const [uploads, setUploads] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
+  const [logo, setLogo] = useState<File | null>(null);
+  const [businessName, setBusinessName] = useState<string>("");
 
   useEffect(() => {
     // revoke old urls
@@ -160,11 +172,10 @@ function PromptContent() {
     if (img.length) setOverridePreviewUrl(img);
 
     if (prefill.length) {
-      setRemixInput(prefill);
-      setRemixIsFullPrompt(true);
+      setEditSummary(prefill);
+      // setRemixIsFullPrompt(true); // Concept deprecated? simple usage
     } else if (remix.length) {
-      setRemixInput(remix);
-      setRemixIsFullPrompt(false);
+      setEditSummary(remix);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -359,9 +370,8 @@ function PromptContent() {
 
   async function handleCopyPromptText() {
     if (isLocked) return;
-
     try {
-      await navigator.clipboard.writeText(fullPromptText || "");
+      await navigator.clipboard.writeText(editSummary || fullPromptText || "");
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -370,14 +380,12 @@ function PromptContent() {
   }
 
   function handleShare() {
-    // UI only for now
     console.log("Share coming soon");
   }
 
   async function handleCopyGenerated() {
     try {
-      const text = (lastFinalPrompt || remixInput || fullPromptText || "").trim();
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(editSummary || "");
     } catch {
       // no-op
     }
@@ -386,60 +394,115 @@ function PromptContent() {
   async function handleDownloadGenerated() {
     const url = (generatedImageUrl || overridePreviewUrl || "").trim();
     if (!url) return;
-
     try {
       const res = await fetch(url, { mode: "cors" });
       const blob = await res.blob();
       const obj = URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = obj;
       a.download = `prompt-generation-${Date.now()}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       URL.revokeObjectURL(obj);
     } catch {
       window.open(url, "_blank", "noopener,noreferrer");
     }
   }
 
+  async function handleRefine(instruction: string) {
+    if (generating || !generatedImageUrl) return;
+    setGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const refResponse = await fetch(generatedImageUrl);
+      const refBlob = await refResponse.blob();
+
+      const form = new FormData();
+      form.append("template_reference_image", refBlob, "ref_image.png");
+      form.append("prompt", instruction);
+      form.append("edit_instructions", instruction);
+      if (userId) form.append("userId", userId);
+
+      const { data: { session } } = await createSupabaseBrowserClient().auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: form,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Refinement failed");
+      }
+
+      const data = await res.json();
+      if (data.imageUrl) {
+        setGeneratedImageUrl(data.imageUrl);
+        // setHasGeneratedForActions(true); // Assuming this variable might not exist?
+      }
+    } catch (e: any) {
+      console.error(e);
+      setGenerateError(e.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   function handleRemixFocus() {
-    const el = document.getElementById("remix-input");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Trigger wizard, close lightbox
+    setLightboxOpen(false);
+    setWizardOpen(true);
+  }
+
+  function handleWizardComplete(summary: string, ans: RemixAnswers, files?: File[]) {
+    setEditSummary(summary);
+    setRemixAnswers(ans);
+    if (files) {
+      // files is File[]
+      // We need to manage uploads state
+      // clearUploads? or just set?
+      // setUploads is available? Yes.
+      // But setUploads appends? No, we likely want to replace if wizard returns the full set.
+      // But RemixChatWizard might return NEW uploads or ALL?
+      // In RemixChatWizard, onComplete calls with `uploads` (state).
+      // So it is the full set currently in the wizard.
+      // BUT my PromptPage implementation uses `addUploads` / `removeUpload`.
+      // `setUploads` updates the array.
+      // So `setUploads(files)` is correct.
+      setUploads(files);
+    }
+    setWizardOpen(false);
   }
 
   function handleRemixFromCard(row: RemixRow) {
-    const img = (row.image_url || "").trim();
-    const finalPrompt =
-      (row.prompt_text || "").trim() ||
-      (lastFinalPrompt || "").trim() ||
-      (fullPromptText || "").trim();
-
-    const target = `/prompts/${encodeURIComponent(slug)}?img=${encodeURIComponent(
-      img
-    )}&prefill=${encodeURIComponent(finalPrompt)}`;
-
-    router.push(target);
+    if (row.image_url) {
+      setOverridePreviewUrl(row.image_url);
+    }
+    // clear previous guided answers as we are starting a fresh remix on a new image
+    setRemixAnswers(null);
+    setEditSummary(""); // clear old summary or maybe keep it? Let's clear to force new chat flow.
+    setWizardOpen(true);
   }
 
   async function downloadAnyImage(url: string) {
     const u = (url || "").trim();
     if (!u) return;
-
     try {
       const res = await fetch(u, { mode: "cors" });
       const blob = await res.blob();
       const obj = URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = obj;
       a.download = `remix-${Date.now()}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       URL.revokeObjectURL(obj);
     } catch {
       window.open(u, "_blank", "noopener,noreferrer");
@@ -448,10 +511,8 @@ function PromptContent() {
 
   async function refreshRemixes() {
     if (!userId || !metaRow?.id) return;
-
     try {
       const supabase = createSupabaseBrowserClient();
-
       const { data } = await supabase
         .from("prompt_generations")
         .select("*")
@@ -469,7 +530,6 @@ function PromptContent() {
         remix: r?.remix ?? null,
         prompt_slug: r?.prompt_slug ?? null,
       }));
-
       setRemixes(rows.filter((r) => r.image_url.trim().length > 0));
     } catch {
       // no-op
@@ -496,77 +556,68 @@ function PromptContent() {
       return;
     }
 
+    if (!editSummary) {
+      setGenerateError("Please use 'Remix' to create instructions first.");
+      return;
+    }
+
     setGenerating(true);
     setGenerateError(null);
 
     try {
-      const remix = remixInput.trim();
+      const form = new FormData();
+      form.append("prompt", editSummary);
+      form.append("userId", userId);
+      form.append("aspectRatio", aspectRatio);
 
-      const finalPrompt = remixIsFullPrompt
-        ? remix
-        : remix.length > 0
-          ? `${fullPromptText}\n\nRemix instructions:\n${remix}`
-          : fullPromptText;
+      // context
+      form.append("promptId", metaRow.id);
+      form.append("promptSlug", metaRow.slug);
 
-      setLastFinalPrompt(finalPrompt);
+      // standard fields
+      form.append("edit_instructions", editSummary);
+      form.append("combined_prompt_text", editSummary);
+      form.append("template_reference_image", imageSrc); // The current preview image is the template anchor
 
-      // ✅ UPDATED: if uploads exist -> FormData /api/generate, else keep nano-banana JSON
-      let res: Response;
+      uploads.slice(0, MAX_UPLOADS).forEach((file) => {
+        form.append("images", file, file.name);
+      });
 
-      if (uploads.length > 0) {
-        const form = new FormData();
-        form.append("prompt", finalPrompt);
-        form.append("userId", userId);
-        form.append("aspectRatio", aspectRatio);
-
-        // context for your DB/history if /api/generate stores metadata
-        form.append("promptId", metaRow.id);
-        form.append("promptSlug", metaRow.slug);
-        form.append("originalPrompt", fullPromptText || "");
-        form.append("remixAdditions", remixIsFullPrompt ? "" : remix);
-        form.append("combinedPromptText", finalPrompt);
-
-        uploads.slice(0, MAX_UPLOADS).forEach((file) => {
-          form.append("images", file, file.name);
-        });
-
-        res = await fetch("/api/generate", {
-          method: "POST",
-          body: form,
-        });
-      } else {
-        res = await fetch("/api/nano-banana/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: finalPrompt,
-            aspectRatio,
-            userId,
-            promptId: metaRow.id,
-            promptSlug: metaRow.slug,
-            remix: remixIsFullPrompt ? "" : remix,
-          }),
-        });
+      if (logo) {
+        form.append("logo_image", logo, logo.name);
       }
+      if (businessName) {
+        form.append("business_name", businessName);
+      }
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: form,
+      });
 
       const json = await res.json();
 
-      if (!res.ok) throw new Error(json?.error || "Generation failed");
-      if (!json?.imageUrl) throw new Error("No imageUrl returned from generator");
+      if (!res.ok) {
+        setGenerateError(json?.error || json?.message || "Generation failed.");
+        setGenerating(false);
+        return;
+      }
 
-      const newUrl = String(json.imageUrl);
-      setGeneratedImageUrl(newUrl);
-
-      // optional, but avoids accidental reuse of old refs
-      setUploads([]);
-
-      await refreshRemixes();
-    } catch (err: any) {
-      setGenerateError(err?.message || "Generation failed");
+      const url = (json?.imageUrl || "").trim();
+      if (url) {
+        setGeneratedImageUrl(url);
+        setOverridePreviewUrl(url); // Show result in main preview
+        refreshRemixes();
+      } else {
+        setGenerateError("No image returned.");
+      }
+    } catch (e: any) {
+      setGenerateError(e?.message || "Failed.");
     } finally {
       setGenerating(false);
     }
   }
+
 
   function clearGenerated() {
     setGeneratedImageUrl(null);
@@ -622,549 +673,416 @@ function PromptContent() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
-      {/* Lightbox */}
-      {lightboxOpen && lightboxUrl ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-          onClick={closeLightbox}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="relative max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/60 px-4 py-3">
-              <div className="text-sm font-semibold text-white/80">Preview</div>
+    <>
+      <RemixChatWizard
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onComplete={handleWizardComplete}
+        templatePreviewUrl={imageSrc}
+        initialValues={remixAnswers}
+        uploads={uploads}
+        onUploadsChange={setUploads}
+        logo={logo}
+        onLogoChange={setLogo}
+        businessName={businessName}
+        onBusinessNameChange={setBusinessName}
+      />
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
+        {/* Lightbox */}
+        <GenerationLightbox
+          open={lightboxOpen}
+          url={lightboxUrl}
+          onClose={closeLightbox}
+          combinedPromptText={editSummary || fullPromptText || ""}
+          onShare={handleShare}
+          onRemix={handleRemixFocus}
+        />
 
-              <div className="flex items-center gap-2">
-                {hasGeneratedForActions ? (
-                  <>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                      onClick={handleDownloadGenerated}
-                    >
-                      Download
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                      onClick={handleCopyGenerated}
-                    >
-                      Copy
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                      onClick={handleShare}
-                    >
-                      Share
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
-                      onClick={handleRemixFocus}
-                    >
-                      Remix
-                    </button>
-                  </>
-                ) : null}
-
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-xs text-white/80 hover:bg-black/60"
-                  onClick={closeLightbox}
-                >
-                  Close
-                </button>
-              </div>
+        <div className="mb-5 sm:mb-7">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">{metaRow.title}</h1>
+              <p className="mt-2 max-w-3xl text-sm text-white/70 sm:text-base">
+                {metaRow.summary && metaRow.summary.trim().length > 0
+                  ? metaRow.summary
+                  : "Open the full prompt, remix it, and generate output (image/video) right here."}
+              </p>
             </div>
 
-            <div className="relative h-[80vh] w-full bg-black">
-              <Image src={lightboxUrl} alt="Full screen preview" fill className="object-contain" priority />
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mb-5 sm:mb-7">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">{metaRow.title}</h1>
-            <p className="mt-2 max-w-3xl text-sm text-white/70 sm:text-base">
-              {metaRow.summary && metaRow.summary.trim().length > 0
-                ? metaRow.summary
-                : "Open the full prompt, remix it, and generate output (image/video) right here."}
-            </p>
-          </div>
-
-          <button
-            className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50 sm:mt-0 sm:w-auto"
-            onClick={() => router.push("/prompts")}
-          >
-            Back to Prompts
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* PREVIEW PANEL */}
-        <section className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <button
-            type="button"
-            className="block w-full text-left"
-            onClick={() => openLightbox(imageSrc)}
-            title="Open full screen"
-          >
-            <div
-              className={[
-                "relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black",
-                previewAspectClass,
-              ].join(" ")}
+            <button
+              className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50 sm:mt-0 sm:w-auto"
+              onClick={() => router.push("/prompts")}
             >
-              <Image
-                src={imageSrc}
-                alt={metaRow.title}
-                fill
-                className={imageSrc === fallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
-                priority
-              />
-
-              {imageSrc === fallbackOrb ? (
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
-              ) : null}
-            </div>
-          </button>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
-              {(metaRow.category ?? "general").toString().toUpperCase()}
-            </span>
-
-            <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/50">
-              SLUG: {metaRow.slug}
-            </span>
-
-            {showProBadge ? (
-              <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-[11px] text-lime-200">
-                PRO
-              </span>
-            ) : null}
-
-            {generatedImageUrl ? (
-              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
-                GENERATED
-              </span>
-            ) : null}
+              Back to Prompts
+            </button>
           </div>
+        </div>
 
-          {generateError ? (
-            <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
-              {generateError}
-            </div>
-          ) : null}
+        <div className="grid gap-5 lg:grid-cols-2">
+          {/* PREVIEW PANEL */}
+          <section className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
+            <button
+              type="button"
+              className="block w-full text-left"
+              onClick={() => openLightbox(imageSrc)}
+              title="Open full screen"
+            >
+              <div
+                className={[
+                  "relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black",
+                  previewAspectClass,
+                ].join(" ")}
+              >
+                <Image
+                  src={imageSrc}
+                  alt={metaRow.title}
+                  fill
+                  className={imageSrc === fallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
+                  priority
+                />
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold">Preview</div>
+                {imageSrc === fallbackOrb ? (
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
+                ) : null}
+              </div>
+            </button>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
+                {(metaRow.category ?? "general").toString().toUpperCase()}
+              </span>
+
+              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/50">
+                SLUG: {metaRow.slug}
+              </span>
+
+              {showProBadge ? (
+                <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-[11px] text-lime-200">
+                  PRO
+                </span>
+              ) : null}
 
               {generatedImageUrl ? (
-                <button
-                  type="button"
-                  onClick={clearGenerated}
-                  className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/80 hover:bg-black/50"
-                >
-                  Clear output
-                </button>
+                <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
+                  GENERATED
+                </span>
               ) : null}
             </div>
 
-            <p className="mt-2 text-sm text-white/65">Click the image to view full screen.</p>
-
-            {hasGeneratedForActions ? (
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <button
-                  type="button"
-                  onClick={handleDownloadGenerated}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                >
-                  Download
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCopyGenerated}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                >
-                  Copy
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                >
-                  Share
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleRemixFocus}
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
-                >
-                  Remix
-                </button>
+            {generateError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
+                {generateError}
               </div>
             ) : null}
-          </div>
-        </section>
 
-        {/* TOOL PANEL */}
-        <section className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="text-lg font-semibold">Prompt Tool</div>
-
-
-          {isLocked ? (
-            <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
-              <div className="text-sm font-semibold text-lime-200">{lockedTitle}</div>
-              <p className="mt-1 text-sm text-white/70">{lockedBody}</p>
-
-              {lockReason === "login" ? (
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                    onClick={() => router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
-                  >
-                    Log in
-                  </button>
-
-                  <button
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
-                    onClick={() => router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
-                  >
-                    Create free account
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                  onClick={() => router.push("/pricing")}
-                >
-                  Upgrade to Pro
-                </button>
-              )}
-            </div>
-          ) : null}
-
-          <div className="mt-4">
-            <details className="group rounded-2xl border border-white/10 bg-black/30 p-4">
-              <summary className="cursor-pointer select-none list-none text-sm font-semibold text-white/85">
-                View full prompt <span className="ml-2 text-xs text-white/50">(click to expand)</span>
-              </summary>
-
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/40 p-3">
-                <pre className="whitespace-pre-wrap break-words text-sm text-white/80">
-                  {isLocked
-                    ? lockReason === "login"
-                      ? "Locked. Log in to view this prompt."
-                      : "Locked. Upgrade to Pro to view this prompt."
-                    : fullPromptText && fullPromptText.trim().length > 0
-                      ? fullPromptText
-                      : "No prompt text found yet. Add it to the prompt or prompt_text column in Supabase."}
-                </pre>
-              </div>
-            </details>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">Remix</div>
-            <p className="mt-2 text-sm text-white/60">
-              Describe what you want to change. We’ll use this to auto-remix the prompt.
-            </p>
-
-            <textarea
-              id="remix-input"
-              className={[
-                "mt-3 w-full rounded-2xl border p-3 text-sm outline-none placeholder:text-white/35 focus:border-white/20",
-                isLocked
-                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                  : "border-white/10 bg-black/40 text-white/90",
-              ].join(" ")}
-              rows={4}
-              placeholder={
-                remixIsFullPrompt
-                  ? "Prefilled prompt loaded. Edit it and press Generate."
-                  : "Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
-              }
-              value={remixInput}
-              onChange={(e) => setRemixInput(e.target.value)}
-              disabled={isLocked}
-            />
-
-            {/* ✅ ADD: Upload Images UI (up to 10) */}
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Upload images</div>
-                <div className="text-xs text-white/50">
-                  {uploads.length}/{MAX_UPLOADS}
-                </div>
-              </div>
-              <p className="mt-2 text-sm text-white/55">
-                Optional. Upload up to 10 reference images to guide the generation.
-              </p>
-
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label
-                  className={[
-                    "inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition",
-                    isLocked
-                      ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                      : "border-white/15 bg-black/30 text-white/85 hover:bg-black/50",
-                  ].join(" ")}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    disabled={isLocked}
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      addUploads(files);
-                      e.target.value = "";
-                    }}
-                  />
-                  Upload images
-                </label>
-
-                <button
-                  type="button"
-                  onClick={clearUploads}
-                  disabled={isLocked || uploads.length === 0}
-                  className={[
-                    "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition",
-                    isLocked || uploads.length === 0
-                      ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                      : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
-                  ].join(" ")}
-                >
-                  Clear
-                </button>
-              </div>
-
-              {uploadPreviews.length ? (
-                <div className="mt-4 grid grid-cols-5 gap-2">
-                  {uploadPreviews.map((src, idx) => (
-                    <div
-                      key={src}
-                      className="group relative overflow-hidden rounded-xl border border-white/10 bg-black/30"
-                      title={uploads[idx]?.name || ""}
-                    >
-                      <div className="relative aspect-square w-full">
-                        <Image src={src} alt={`Upload ${idx + 1}`} fill className="object-cover" />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => removeUpload(idx)}
-                        disabled={isLocked}
-                        className={[
-                          "absolute right-1 top-1 rounded-lg border px-2 py-1 text-[11px] transition",
-                          isLocked
-                            ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                            : "border-white/15 bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-black/80",
-                        ].join(" ")}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-4 text-xs text-white/45">No images uploaded.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold">Generator Settings</div>
-              <div className="text-xs text-white/50">
-                Selected: {mediaType.toUpperCase()} · {aspectRatio}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill
-                label="Image"
-                selected={mediaType === "image"}
-                onClick={() => setMediaType("image")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <SelectPill
-                label="9:16"
-                selected={aspectRatio === "9:16"}
-                onClick={() => setAspectRatio("9:16")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="16:9"
-                selected={aspectRatio === "16:9"}
-                onClick={() => setAspectRatio("16:9")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="1:1"
-                selected={aspectRatio === "1:1"}
-                onClick={() => setAspectRatio("1:1")}
-                disabled={isLocked || generating}
-              />
-              <SelectPill
-                label="4:5"
-                selected={aspectRatio === "4:5"}
-                onClick={() => setAspectRatio("4:5")}
-                disabled={isLocked || generating}
-              />
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <button
-              className={[
-                "inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:py-2",
-                isLocked
-                  ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                  : "border-white/15 bg-black/40 text-white/85 hover:bg-black/60",
-              ].join(" ")}
-              onClick={handleCopyPromptText}
-              disabled={isLocked}
-            >
-              {copied ? "Copied" : "Copy Prompt"}
-            </button>
-
-            <button
-              className={[
-                "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
-                isLocked
-                  ? "bg-white/10 text-white/40 hover:bg-white/15"
-                  : generating
-                    ? "bg-lime-400/60 text-black"
-                    : "bg-lime-400 text-black hover:bg-lime-300",
-              ].join(" ")}
-              onClick={handleGenerate}
-              disabled={isLocked || generating}
-            >
-              {generating
-                ? "Generating..."
-                : lockReason === "login"
-                  ? "Log in to Generate"
-                  : isLocked
-                    ? "Upgrade to Pro"
-                    : "Generate"}
-            </button>
-          </div>
-
-          {userId ? (
             <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Remixes</div>
-                <div className="text-xs text-white/50">
-                  {remixesLoading ? "Loading..." : remixes.length ? `${remixes.length}` : "0"}
-                </div>
+                <div className="text-sm font-semibold">Preview</div>
+
+                {generatedImageUrl ? (
+                  <button
+                    type="button"
+                    onClick={clearGenerated}
+                    className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/80 hover:bg-black/50"
+                  >
+                    Clear output
+                  </button>
+                ) : null}
               </div>
 
-              {remixesError ? (
-                <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">
-                  {remixesError}
+              <p className="mt-2 text-sm text-white/65">Click the image to view full screen.</p>
+
+              {hasGeneratedForActions ? (
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={handleDownloadGenerated}
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                  >
+                    Download
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyGenerated}
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                  >
+                    Copy
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
+                  >
+                    Share
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRemixFocus}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
+                  >
+                    Remix
+                  </button>
                 </div>
               ) : null}
+            </div>
+          </section>
 
-              {remixesLoading ? (
-                <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
-              ) : remixes.length === 0 ? (
-                <div className="mt-3 text-sm text-white/60">
-                  No remixes yet. Generate one to start building your library.
-                </div>
-              ) : (
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {remixes.slice(0, 12).map((r) => (
-                    <div
-                      key={r.id}
-                      className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
+          {/* TOOL PANEL */}
+          <section className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
+            <div className="text-lg font-semibold">Prompt Tool</div>
+
+
+            {isLocked ? (
+              <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
+                <div className="text-sm font-semibold text-lime-200">{lockedTitle}</div>
+                <p className="mt-1 text-sm text-white/70">{lockedBody}</p>
+
+                {lockReason === "login" ? (
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                      onClick={() => router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
                     >
-                      <button
-                        type="button"
-                        onClick={() => openLightbox(r.image_url)}
-                        className="block w-full"
-                        title="Tap to view full screen"
-                      >
-                        <div className="relative aspect-square w-full">
-                          <Image src={r.image_url} alt="Remix" fill className="object-cover" />
-                        </div>
-                      </button>
+                      Log in
+                    </button>
 
-                      {/* Hover actions */}
-                      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
-                        <div className="absolute inset-0 bg-black/40" />
-                        <div className="pointer-events-auto absolute bottom-2 left-2 right-2 grid grid-cols-4 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => downloadAnyImage(r.image_url)}
-                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
-                          >
-                            Download
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCopyGenerated}
-                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
-                          >
-                            Copy
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleShare}
-                            className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
-                          >
-                            Share
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemixFromCard(r)}
-                            className="rounded-lg bg-lime-400 px-2 py-2 text-[11px] font-semibold text-black hover:bg-lime-300"
-                          >
-                            Remix
-                          </button>
-                        </div>
-                      </div>
+                    <button
+                      className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
+                      onClick={() => router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
+                    >
+                      Create free account
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                    onClick={() => router.push("/pricing")}
+                  >
+                    Upgrade to Pro
+                  </button>
+                )}
+              </div>
+            ) : null}
+
+            <div className="mt-4">
+              {/* EDIT SUMMARY DISPLAY (Replaces "View full prompt" and "Remix Input") */}
+              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="text-sm font-semibold">Prompt</div>
+
+                {generatedImageUrl ? (
+                  <RefineChat onRefine={handleRefine} isGenerating={generating} />
+                ) : (
+                  <textarea
+                    readOnly
+                    onClick={!isLocked ? handleRemixFocus : undefined}
+                    className={[
+                      "mt-3 w-full rounded-2xl border p-4 text-sm outline-none focus:border-white/20 transition-colors",
+                      isLocked ? "border-white/5 bg-black/20 text-white/30 cursor-not-allowed" : "border-white/10 bg-black/40 text-white/85 cursor-pointer hover:bg-black/50 hover:border-white/20"
+                    ].join(" ")}
+                    rows={6}
+                    placeholder={isLocked ? "Locked." : "Click here to remix constraints & instructions..."}
+                    value={editSummary}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Reference Uploads Preview (Read only view of what's in the wizard) */}
+            {uploads.length > 0 && !isLocked && (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Subject References</div>
+                  <div className="text-xs text-white/45">{uploads.length}</div>
+                </div>
+                <div className="mt-3 grid grid-cols-5 gap-2">
+                  {uploadPreviews.map((src, idx) => (
+                    <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                      <Image src={src} alt="Ref" fill className="object-cover" unoptimized />
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => router.push("/library")}
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
-                >
-                  View all remixes
-                </button>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold">Generator Settings</div>
+                <div className="text-xs text-white/50">
+                  Selected: {mediaType.toUpperCase()} · {aspectRatio}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SelectPill
+                  label="Image"
+                  selected={mediaType === "image"}
+                  onClick={() => setMediaType("image")}
+                  disabled={isLocked || generating}
+                />
+                <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SelectPill
+                  label="9:16"
+                  selected={aspectRatio === "9:16"}
+                  onClick={() => setAspectRatio("9:16")}
+                  disabled={isLocked || generating}
+                />
+                <SelectPill
+                  label="16:9"
+                  selected={aspectRatio === "16:9"}
+                  onClick={() => setAspectRatio("16:9")}
+                  disabled={isLocked || generating}
+                />
+                <SelectPill
+                  label="1:1"
+                  selected={aspectRatio === "1:1"}
+                  onClick={() => setAspectRatio("1:1")}
+                  disabled={isLocked || generating}
+                />
+                <SelectPill
+                  label="4:5"
+                  selected={aspectRatio === "4:5"}
+                  onClick={() => setAspectRatio("4:5")}
+                  disabled={isLocked || generating}
+                />
               </div>
             </div>
-          ) : null}
-        </section>
-      </div >
-    </main >
+
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                className={[
+                  "inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:py-2",
+                  isLocked
+                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
+                    : "border-white/15 bg-black/40 text-white/85 hover:bg-black/60",
+                ].join(" ")}
+                onClick={handleCopyPromptText}
+                disabled={isLocked}
+              >
+                {copied ? "Copied" : "Copy Prompt"}
+              </button>
+
+              <button
+                className={[
+                  "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
+                  isLocked
+                    ? "bg-white/10 text-white/40 hover:bg-white/15"
+                    : generating
+                      ? "bg-lime-400/60 text-black"
+                      : "bg-lime-400 text-black hover:bg-lime-300",
+                ].join(" ")}
+                onClick={handleGenerate}
+                disabled={isLocked || generating}
+              >
+                {generating
+                  ? "Generating..."
+                  : lockReason === "login"
+                    ? "Log in to Generate"
+                    : isLocked
+                      ? "Upgrade to Pro"
+                      : "Generate"}
+              </button>
+            </div>
+
+            {userId ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold">Remixes</div>
+                  <div className="text-xs text-white/50">
+                    {remixesLoading ? "Loading..." : remixes.length ? `${remixes.length}` : "0"}
+                  </div>
+                </div>
+
+                {remixesError ? (
+                  <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">
+                    {remixesError}
+                  </div>
+                ) : null}
+
+                {remixesLoading ? (
+                  <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
+                ) : remixes.length === 0 ? (
+                  <div className="mt-3 text-sm text-white/60">
+                    No remixes yet. Generate one to start building your library.
+                  </div>
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {remixes.slice(0, 12).map((r) => (
+                      <div
+                        key={r.id}
+                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openLightbox(r.image_url)}
+                          className="block w-full"
+                          title="Tap to view full screen"
+                        >
+                          <div className="relative aspect-square w-full">
+                            <Image src={r.image_url} alt="Remix" fill className="object-cover" />
+                          </div>
+                        </button>
+
+                        {/* Hover actions */}
+                        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
+                          <div className="absolute inset-0 bg-black/40" />
+                          <div className="pointer-events-auto absolute bottom-2 left-2 right-2 grid grid-cols-4 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => downloadAnyImage(r.image_url)}
+                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                            >
+                              Download
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCopyGenerated}
+                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                            >
+                              Copy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleShare}
+                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                            >
+                              Share
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemixFromCard(r)}
+                              className="rounded-lg bg-lime-400 px-2 py-2 text-[11px] font-semibold text-black hover:bg-lime-300"
+                            >
+                              Remix
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/library")}
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
+                  >
+                    View all remixes
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div >
+      </main>
+    </>
   );
 }
 
