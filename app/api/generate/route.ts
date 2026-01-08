@@ -13,12 +13,12 @@ const SYSTEM_CORE = `
 `;
 
 const SYSTEM_IDENTITY = `
-[STRICT IDENTITY LOCK]
-1. IMAGE ROLES: The FIRST image provided is the TEMPLATE. All SUBSEQUENT images are the SUBJECT REFERENCE.
-2. ACTION: You MUST replace the subject in the TEMPLATE (Image 1) with the person in the SUBJECT REFERENCE (Images 2+).
-3. ABSOLUTE LIKENESS: The new face MUST match the SUBJECT REFERENCE 100%. Use "face swap" quality.
-4. NO ENHANCEMENT: Do NOT beautify or alter the subject's features.
-5. INTEGRATION: Keep the lighting/shadows of the Template, but apply them to the new Subject's face without changing the face shape.
+[STRICT SUBJECT REPLACEMENT & LAYOUT ADAPTATION]
+1. REPLACE SUBJECT: Replace the main subject in the template with the person in the Uploaded Photo.
+2. PRESERVE UPLOAD PERSPECTIVE: You MUST keep the same camera angle, perspective, and body size of the person in the Uploaded Photo.
+3. ADAPT DESIGN: Design the new image AROUND the uploaded subject and their perspective. Do NOT warp the subject to fit the template.
+4. LIKENESS LOCK: Keep the facial position, expression, and features exactly consistent with the Uploaded Photo.
+5. INTEGRATION: Blend the subject into the scene naturally (lighting/shadows) but maintain their physical integrity (clothing, body shape, head shape) as provided in the upload.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
