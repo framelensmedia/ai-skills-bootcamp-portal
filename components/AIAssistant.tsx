@@ -184,8 +184,7 @@ export default function AIAssistant() {
                                 {[
                                     "Write a catchy headline",
                                     "Suggest blog topics",
-                                    "Explain the remix tool",
-                                    "Create a logo Prompt"
+                                    "Explain the remix tool"
                                 ].map((s) => (
                                     <button
                                         key={s}
