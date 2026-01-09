@@ -186,28 +186,32 @@ export default function RemixChatWizard({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" role="dialog">
-            <div className="flex flex-col-reverse md:flex-row h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-0 md:p-4" role="dialog">
+            <div className="flex flex-col-reverse md:flex-row h-[100dvh] md:h-[90vh] w-full max-w-5xl overflow-hidden bg-black md:rounded-2xl md:border md:border-white/10">
                 <div className="flex w-full flex-col md:w-2/3 h-full overflow-hidden">
                     {/* Header */}
-                    <div className="flex items-center justify-between border-b border-white/10 bg-black/60 p-4">
+                    <div className="flex items-center justify-between border-b border-white/10 bg-black/60 p-4 shrink-0">
                         <div className="text-sm font-semibold text-white">Guided Remix</div>
-                        <button onClick={onClose} className="text-white/40 hover:text-white">✕</button>
+                        <button onClick={onClose} className="p-2 text-white/40 hover:text-white">✕</button>
                     </div>
 
                     {/* Chat Area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-4 md:p-4">
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-2xl p-4 text-sm ${m.role === 'user' ? 'bg-lime-400 text-black rounded-tr-none' : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'}`}>
-                                    {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
+                                <div className={`
+                                    rounded-2xl p-4 text-sm
+                                    ${m.role === 'user' ? 'bg-lime-400 text-black rounded-tr-none' : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'}
+                                    ${(m.isUploadStep || m.isLogoStep) ? 'w-full max-w-full' : 'max-w-[95%] md:max-w-[85%]'}
+                                `}>
+                                    {m.text && <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>}
                                     {m.isUploadStep && (
-                                        <div className="mt-3">
+                                        <div className="mt-3 -mx-1">
                                             <UploadStepWrapper files={uploads} setFiles={onUploadsChange} />
                                         </div>
                                     )}
                                     {m.isLogoStep && (
-                                        <div className="mt-3">
+                                        <div className="mt-3 -mx-1">
                                             <LogoStepWrapper logo={logo} setLogo={onLogoChange} />
                                         </div>
                                     )}
@@ -219,9 +223,9 @@ export default function RemixChatWizard({
                     </div>
 
                     {/* Input Area */}
-                    <div className="border-t border-white/10 bg-black/60 p-4 md:p-6 shrink-0 z-10">
+                    <div className="border-t border-white/10 bg-black/80 backdrop-blur-xl p-4 shrink-0 z-10 pb-8 md:pb-6">
                         {currentStep === "intro" ? (
-                            <button onClick={() => advanceStep()} className="w-full rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black hover:bg-lime-300">
+                            <button onClick={() => advanceStep()} className="w-full rounded-xl bg-lime-400 py-4 text-sm font-bold text-black hover:bg-lime-300 md:py-3">
                                 Looks good, start editing
                             </button>
                         ) : (
@@ -243,7 +247,7 @@ export default function RemixChatWizard({
                                         }
                                     }}
                                 />
-                                <button onClick={() => advanceStep()} className="rounded-xl bg-lime-400 px-6 py-3 text-sm font-semibold text-black hover:bg-lime-300 whitespace-nowrap">
+                                <button onClick={() => advanceStep()} className="rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black hover:bg-lime-300 whitespace-nowrap">
                                     Next
                                 </button>
                                 <button onClick={() => advanceStep(true)} className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold text-white/60 hover:bg-black/60 whitespace-nowrap">
@@ -269,7 +273,7 @@ export default function RemixChatWizard({
 function LogoStepWrapper({ logo, setLogo }: { logo: File | null, setLogo: (f: File | null) => void }) {
     // Simplified single-file uploader for logo
     return (
-        <div className="w-full min-w-[200px]">
+        <div className="w-full min-w-0">
             <ImageUploader files={logo ? [logo] : []} onChange={(files) => setLogo(files[0] || null)} maxFiles={1} />
         </div>
     );
@@ -278,7 +282,7 @@ function LogoStepWrapper({ logo, setLogo }: { logo: File | null, setLogo: (f: Fi
 // But I am replacing almost everything. I should include UploadStepWrapper.
 function UploadStepWrapper({ files, setFiles }: { files: File[], setFiles: (f: File[]) => void }) {
     return (
-        <div className="w-full min-w-[300px]">
+        <div className="w-full min-w-0">
             <ImageUploader files={files} onChange={setFiles} maxFiles={10} />
         </div>
     );
