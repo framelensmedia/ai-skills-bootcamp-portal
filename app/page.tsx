@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
 
@@ -148,7 +148,73 @@ function FeaturedPromptSlider({ items }: { items: PublicPrompt[] }) {
   );
 }
 
+// Typewriter Component
+function Typewriter({ text, className = "", gradientWords = [] }: { text: string; className?: string; gradientWords?: string[] }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Calculate total duration roughly: (text length in chars + spaces) * 100ms
+  const [complete, setComplete] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      const totalChars = text.length;
+      const duration = totalChars * 100 + 500; // +0.5s buffer
+      const t = setTimeout(() => setComplete(true), duration);
+      return () => clearTimeout(t);
+    }
+  }, [visible, text]);
+
+  const words = text.split(" ");
+
+  return (
+    <span ref={ref} className={className}>
+      {words.map((word, wordIndex) => {
+        const isGradient = gradientWords.includes(word);
+        // We need cumulative character count for delay? 
+        // Or just simplify: assume text is "AI Made Easy"
+        // Words: ["AI", "Made", "Easy"]
+        // Delay offset calculation
+        const previousChars = words.slice(0, wordIndex).join(" ").length + (wordIndex > 0 ? 1 : 0);
+
+        return (
+          <span key={wordIndex}>
+            {word.split("").map((char, charIndex) => (
+              <span
+                key={charIndex}
+                className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'} ${isGradient ? "text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400" : "text-white"}`}
+                style={{ transitionDelay: `${(previousChars + charIndex) * 100}ms` }}
+              >
+                {char}
+              </span>
+            ))}
+            {wordIndex < words.length - 1 && (
+              <span
+                className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'}`}
+                style={{ transitionDelay: `${(previousChars + word.length) * 100}ms` }}
+              >&nbsp;</span>
+            )}
+          </span>
+        );
+      })}
+      <span className={`inline-block ml-1 text-[#B7FF00] transition-opacity duration-1000 ${!complete ? "animate-pulse" : ""} ${visible && !complete ? 'opacity-100' : 'opacity-0'}`}>|</span>
+    </span>
+  );
+}
+
 export default function HomePage() {
+
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [recentPrompts, setRecentPrompts] = useState<PublicPrompt[]>([]);
@@ -221,7 +287,7 @@ export default function HomePage() {
             </div>
 
             <h1 className="mt-6 text-5xl font-bold tracking-tight text-white md:text-7xl">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400">AI</span> Made Easy
+              <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-relaxed text-white/60 md:text-lg">

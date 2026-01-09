@@ -123,7 +123,7 @@ export default function AIAssistant() {
                     }`}
             >
                 {/* Close & Header Controls */}
-                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start z-20 pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between bg-black px-6 py-4 border-b border-white/10">
                     {/* Left: Branding (Only visible when Expanded) */}
                     <div className={`flex items-center gap-3 pointer-events-auto transition-opacity duration-500 ${isExpanded ? "opacity-100" : "opacity-0"}`}>
                         <div className="relative h-8 w-8 sm:h-9 sm:w-9 shrink-0">
