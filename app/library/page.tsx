@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import { Pencil, Check, X, Trash2 } from "lucide-react";
 
 type SortMode = "newest" | "oldest";
 
@@ -98,6 +99,11 @@ function LibraryContent() {
   const [lbRemix, setLbRemix] = useState("");
   const [lbCombined, setLbCombined] = useState("");
 
+  // Editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+
   function openLightbox(it: LibraryItem) {
     setLightboxUrl(it.imageUrl);
     setLbOriginal(it.originalPromptText);
@@ -126,9 +132,42 @@ function LibraryContent() {
   }) {
     const href =
       `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
-      `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
       `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
     router.push(href);
+  }
+
+  async function handleUpdateTitle(id: string) {
+    if (!editingValue.trim()) return;
+    setSavingId(id);
+    const supabase = createSupabaseBrowserClient();
+    try {
+      const { data: row } = await supabase.from("prompt_generations").select("settings").eq("id", id).single();
+      if (row) {
+        const newSettings = { ...row.settings, headline: editingValue };
+        await supabase.from("prompt_generations").update({ settings: newSettings }).eq("id", id);
+        setItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: editingValue } : it)));
+      }
+    } catch (e) {
+      console.error("Failed to update title", e);
+    } finally {
+      setSavingId(null);
+      setEditingId(null);
+      setEditingValue("");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Are you sure you want to delete this image?")) return;
+    const supabase = createSupabaseBrowserClient();
+    // Optimistic remove
+    setItems((prev) => prev.filter((it) => it.id !== id));
+
+    try {
+      await supabase.from("prompt_generations").delete().eq("id", id);
+    } catch (e) {
+      console.error("Delete failed", e);
+      // If it fails, we should probably re-fetch, but for now just logging.
+    }
   }
 
   useEffect(() => {
@@ -212,7 +251,8 @@ function LibraryContent() {
             promptSlug: g.prompt_slug ?? null,
             aspectRatio,
 
-            promptTitle: p?.title || g.prompt_slug || "Unknown prompt",
+            // Use remix headline if available, else prompt title/slug
+            promptTitle: g.settings?.headline || p?.title || g.prompt_slug || "Untitled",
             promptCategory: p?.category ?? null,
 
             originalPromptText,
@@ -329,7 +369,67 @@ function LibraryContent() {
                 </button>
 
                 <div className="mt-2 flex flex-col gap-1 px-1">
-                  <div className="text-xs font-semibold text-white/85 line-clamp-1">{it.promptTitle}</div>
+                  <div className="flex items-center justify-between gap-2 h-6">
+                    {editingId === it.id ? (
+                      <div className="flex flex-1 items-center gap-1">
+                        <input
+                          autoFocus
+                          className="w-full min-w-0 rounded border border-white/20 bg-black/50 px-1 py-0.5 text-xs text-white placeholder-white/30 focus:border-white/50 focus:outline-none"
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleUpdateTitle(it.id);
+                          }}
+                        />
+                        <button
+                          onClick={() => handleUpdateTitle(it.id)}
+                          disabled={!!savingId}
+                          className="text-lime-400 hover:text-lime-300"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditingValue("");
+                          }}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="text-xs font-semibold text-white/85 line-clamp-1 cursor-pointer hover:text-white"
+                          onClick={() => {
+                            setEditingId(it.id);
+                            setEditingValue(it.promptTitle);
+                          }}
+                          title="Click to rename"
+                        >
+                          {it.promptTitle}
+                        </div>
+                        <button
+                          className="shrink-0 text-white/20 hover:text-white transition-colors p-1"
+                          onClick={() => {
+                            setEditingId(it.id);
+                            setEditingValue(it.promptTitle);
+                          }}
+                          title="Edit title"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          className="shrink-0 text-white/20 hover:text-red-400 transition-colors p-1"
+                          onClick={() => handleDelete(it.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {it.promptSlug ? (

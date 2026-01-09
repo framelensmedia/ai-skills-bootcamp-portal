@@ -81,6 +81,7 @@ export async function POST(req: Request) {
         let imageFiles: File[] = [];
         let logoFile: File | null = null;
         let businessName: string | null = null;
+        let headline: string | null = null;
         let templateFile: File | null = null;
 
         // 1. Parse Input
@@ -112,6 +113,9 @@ export async function POST(req: Request) {
             logoFile = form.get("logo_image") as File | null;
             businessName = String(form.get("business_name") ?? "").trim() || null;
             if (!businessName) businessName = null;
+
+            headline = String(form.get("headline") ?? "").trim() || null;
+            if (!headline) headline = null;
 
             imageFiles = form.getAll("images") as File[];
         } else {
@@ -335,6 +339,7 @@ export async function POST(req: Request) {
                     combined_prompt_text: combined_prompt_text || rawPrompt,
                     edit_instructions,
                     template_reference_image,
+                    headline,
                 },
             });
         } catch (e) {

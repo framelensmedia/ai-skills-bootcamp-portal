@@ -603,6 +603,9 @@ function PromptContent() {
       if (businessName) {
         form.append("business_name", businessName);
       }
+      if (remixAnswers?.headline) {
+        form.append("headline", remixAnswers.headline);
+      }
 
       const res = await fetch("/api/generate", {
         method: "POST",
