@@ -14,7 +14,9 @@ import {
   Clock,
   AlertCircle,
   ArrowLeft,
-  Upload
+  Upload,
+  Shield,
+  Sparkles
 } from "lucide-react";
 
 type PromptRow = {
