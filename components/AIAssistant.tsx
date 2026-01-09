@@ -280,21 +280,31 @@ export default function AIAssistant() {
 
             {/* --- MINIMIZED BUTTON (Bottom Tab) --- */}
             <div
-                className={`fixed bottom-0 right-8 z-[90] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isOpen ? "translate-y-0" : "translate-y-20 opacity-0 pointer-events-none"
+                className={`fixed bottom-0 right-0 z-[90] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${!isOpen ? "translate-y-0" : "translate-y-20 opacity-0 pointer-events-none"
                     }`}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
             >
                 <button
-                    onClick={() => { setIsOpen(true); setIsExpanded(false); }}
-                    className={`group flex items-center gap-2 rounded-t-xl bg-[#B7FF00]/90 backdrop-blur-sm px-6 py-2.5 shadow-[0_0_20px_rgba(183,255,0,0.2)] transition-all duration-500 will-change-transform ${isIdle
-                        ? "translate-y-0 opacity-50 grayscale-[0.5] hover:opacity-100 hover:grayscale-0"
-                        : "translate-y-0 opacity-100 hover:pb-4 hover:-translate-y-1"
+                    onClick={() => {
+                        if (isIdle) {
+                            setIsIdle(false);
+                            return;
+                        }
+                        setIsOpen(true);
+                        setIsExpanded(false);
+                    }}
+                    className={`group flex items-center gap-0 rounded-l-2xl rounded-r-none bg-[#B7FF00] backdrop-blur-md pl-4 pr-4 py-3 shadow-[0_0_20px_rgba(183,255,0,0.2)] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isIdle
+                        ? "translate-x-[calc(100%-3.5rem)] opacity-50 hover:translate-x-0 hover:opacity-100"
+                        : "translate-x-0 opacity-100"
                         }`}
                 >
-                    <Sparkles size={18} className="text-black fill-current" />
-                    <span className="text-sm font-bold text-black tracking-wide">Ask AI</span>
-                    <span className={`ml-1 h-2 w-2 rounded-full bg-black animate-pulse opacity-50 transition-opacity ${isIdle ? 'opacity-0' : 'opacity-50'}`}></span>
+                    <Sparkles size={20} className="text-black fill-current shrink-0 mr-3" />
+
+                    <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] whitespace-nowrap ${isIdle ? "w-0 opacity-0" : "w-auto opacity-100 pr-4"
+                        }`}>
+                        <span className="text-sm font-bold text-black tracking-wide">Ask AI</span>
+                    </div>
                 </button>
             </div>
         </>
