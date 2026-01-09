@@ -170,11 +170,11 @@ export default function AIAssistant() {
                         <div className="flex flex-col items-center gap-6 text-center max-w-2xl w-full z-10">
                             {/* Logo instead of Sparkles */}
                             {/* Replaced Logo back with Sparkles */}
-                            <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-[#B7FF00] text-black shadow-[0_0_50px_rgba(183,255,0,0.3)] mb-2 animate-pulse-slow">
-                                <Sparkles size={48} className="fill-current" />
+                            <div className="flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-3xl bg-[#B7FF00] text-black shadow-[0_0_50px_rgba(183,255,0,0.3)] mb-2 animate-pulse-slow">
+                                <Sparkles className="h-8 w-8 md:h-12 md:w-12 fill-current" />
                             </div>
 
-                            <h2 className="text-5xl font-bold text-white tracking-tight">Ask AI</h2>
+                            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Ask AI</h2>
                             <p className="text-xl text-white/50 leading-relaxed mb-8">
                                 Hi {user.displayName}. <br />What can I create for you today?
                             </p>
@@ -246,7 +246,7 @@ export default function AIAssistant() {
                     {/* 3. INPUT AREA (Morphs position) */}
                     <div className={`w-full transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] shrink-0 z-30 ${hasMessages
                         ? "bg-black/80 border-t border-white/10 p-6 backdrop-blur-xl"
-                        : "absolute bottom-1/4 left-0 right-0 flex justify-center px-4"
+                        : "absolute bottom-6 md:bottom-1/4 left-0 right-0 flex justify-center px-4"
                         }`}>
                         <div className={`relative transition-all duration-700 w-full ${hasMessages ? "max-w-3xl mx-auto" : "max-w-2xl mx-auto"}`}>
                             <input
