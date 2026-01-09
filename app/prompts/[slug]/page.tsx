@@ -98,6 +98,13 @@ function PromptContent() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  // Interaction State
+  const [manualMode, setManualMode] = useState(false);
+
+  // If user edits manually, enable manual mode
+  // But actually, we want to start in overlay mode.
+  // We'll rely on button clicks.
+
   // ✅ ADD: uploads state
   const MAX_UPLOADS = 10;
   const [uploads, setUploads] = useState<File[]>([]);
@@ -483,6 +490,8 @@ function PromptContent() {
       setUploads(files);
     }
     setWizardOpen(false);
+    // When wizard completes (with valid output), switch to manual mode so user sees the result
+    if (summary) setManualMode(true);
   }
 
   function handleRemixFromCard(row: RemixRow) {
@@ -725,16 +734,16 @@ function PromptContent() {
 
         <div className="grid gap-5 lg:grid-cols-2">
           {/* PREVIEW PANEL */}
-          <section className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
+          <section className="order-1 lg:order-2">
             <button
               type="button"
-              className="block w-full text-left"
+              className="group relative block w-full text-left"
               onClick={() => openLightbox(imageSrc)}
               title="Open full screen"
             >
               <div
                 className={[
-                  "relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black",
+                  "relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 group-hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]",
                   previewAspectClass,
                 ].join(" ")}
               >
@@ -742,36 +751,36 @@ function PromptContent() {
                   src={imageSrc}
                   alt={metaRow.title}
                   fill
-                  className={imageSrc === fallbackOrb ? "object-contain brightness-[0.55]" : "object-contain"}
+                  className="object-contain"
                   priority
                 />
 
-                {imageSrc === fallbackOrb ? (
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
-                ) : null}
+                {/* Expand Icon Overlay - Subtle */}
+                <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                  </svg>
+                </div>
               </div>
             </button>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
+            {/* Floating Tags / Info */}
+            <div className="mt-4 flex flex-wrap items-center gap-2 justify-center">
+              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
                 {(metaRow.category ?? "general").toString().toUpperCase()}
               </span>
 
-              <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/50">
-                SLUG: {metaRow.slug}
-              </span>
-
-              {showProBadge ? (
-                <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-[11px] text-lime-200">
+              {showProBadge && (
+                <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-4 py-1.5 text-xs font-bold tracking-wide text-lime-200 backdrop-blur-md">
                   PRO
                 </span>
-              ) : null}
+              )}
 
-              {generatedImageUrl ? (
-                <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] text-white/70">
+              {generatedImageUrl && (
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
                   GENERATED
                 </span>
-              ) : null}
+              )}
             </div>
 
             {generateError ? (
@@ -780,82 +789,56 @@ function PromptContent() {
               </div>
             ) : null}
 
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Preview</div>
-
-                {generatedImageUrl ? (
-                  <button
-                    type="button"
-                    onClick={clearGenerated}
-                    className="rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/80 hover:bg-black/50"
-                  >
-                    Clear output
-                  </button>
-                ) : null}
+            {/* Minimal Actions for Generated Result */}
+            {hasGeneratedForActions && (
+              <div className="mt-6 flex justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={handleDownloadGenerated}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
+                  title="Download"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 12.75l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={clearGenerated}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
+                  title="Clear"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-
-              <p className="mt-2 text-sm text-white/65">Click the image to view full screen.</p>
-
-              {hasGeneratedForActions ? (
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button
-                    type="button"
-                    onClick={handleDownloadGenerated}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                  >
-                    Download
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyGenerated}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                  >
-                    Copy
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 hover:bg-black/50"
-                  >
-                    Share
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleRemixFocus}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-3 py-2 text-xs font-semibold text-black hover:bg-lime-300"
-                  >
-                    Remix
-                  </button>
-                </div>
-              ) : null}
-            </div>
+            )}
           </section>
 
           {/* TOOL PANEL */}
-          <section className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-            <div className="text-lg font-semibold">Prompt Tool</div>
-
+          <section className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="text-xl font-bold tracking-tight text-white">Prompt Tool</div>
+              <div className="text-xs font-semibold text-lime-400 uppercase tracking-widest">AI Studio</div>
+            </div>
 
             {isLocked ? (
-              <div className="mt-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-4">
+              <div className="rounded-3xl border border-lime-400/20 bg-lime-400/5 p-6 backdrop-blur-xl">
                 <div className="text-sm font-semibold text-lime-200">{lockedTitle}</div>
-                <p className="mt-1 text-sm text-white/70">{lockedBody}</p>
+                <p className="mt-1 text-sm text-lime-100/70">{lockedBody}</p>
 
                 {lockReason === "login" ? (
-                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
-                      className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                      className="inline-flex w-full items-center justify-center rounded-2xl bg-lime-400 px-4 py-3 text-sm font-bold text-black hover:bg-lime-300 transition-all hover:scale-[1.02]"
                       onClick={() => router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
                     >
                       Log in
                     </button>
 
                     <button
-                      className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
+                      className="inline-flex w-full items-center justify-center rounded-2xl border border-lime-400/20 bg-lime-400/10 px-4 py-3 text-sm font-bold text-lime-100 hover:bg-lime-400/20 transition-all"
                       onClick={() => router.push(`/signup?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`)}
                     >
                       Create free account
@@ -863,7 +846,7 @@ function PromptContent() {
                   </div>
                 ) : (
                   <button
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+                    className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-lime-400 px-4 py-3 text-sm font-bold text-black hover:bg-lime-300 transition-all hover:scale-[1.02]"
                     onClick={() => router.push("/pricing")}
                   >
                     Upgrade to Pro
@@ -872,39 +855,76 @@ function PromptContent() {
               </div>
             ) : null}
 
-            <div className="mt-4">
-              {/* EDIT SUMMARY DISPLAY (Replaces "View full prompt" and "Remix Input") */}
-              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="text-sm font-semibold">Prompt</div>
+            {/* EDIT SUMMARY DISPLAY (Glass Card) */}
+            <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">1</span>
+                <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
+              </div>
 
-                {generatedImageUrl ? (
-                  <RefineChat onRefine={handleRefine} isGenerating={generating} />
-                ) : (
+              {/* Overlay for Initial Interaction (Guided vs Freestyle) */}
+              {!manualMode && !generating && !isLocked && !generatedImageUrl && (
+                <div className="absolute inset-0 z-20 flex flex-row items-center justify-center gap-3 bg-black/60 backdrop-blur-md transition-all duration-300">
+                  <button
+                    type="button"
+                    onClick={handleRemixFocus}
+                    className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
+                  >
+                    <span>Remix</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
+                      <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(true)}
+                    className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
+                  >
+                    <span>Freestyle</span>
+                    <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
+                  </button>
+                </div>
+              )}
+
+              {generatedImageUrl ? (
+                <RefineChat onRefine={handleRefine} isGenerating={generating} />
+              ) : (
+                <div className={`relative transition-all duration-500 ${!manualMode && !isLocked ? 'blur-sm opacity-40 scale-[0.98]' : ''}`}>
                   <textarea
-                    readOnly
-                    onClick={!isLocked ? handleRemixFocus : undefined}
+                    readOnly={!manualMode || isLocked}
+                    onClick={!manualMode && !isLocked ? undefined : undefined}
+                    onChange={(e) => {
+                      if (manualMode && !isLocked) {
+                        setEditSummary(e.target.value);
+                      }
+                    }}
                     className={[
-                      "mt-3 w-full rounded-2xl border p-4 text-sm outline-none focus:border-white/20 transition-colors",
-                      isLocked ? "border-white/5 bg-black/20 text-white/30 cursor-not-allowed" : "border-white/10 bg-black/40 text-white/85 cursor-pointer hover:bg-black/50 hover:border-white/20"
+                      "w-full rounded-2xl rounded-tl-none border-0 p-5 text-sm outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner",
+                      isLocked
+                        ? "bg-white/5 text-white/30 cursor-not-allowed"
+                        : "bg-[#2A2A2A] text-white focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
                     ].join(" ")}
                     rows={6}
-                    placeholder={isLocked ? "Locked." : "Click here to remix constraints & instructions..."}
+                    placeholder={isLocked ? "Locked." : "Describe your image..."}
                     value={editSummary}
                   />
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Reference Uploads Preview (Read only view of what's in the wizard) */}
+            {/* Reference Uploads (Glass Card) */}
             {uploads.length > 0 && !isLocked && (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">Subject References</div>
-                  <div className="text-xs text-white/45">{uploads.length}</div>
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">2</span>
+                    <div className="text-sm font-bold text-white/90">References</div>
+                  </div>
+                  <div className="text-xs font-mono text-white/40">{uploads.length} FILES</div>
                 </div>
-                <div className="mt-3 grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {uploadPreviews.map((src, idx) => (
-                    <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                    <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-inner">
                       <Image src={src} alt="Ref" fill className="object-cover" unoptimized />
                     </div>
                   ))}
@@ -912,16 +932,19 @@ function PromptContent() {
               </div>
             )}
 
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold">Generator Settings</div>
-                <div className="text-xs text-white/50">
-                  Selected: {mediaType.toUpperCase()} · {aspectRatio}
+            {/* Generator Settings (Glass Card) */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">3</span>
+                  <div className="text-sm font-bold text-white/90">Settings</div>
+                </div>
+                <div className="text-xs font-mono text-lime-400/80">
+                  {mediaType.toUpperCase()} / {aspectRatio}
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <SelectPill
                   label="Image"
                   selected={mediaType === "image"}
@@ -959,28 +982,29 @@ function PromptContent() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {/* ACTION BUTTONS */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
               <button
                 className={[
-                  "inline-flex items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition sm:py-2",
+                  "flex-1 inline-flex items-center justify-center rounded-2xl px-6 py-4 text-sm font-bold tracking-tight text-white transition-all transform hover:scale-[1.02]",
                   isLocked
-                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                    : "border-white/15 bg-black/40 text-white/85 hover:bg-black/60",
+                    ? "cursor-not-allowed bg-white/5 text-white/20"
+                    : "bg-white/10 hover:bg-white/20 border border-white/10 shadow-lg backdrop-blur-md",
                 ].join(" ")}
                 onClick={handleCopyPromptText}
                 disabled={isLocked}
               >
-                {copied ? "Copied" : "Copy Prompt"}
+                {copied ? "Copied" : "Copy Prompt Only"}
               </button>
 
               <button
                 className={[
-                  "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
+                  "flex-[2] inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
                   isLocked
                     ? "bg-white/10 text-white/40 hover:bg-white/15"
                     : generating
-                      ? "bg-lime-400/60 text-black"
-                      : "bg-lime-400 text-black hover:bg-lime-300",
+                      ? "bg-lime-400/60"
+                      : "bg-lime-400 hover:bg-lime-300",
                 ].join(" ")}
                 onClick={handleGenerate}
                 disabled={isLocked || generating}
@@ -991,80 +1015,68 @@ function PromptContent() {
                     ? "Log in to Generate"
                     : isLocked
                       ? "Upgrade to Pro"
-                      : "Generate"}
+                      : "Generate Artwork"}
               </button>
             </div>
 
             {userId ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold">Remixes</div>
-                  <div className="text-xs text-white/50">
-                    {remixesLoading ? "Loading..." : remixes.length ? `${remixes.length}` : "0"}
+              <div className="mt-8">
+                <div className="flex items-center justify-between gap-3 mb-4 px-2">
+                  <div className="text-sm font-bold text-white/60 uppercase tracking-widest">Remix History</div>
+                  <div className="text-xs font-mono text-white/40">
+                    {remixesLoading ? "..." : remixes.length ? `${remixes.length}` : "0"}
                   </div>
                 </div>
 
                 {remixesError ? (
-                  <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">
+                  <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200">
                     {remixesError}
                   </div>
                 ) : null}
 
                 {remixesLoading ? (
-                  <div className="mt-3 text-sm text-white/60">Loading your remixes…</div>
+                  <div className="px-2 text-sm text-white/40 animate-pulse">Loading library...</div>
                 ) : remixes.length === 0 ? (
-                  <div className="mt-3 text-sm text-white/60">
-                    No remixes yet. Generate one to start building your library.
+                  <div className="rounded-3xl border border-white/5 bg-white/5 p-8 text-center">
+                    <p className="text-sm text-white/40">No remixes yet.</p>
+                    <p className="text-xs text-white/20 mt-1">Generate your first image to start your collection.</p>
                   </div>
                 ) : (
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {remixes.slice(0, 12).map((r) => (
                       <div
                         key={r.id}
-                        className="group relative overflow-hidden rounded-xl border border-white/10 bg-black hover:border-white/25"
+                        className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/5 hover:border-lime-400/30 transition-all hover:shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]"
                       >
                         <button
                           type="button"
                           onClick={() => openLightbox(r.image_url)}
                           className="block w-full"
-                          title="Tap to view full screen"
+                          title="View"
                         >
                           <div className="relative aspect-square w-full">
-                            <Image src={r.image_url} alt="Remix" fill className="object-cover" />
+                            <Image src={r.image_url} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
                           </div>
                         </button>
 
                         {/* Hover actions */}
-                        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100">
-                          <div className="absolute inset-0 bg-black/40" />
-                          <div className="pointer-events-auto absolute bottom-2 left-2 right-2 grid grid-cols-4 gap-2">
+                        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                          <div className="pointer-events-auto absolute bottom-2 left-2 right-2 flex gap-1 justify-center">
                             <button
                               type="button"
                               onClick={() => downloadAnyImage(r.image_url)}
-                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
+                              className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+                              title="Download"
                             >
-                              Download
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleCopyGenerated}
-                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
-                            >
-                              Copy
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleShare}
-                              className="rounded-lg border border-white/15 bg-black/50 px-2 py-2 text-[11px] text-white/85 hover:bg-black/70"
-                            >
-                              Share
+                              ↓
                             </button>
                             <button
                               type="button"
                               onClick={() => handleRemixFromCard(r)}
-                              className="rounded-lg bg-lime-400 px-2 py-2 text-[11px] font-semibold text-black hover:bg-lime-300"
+                              className="h-8 w-8 flex items-center justify-center rounded-lg bg-lime-400 hover:bg-lime-300 text-black font-bold"
+                              title="Remix this"
                             >
-                              Remix
+                              ↺
                             </button>
                           </div>
                         </div>
@@ -1077,9 +1089,9 @@ function PromptContent() {
                   <button
                     type="button"
                     onClick={() => router.push("/library")}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm font-semibold text-white hover:bg-black/50"
+                    className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white transition-all"
                   >
-                    View all remixes
+                    View Full Library <span className="transition-transform group-hover:translate-x-1">→</span>
                   </button>
                 </div>
               </div>

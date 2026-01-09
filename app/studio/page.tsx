@@ -59,6 +59,9 @@ function StudioContent() {
   // Kept for fallback copy? Or should I just use editSummary?
   // "The prompt field... edit-instruction summary". So editSummary is the source of truth.
 
+  // Interaction State
+  const [manualMode, setManualMode] = useState(false);
+
   // ✅ Uploads (up to 10)
   const [uploads, setUploads] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
@@ -130,6 +133,7 @@ function StudioContent() {
     setEditSummary(summary);
     setRemixAnswers(ans);
     setWizardOpen(false);
+    if (summary) setManualMode(true);
   }
 
   async function handleGenerate() {
@@ -256,34 +260,69 @@ function StudioContent() {
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* LEFT: Prompt Tool */}
-        <div className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-lg font-semibold">Prompt Tool</div>
-            <div className="text-lg font-semibold">Prompt Tool</div>
+        <div className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <div className="text-xl font-bold tracking-tight text-white">Prompt Tool</div>
+            <div className="text-xs font-semibold text-lime-400 uppercase tracking-widest">AI Studio</div>
           </div>
 
           {/* Edit Summary Display */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">Prompt</div>
-            <textarea
-              readOnly
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none focus:border-white/20"
-              rows={6}
-              placeholder="Use 'Remix' to key in your changes..."
-              value={editSummary}
-            />
+          {/* Edit Summary Display */}
+          <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">1</span>
+              <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
+            </div>
+
+            {/* Overlay for Initial Interaction (Guided vs Freestyle) */}
+            {!manualMode && !generating && (
+              <div className="absolute inset-0 z-20 flex flex-row items-center justify-center gap-3 bg-black/60 backdrop-blur-md transition-all duration-300">
+                <button
+                  type="button"
+                  onClick={() => setWizardOpen(true)}
+                  className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
+                >
+                  <span>Remix</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
+                    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManualMode(true)}
+                  className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
+                >
+                  <span>Freestyle</span>
+                  <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
+                </button>
+              </div>
+            )}
+
+            <div className={`relative transition-all duration-500 ${!manualMode ? 'blur-sm opacity-40 scale-[0.98]' : ''}`}>
+              <textarea
+                readOnly={!manualMode}
+                onChange={(e) => setEditSummary(e.target.value)}
+                className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                rows={6}
+                placeholder="Use 'Remix' to key in your changes..."
+                value={editSummary}
+              />
+            </div>
           </div>
 
-          {/* Reference Uploads Preview (Read only view of what's in the wizard) */}
+          {/* Reference Uploads */}
           {uploads.length > 0 && (
-            <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">Subject References</div>
-                <div className="text-xs text-white/45">{uploads.length}</div>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">2</span>
+                  <div className="text-sm font-bold text-white/90">References</div>
+                </div>
+                <div className="text-xs font-mono text-white/40">{uploads.length} FILES</div>
               </div>
-              <div className="mt-3 grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 {uploadPreviews.map((src, idx) => (
-                  <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-inner">
                     <Image src={src} alt="Ref" fill className="object-cover" />
                   </div>
                 ))}
@@ -292,11 +331,14 @@ function StudioContent() {
           )}
 
           {/* Generator Settings */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Generator Settings</div>
-              <div className="text-xs text-white/45">
-                Selected: {mediaType.toUpperCase()} · {aspectRatio}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">3</span>
+                <div className="text-sm font-bold text-white/90">Settings</div>
+              </div>
+              <div className="text-xs font-mono text-lime-400/80">
+                {mediaType.toUpperCase()} / {aspectRatio}
               </div>
             </div>
 
@@ -319,15 +361,15 @@ function StudioContent() {
           </div>
 
           {/* Remixes placeholder */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Remixes</div>
-              <div className="text-xs text-white/45">0</div>
+              <div className="text-sm font-bold text-white/90">Remixes</div>
+              <div className="text-xs font-mono text-white/40">0</div>
             </div>
-            <p className="mt-2 text-sm text-white/55">No remixes yet. Generate one to start building your library.</p>
+            <p className="mt-2 text-sm text-white/40">No remixes yet. Generate one to start building your library.</p>
             <button
               type="button"
-              className="mt-4 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white/80 hover:border-white/20 hover:bg-black/55"
+              className="mt-4 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-bold text-white/80 hover:bg-black/60 transition-all hover:scale-[1.01]"
               onClick={() => router.push("/library")}
             >
               View all remixes
@@ -335,26 +377,27 @@ function StudioContent() {
           </div>
 
           {genError ? (
-            <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg">
               {genError}
             </div>
           ) : null}
 
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          {/* ACTION BUTTONS */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
             <button
               type="button"
               onClick={handleCopyPrompt}
-              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold text-white/85 hover:bg-black/60 sm:py-2"
+              className="flex-1 inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-bold tracking-tight text-white hover:bg-white/10 transition-all transform hover:scale-[1.02] backdrop-blur-md"
             >
-              {copied ? "Copied" : "Copy Prompt"}
+              {copied ? "Copied" : "Copy Prompt Only"}
             </button>
 
             <button
               type="button"
               onClick={() => setWizardOpen(true)}
-              className="inline-flex items-center justify-center rounded-xl border border-lime-400/30 bg-lime-400/10 px-5 py-3 text-sm font-semibold text-lime-200 transition hover:bg-lime-400/20 sm:py-2"
+              className="flex-1 inline-flex items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10 px-6 py-4 text-sm font-bold tracking-tight text-lime-200 hover:bg-lime-400/20 transition-all transform hover:scale-[1.02]"
             >
-              Remix
+              Start Remix
             </button>
 
             <button
@@ -362,46 +405,62 @@ function StudioContent() {
               onClick={handleGenerate}
               disabled={generating}
               className={[
-                "inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-black transition sm:py-2",
-                generating ? "cursor-not-allowed bg-[#B7FF00]/50" : "bg-[#B7FF00] hover:opacity-90",
+                "flex-[2] inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
+                generating ? "cursor-not-allowed bg-lime-400/60" : "bg-[#B7FF00] hover:bg-lime-300",
               ].join(" ")}
             >
-              {generating ? "Generating..." : "Generate"}
+              {generating ? "Generating..." : "Generate Artwork"}
             </button>
           </div>
         </div>
 
         {/* RIGHT: Preview */}
-        <div className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="text-sm font-semibold">Preview</div>
-
-          <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-            <div className="relative aspect-[4/5] w-full bg-black">
+        <div className="order-1 lg:order-2 space-y-4">
+          <div className="group relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]">
+            <div className="relative aspect-[9/16] w-full">
               <Image
                 src={lastImageUrl || previewImageUrl}
                 alt="Preview"
                 fill
-                className="object-cover"
+                className="object-contain"
                 priority={false}
+                unoptimized
               />
             </div>
+            {/* Expand Icon Overlay - Subtle */}
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
+
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-xs font-semibold text-white/70">Prompt Summary</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm text-white/80">
-              {normalize(editSummary) || "Nothing yet."}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {mediaType.toUpperCase()}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {aspectRatio}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {uploads.length} REFS
+            </span>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-xl">
+            <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">Prompt Summary</div>
+            <div className="whitespace-pre-wrap text-sm text-white/80 leading-relaxed font-mono opacity-80">
+              {normalize(editSummary) || "// No prompt instructions set."}
             </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/50">
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Type: {mediaType}</div>
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Aspect: {aspectRatio}</div>
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Uploads: {uploads.length}/10</div>
           </div>
         </div>
       </section>
-    </main>
+    </main >
   );
 }
 
