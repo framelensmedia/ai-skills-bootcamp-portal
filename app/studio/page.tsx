@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import ImageUploader from "@/components/ImageUploader";
 
 type MediaType = "image" | "video";
 
@@ -60,7 +61,7 @@ function StudioContent() {
   // "The prompt field... edit-instruction summary". So editSummary is the source of truth.
 
   // Interaction State
-  const [manualMode, setManualMode] = useState(false);
+  const [manualMode, setManualMode] = useState(true);
 
   // ✅ Uploads (up to 10)
   const [uploads, setUploads] = useState<File[]>([]);
@@ -270,71 +271,33 @@ function StudioContent() {
           {/* Edit Summary Display */}
           <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
             <div className="mb-3 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">1</span>
               <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
             </div>
 
-            {/* Overlay for Initial Interaction (Guided vs Freestyle) */}
-            {!manualMode && !generating && (
-              <div className="absolute inset-0 z-20 flex flex-row items-center justify-center gap-3 bg-black/60 backdrop-blur-md transition-all duration-300">
-                <button
-                  type="button"
-                  onClick={() => setWizardOpen(true)}
-                  className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
-                >
-                  <span>Remix</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
-                    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setManualMode(true)}
-                  className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
-                >
-                  <span>Freestyle</span>
-                  <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
-                </button>
-              </div>
-            )}
 
-            <div className={`relative transition-all duration-500 ${!manualMode ? 'blur-sm opacity-40 scale-[0.98]' : ''}`}>
+
+            <div className="relative transition-all duration-500">
               <textarea
-                readOnly={!manualMode}
                 onChange={(e) => setEditSummary(e.target.value)}
                 className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
                 rows={6}
-                placeholder="Use 'Remix' to key in your changes..."
+                placeholder="Describe your image..."
                 value={editSummary}
               />
+
+              <div className="mt-4">
+                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
+                <ImageUploader files={uploads} onChange={setUploads} />
+              </div>
             </div>
           </div>
 
-          {/* Reference Uploads */}
-          {uploads.length > 0 && (
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">2</span>
-                  <div className="text-sm font-bold text-white/90">References</div>
-                </div>
-                <div className="text-xs font-mono text-white/40">{uploads.length} FILES</div>
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {uploadPreviews.map((src, idx) => (
-                  <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-inner">
-                    <Image src={src} alt="Ref" fill className="object-cover" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Generator Settings */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">3</span>
                 <div className="text-sm font-bold text-white/90">Settings</div>
               </div>
               <div className="text-xs font-mono text-lime-400/80">
@@ -452,12 +415,7 @@ function StudioContent() {
             </span>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-xl">
-            <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">Prompt Summary</div>
-            <div className="whitespace-pre-wrap text-sm text-white/80 leading-relaxed font-mono opacity-80">
-              {normalize(editSummary) || "// No prompt instructions set."}
-            </div>
-          </div>
+
         </div>
       </section>
     </main >

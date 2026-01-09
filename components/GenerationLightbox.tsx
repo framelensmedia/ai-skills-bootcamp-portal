@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 
 type Props = {
   open: boolean;
@@ -22,6 +22,10 @@ type Props = {
     remixPromptText: string;
     combinedPromptText: string;
   }) => void;
+
+  title?: string;
+  onRename?: (newTitle: string) => void;
+  onDelete?: () => void;
 };
 
 function normalize(v: any) {
@@ -79,6 +83,9 @@ export default function GenerationLightbox({
   combinedPromptText,
   onShare,
   onRemix,
+  title = "Untitled",
+  onRename,
+  onDelete,
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -86,6 +93,13 @@ export default function GenerationLightbox({
   const [copiedCombined, setCopiedCombined] = useState(false);
   const [copiedOriginal, setCopiedOriginal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Title editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState(title);
+
+  // Update tempTitle when prop changes
+  useMemo(() => setTempTitle(title), [title]);
 
   const safeUrl = useMemo(() => normalize(url), [url]);
   const canShow = open && safeUrl.length > 0;
@@ -164,10 +178,41 @@ export default function GenerationLightbox({
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3 backdrop-blur-md">
-          <div className="hidden text-sm font-bold text-white md:block">Preview</div>
+          {/* Title Area */}
+          <div className="flex-1 mr-4 min-w-0 flex items-center gap-2">
+            {isEditingTitle && onRename ? (
+              <div className="flex items-center gap-2 w-full max-w-xs">
+                <input
+                  className="w-full rounded border border-white/20 bg-black/50 px-2 py-1 text-sm text-white focus:outline-none"
+                  value={tempTitle}
+                  onChange={e => setTempTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      onRename(tempTitle);
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  autoFocus
+                />
+                <button onClick={() => { onRename(tempTitle); setIsEditingTitle(false); }} className="text-lime-400"><Check className="w-4 h-4" /></button>
+                <button onClick={() => { setIsEditingTitle(false); setTempTitle(title); }} className="text-red-400"><X className="w-4 h-4" /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="text-sm font-bold text-white truncate max-w-[150px] md:max-w-md" title={title}>
+                  {title}
+                </div>
+                {onRename && (
+                  <button onClick={() => { setTempTitle(title); setIsEditingTitle(true); }} className="text-white/20 hover:text-white p-1">
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Mobile-friendly horizontal scroll for actions if needed, or just flex-wrap */}
-          <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+          <div className="flex shrink-0 items-center justify-between gap-2 md:w-auto md:justify-end">
             <div className="flex items-center gap-1 md:gap-2 overflow-x-auto no-scrollbar mask-linear-fade">
               <button
                 type="button"
@@ -220,6 +265,18 @@ export default function GenerationLightbox({
                 <span className="hidden md:block">Share</span>
                 <Share2 className="w-4 h-4" />
               </button>
+
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-red-500/20 bg-red-950/20 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-red-200 hover:bg-red-950/40 hover:border-red-500/40 transition-colors"
+                  title="Delete"
+                >
+                  <span className="hidden md:block">Delete</span>
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <button

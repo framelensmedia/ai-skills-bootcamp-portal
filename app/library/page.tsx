@@ -136,18 +136,19 @@ function LibraryContent() {
     router.push(href);
   }
 
-  async function handleUpdateTitle(id: string) {
-    if (!editingValue.trim()) return;
+  async function handleUpdateTitle(id: string, overrideValue?: string) {
+    const val = overrideValue !== undefined ? overrideValue : editingValue;
+    if (!val.trim()) return;
     setSavingId(id);
     try {
       const res = await fetch("/api/library", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, headline: editingValue }),
+        body: JSON.stringify({ id, headline: val }),
       });
       if (!res.ok) throw new Error("Update failed");
 
-      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: editingValue } : it)));
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: val } : it)));
     } catch (e) {
       console.error("Failed to update title", e);
     } finally {
@@ -294,6 +295,21 @@ function LibraryContent() {
         combinedPromptText={lbCombined}
         onShare={handleShare}
         onRemix={handleRemix}
+
+        title={items.find(i => i.imageUrl === lightboxUrl)?.promptTitle}
+        onRename={(newTitle) => {
+          const item = items.find(i => i.imageUrl === lightboxUrl);
+          if (item) {
+            handleUpdateTitle(item.id, newTitle);
+          }
+        }}
+        onDelete={() => {
+          const item = items.find(i => i.imageUrl === lightboxUrl);
+          if (item) {
+            handleDelete(item.id);
+            closeLightbox();
+          }
+        }}
       />
 
       <div className="mb-5 sm:mb-7">

@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
+import ImageUploader from "@/components/ImageUploader";
 
 /**
  * ✅ ADD: inline uploader UI (no extra component file needed)
@@ -861,7 +862,6 @@ function PromptContent() {
             {/* EDIT SUMMARY DISPLAY (Glass Card) */}
             <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
               <div className="mb-3 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">1</span>
                 <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
               </div>
 
@@ -911,35 +911,25 @@ function PromptContent() {
                     placeholder={isLocked ? "Locked." : "Describe your image..."}
                     value={editSummary}
                   />
+
+                  {!isLocked && (
+                    <div className={`grid transition-all duration-300 ease-in-out ${manualMode ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0 mt-0'}`}>
+                      <div className="overflow-hidden">
+                        <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
+                        <ImageUploader files={uploads} onChange={setUploads} disabled={!manualMode} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Reference Uploads (Glass Card) */}
-            {uploads.length > 0 && !isLocked && (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">2</span>
-                    <div className="text-sm font-bold text-white/90">References</div>
-                  </div>
-                  <div className="text-xs font-mono text-white/40">{uploads.length} FILES</div>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {uploadPreviews.map((src, idx) => (
-                    <div key={src} className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-inner">
-                      <Image src={src} alt="Ref" fill className="object-cover" unoptimized />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* Generator Settings (Glass Card) */}
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold">3</span>
                   <div className="text-sm font-bold text-white/90">Settings</div>
                 </div>
                 <div className="text-xs font-mono text-lime-400/80">
