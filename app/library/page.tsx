@@ -139,14 +139,15 @@ function LibraryContent() {
   async function handleUpdateTitle(id: string) {
     if (!editingValue.trim()) return;
     setSavingId(id);
-    const supabase = createSupabaseBrowserClient();
     try {
-      const { data: row } = await supabase.from("prompt_generations").select("settings").eq("id", id).single();
-      if (row) {
-        const newSettings = { ...row.settings, headline: editingValue };
-        await supabase.from("prompt_generations").update({ settings: newSettings }).eq("id", id);
-        setItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: editingValue } : it)));
-      }
+      const res = await fetch("/api/library", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, headline: editingValue }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: editingValue } : it)));
     } catch (e) {
       console.error("Failed to update title", e);
     } finally {
@@ -158,12 +159,12 @@ function LibraryContent() {
 
   async function handleDelete(id: string) {
     if (!window.confirm("Are you sure you want to delete this image?")) return;
-    const supabase = createSupabaseBrowserClient();
     // Optimistic remove
     setItems((prev) => prev.filter((it) => it.id !== id));
 
     try {
-      await supabase.from("prompt_generations").delete().eq("id", id);
+      const res = await fetch(`/api/library?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
     } catch (e) {
       console.error("Delete failed", e);
       // If it fails, we should probably re-fetch, but for now just logging.
