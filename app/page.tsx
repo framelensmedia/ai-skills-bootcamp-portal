@@ -152,6 +152,7 @@ export default function HomePage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [recentPrompts, setRecentPrompts] = useState<PublicPrompt[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [recentLoading, setRecentLoading] = useState(true);
 
   useEffect(() => {
@@ -161,18 +162,35 @@ export default function HomePage() {
       setRecentLoading(true);
 
       try {
-        const { data, error } = await supabase
-          .from("prompts_public")
-          .select(
-            "id, title, slug, summary, category, access_level, created_at, featured_image_url, image_url, media_url"
-          )
-          .order("created_at", { ascending: false })
-          .limit(12);
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const [promptsRes, favRes] = await Promise.all([
+          supabase
+            .from("prompts_public")
+            .select(
+              "id, title, slug, summary, category, access_level, created_at, featured_image_url, image_url, media_url"
+            )
+            .order("created_at", { ascending: false })
+            .limit(12),
+          user
+            ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
+            : Promise.resolve({ data: [] })
+        ]);
 
         if (cancelled) return;
 
-        if (error) setRecentPrompts([]);
-        else setRecentPrompts((data || []) as PublicPrompt[]);
+        if (promptsRes.error) {
+          setRecentPrompts([]);
+        } else {
+          setRecentPrompts((promptsRes.data || []) as PublicPrompt[]);
+        }
+
+        const ids = new Set<string>();
+        (favRes.data || []).forEach((f: any) => {
+          if (f.prompt_id) ids.add(f.prompt_id);
+        });
+        setFavoriteIds(ids);
+
       } finally {
         if (!cancelled) setRecentLoading(false);
       }
@@ -194,13 +212,19 @@ export default function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
           <div>
-            <Tag text="No technical skills required" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/5 px-3 py-1.5 backdrop-blur-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#B7FF00] opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#B7FF00]"></span>
+              </span>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B7FF00]">No technical skills required</span>
+            </div>
 
-            <h1 className="mt-4 text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              <span className="text-[#B7FF00]">AI</span> Made Easy
+            <h1 className="mt-6 text-5xl font-bold tracking-tight text-white md:text-7xl">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400">AI</span> Made Easy
             </h1>
 
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/70 md:text-base">
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-white/60 md:text-lg">
               The all-in-one platform to launch your business with AI. Master the skills, create pro-level content, and start generating revenue faster than ever.
             </p>
 
@@ -227,6 +251,11 @@ export default function HomePage() {
                 <input
                   className="w-full bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
                   placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      window.location.href = `/prompts?q=${encodeURIComponent(e.currentTarget.value)}`;
+                    }
+                  }}
                 />
               </div>
 
@@ -275,33 +304,29 @@ export default function HomePage() {
       </section>
 
       {/* CATEGORY BAR */}
-      <section className="mx-auto max-w-6xl px-4">
-        <div className="flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
-          {["All", "Flyers", "Ads", "Product", "Thumbnails", "Branding", "UGC"].map((c) => (
-            <button
-              key={c}
-              className={`rounded-md px-3 py-2 text-xs font-semibold ${c === "All"
-                ? "bg-white text-black"
-                : "border border-white/10 bg-black/30 text-white/70 hover:text-white"
-                }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </section>
+
 
       {/* TRENDING PROMPTS */}
-      <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#B7FF00]">Trending</p>
-            <h2 className="mt-2 text-2xl font-bold md:text-3xl">Prompts</h2>
-            <p className="mt-2 text-sm text-white/60">Latest published prompts (auto-filled for internal testing).</p>
+      <section className="mx-auto max-w-6xl px-4 py-8">
+        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-tight">Trending Prompts</h2>
+              <p className="text-xs text-white/50 font-medium">Community favorites, ready to remix.</p>
+            </div>
           </div>
 
-          <Link href="/prompts" className="hidden text-sm text-white/70 hover:text-white md:block">
-            View all →
+          <Link href="/prompts" className="group hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+            <span>View More Prompts</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:text-white">
+              <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+            </svg>
           </Link>
         </div>
 
@@ -317,14 +342,14 @@ export default function HomePage() {
             trendingPrompts.map((p) => (
               <PromptCard
                 key={p.id}
+                id={p.id}
                 title={p.title}
                 summary={p.summary || ""}
                 slug={p.slug}
-                category={p.category || "general"}
+                category={p.category || undefined}
                 accessLevel={p.access_level}
-                featuredImageUrl={p.featured_image_url}
-                imageUrl={p.image_url}
-                mediaUrl={p.media_url}
+                imageUrl={p.image_url || p.featured_image_url || p.media_url}
+                initialFavorited={favoriteIds.has(p.id)}
               />
             ))
           ) : (
@@ -332,15 +357,18 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="mt-6 md:hidden">
-          <Link href="/prompts" className="text-sm text-white/70 hover:text-white">
-            View all →
+        <div className="mt-8 flex justify-center md:hidden">
+          <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+            <span>View More Prompts</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:text-white">
+              <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+            </svg>
           </Link>
         </div>
       </section>
 
       {/* TUTORIALS (unchanged) */}
-      <section className="mx-auto max-w-6xl px-4 pb-10 md:pb-14">
+      <section className="mx-auto max-w-6xl px-4 pt-20 pb-10 md:pt-32 md:pb-14">
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#B7FF00]">Learn the system</p>
           <h2 className="mt-2 text-2xl font-bold md:text-3xl">Tutorials</h2>

@@ -9,6 +9,37 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 
+function Typewriter({ text }: { text: string }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="text-lg font-bold text-white tracking-tight mb-2 min-h-[28px]">
+      {text.split("").map((char, i) => (
+        <span
+          key={i}
+          className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'}`}
+          style={{ transitionDelay: `${i * 50}ms` }}
+        >
+          {char === " " ? "\u00A0" : char}
+        </span>
+      ))}
+      <span className={`inline-block ml-0.5 animate-pulse text-lime-400 ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
+    </div>
+  );
+}
+
 /**
  * ✅ ADD: inline uploader UI (no extra component file needed)
  * - Allows up to 10 images
@@ -861,31 +892,34 @@ function PromptContent() {
 
             {/* EDIT SUMMARY DISPLAY (Glass Card) */}
             <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
-              <div className="mb-3 flex items-center gap-2">
-                <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
-              </div>
+
+
+
 
               {/* Overlay for Initial Interaction (Guided vs Freestyle) */}
               {!manualMode && !generating && !isLocked && !generatedImageUrl && (
-                <div className="absolute inset-0 z-20 flex flex-row items-center justify-center gap-3 bg-black/60 backdrop-blur-md transition-all duration-300">
-                  <button
-                    type="button"
-                    onClick={handleRemixFocus}
-                    className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
-                  >
-                    <span>Remix</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
-                      <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualMode(true)}
-                    className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
-                  >
-                    <span>Freestyle</span>
-                    <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
-                  </button>
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 backdrop-blur-md transition-all duration-300">
+                  <Typewriter text="How do you want to start?" />
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={handleRemixFocus}
+                      className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
+                    >
+                      <span>Remix</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
+                        <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualMode(true)}
+                      className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
+                    >
+                      <span>Freestyle</span>
+                      <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

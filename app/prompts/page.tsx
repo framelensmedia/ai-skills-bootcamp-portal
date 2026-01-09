@@ -2,6 +2,9 @@ import PromptCard from "@/components/PromptCard";
 import PromptsToolbar from "@/components/PromptsToolbar";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type SearchParams = {
   q?: string;
   category?: string;
@@ -11,13 +14,14 @@ type SearchParams = {
 export default async function PromptsPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
   const supabase = await createSupabaseServerClient();
+  const { q: qParam, category: catParam, sort: sortParam } = await searchParams;
 
-  const q = (searchParams.q ?? "").trim();
-  const category = (searchParams.category ?? "all").trim().toLowerCase();
-  const sort = (searchParams.sort ?? "newest").trim();
+  const q = (qParam ?? "").trim();
+  const category = (catParam ?? "all").trim().toLowerCase();
+  const sort = (sortParam ?? "newest").trim();
 
   // Build query from SAFE VIEW
   let query = supabase
@@ -34,7 +38,7 @@ export default async function PromptsPage({
   }
 
   if (category && category !== "all") {
-    query = query.eq("category", category);
+    query = query.ilike("category", category);
   }
 
   // Sorting
@@ -63,23 +67,40 @@ export default async function PromptsPage({
     new Set((prompts ?? []).map((p) => (p.category ?? "general").toLowerCase()))
   ).sort();
 
+  // Fetch favorites if user is logged in
+  const { data: { user } } = await supabase.auth.getUser();
+  const favoriteIds = new Set<string>();
+
+  if (user) {
+    const { data: favs } = await supabase
+      .from("prompt_favorites")
+      .select("prompt_id")
+      .eq("user_id", user.id);
+
+    (favs || []).forEach((f) => {
+      if (f.prompt_id) favoriteIds.add(f.prompt_id);
+    });
+  }
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10 text-white">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold sm:text-3xl">Prompts</h1>
-        <p className="mt-2 text-sm text-white/70">
-          Browse prompt packs and individual prompts. Click any prompt to open the tool.
-        </p>
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:py-14 text-white">
+      {/* Header */}
+      <h1 className="text-3xl font-bold tracking-tight md:text-5xl">Prompts</h1>
+      <p className="mt-4 text-white/60">
+        Browse prompt packs and individual prompts. Click any prompt to open the tool.
+      </p>
+
+      {/* Toolbar */}
+      <div className="mt-8">
+        <PromptsToolbar
+          initialQuery={q}
+          initialCategory={category}
+          initialSort={sort}
+          categories={categories}
+        />
       </div>
 
-      <PromptsToolbar
-        initialQuery={q}
-        initialCategory={category || "all"}
-        initialSort={sort || "newest"}
-        categories={categories}
-      />
-
-      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {(prompts ?? []).map((p) => {
           const image =
             p.featured_image_url || p.image_url || p.media_url || null;
@@ -87,16 +108,18 @@ export default async function PromptsPage({
           return (
             <PromptCard
               key={p.id}
+              id={p.id}
               title={p.title}
               summary={p.summary || ""}
               slug={p.slug}
-              category={p.category || "general"}
-              imageUrl={image}
-              accessLevel={p.access_level || "free"}
+              featuredImageUrl={image}
+              category={p.category || undefined}
+              accessLevel={p.access_level || undefined}
+              initialFavorited={favoriteIds.has(p.id)}
             />
           );
         })}
       </div>
-    </main>
+    </div>
   );
 }
