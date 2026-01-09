@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Send, Sparkles, User, ArrowLeft, Bot, Mic } from "lucide-react";
@@ -13,7 +13,7 @@ type Message = {
     content: string;
 };
 
-export default function ChatPage() {
+function ChatContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const initialQuery = searchParams.get("q");
@@ -142,16 +142,16 @@ export default function ChatPage() {
 
                                 {/* Avatar */}
                                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${msg.role === 'user'
-                                        ? 'border-white/10 bg-white/5 text-white'
-                                        : 'border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00]'
+                                    ? 'border-white/10 bg-white/5 text-white'
+                                    : 'border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00]'
                                     }`}>
                                     {msg.role === 'user' ? <User size={14} /> : <Sparkles size={14} className="fill-current" />}
                                 </div>
 
                                 {/* Bubble */}
                                 <div className={`relative px-5 py-4 text-sm leading-relaxed shadow-sm ${msg.role === 'user'
-                                        ? 'bg-[#B7FF00] text-black rounded-2xl rounded-tr-none'
-                                        : 'bg-white/10 text-white/90 border border-white/5 rounded-2xl rounded-tl-none'
+                                    ? 'bg-[#B7FF00] text-black rounded-2xl rounded-tr-none'
+                                    : 'bg-white/10 text-white/90 border border-white/5 rounded-2xl rounded-tl-none'
                                     }`}>
                                     <div className="whitespace-pre-wrap">{msg.content}</div>
                                 </div>
@@ -209,5 +209,13 @@ export default function ChatPage() {
                 </div>
             </footer>
         </div>
+    );
+}
+
+export default function ChatPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen w-full items-center justify-center bg-black text-white">Loading...</div>}>
+            <ChatContent />
+        </Suspense>
     );
 }
