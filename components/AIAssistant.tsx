@@ -107,7 +107,7 @@ export default function AIAssistant() {
         setInput("");
     };
 
-    if (!user) return null;
+    // if (!user) return null; // Allow rendering for guests so they see the button
 
     const hasMessages = messages.length > 0;
 
@@ -176,7 +176,7 @@ export default function AIAssistant() {
 
                             <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Ask AI</h2>
                             <p className="text-xl text-white/50 leading-relaxed mb-8">
-                                Hi {user.displayName}. <br />What can I create for you today?
+                                Hi {user?.displayName || "there"}. <br />What can I create for you today?
                             </p>
 
                             {/* Suggestions */}
@@ -288,7 +288,7 @@ export default function AIAssistant() {
                 <button
                     onClick={() => { setIsOpen(true); setIsExpanded(false); }}
                     className={`group flex items-center gap-2 rounded-t-xl bg-[#B7FF00]/90 backdrop-blur-sm px-6 py-2.5 shadow-[0_0_20px_rgba(183,255,0,0.2)] transition-all duration-500 will-change-transform ${isIdle
-                        ? "translate-y-[65%] opacity-40 hover:translate-y-0 hover:opacity-100"
+                        ? "translate-y-0 opacity-50 grayscale-[0.5] hover:opacity-100 hover:grayscale-0"
                         : "translate-y-0 opacity-100 hover:pb-4 hover:-translate-y-1"
                         }`}
                 >
