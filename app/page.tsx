@@ -194,14 +194,14 @@ export default function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
           <div>
-            <Tag text="Prompts you can use instantly" />
+            <Tag text="No technical skills required" />
 
             <h1 className="mt-4 text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
-              Learn Real <span className="text-[#B7FF00]">AI&nbsp;Skills</span>
+              <span className="text-[#B7FF00]">AI</span> Made Easy
             </h1>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/70 md:text-base">
-              Learn AI Skills that earn real money. Enjoy access to hundreds of prompts, templates, courses, and tools.
+              The all-in-one platform to launch your business with AI. Master the skills, create pro-level content, and start generating revenue faster than ever.
             </p>
 
             {/* MOBILE ONLY: slider goes above search/CTA */}
