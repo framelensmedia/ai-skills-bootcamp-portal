@@ -40,10 +40,10 @@ export function RefineChat({ onRefine, isGenerating }: RefineChatProps) {
     };
 
     return (
-        <div className="mt-4 flex flex-col gap-3 p-4 border border-white/10 rounded-2xl bg-black/40 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
+        <div className="mt-4 flex flex-col gap-3 p-4 border border-lime-400/20 rounded-2xl bg-gradient-to-b from-lime-400/5 to-transparent backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-2 text-lime-400 text-[10px] font-bold uppercase tracking-widest">
                 <SparklesIcon className="animate-pulse" />
-                <span>Refine Creation</span>
+                <span>Refine & Edit</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -52,7 +52,7 @@ export function RefineChat({ onRefine, isGenerating }: RefineChatProps) {
                         key={s.label}
                         onClick={() => onRefine(s.prompt)}
                         disabled={isGenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-white/10 rounded-full bg-white/5 hover:bg-white/10 hover:border-lime-400/30 transition-all disabled:opacity-50 text-white/70"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-white/10 rounded-full bg-white/5 hover:bg-white/10 hover:border-lime-400/30 hover:text-lime-200 transition-all disabled:opacity-50 text-white/70"
                     >
                         {s.label}
                     </button>
@@ -64,23 +64,23 @@ export function RefineChat({ onRefine, isGenerating }: RefineChatProps) {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask for changes (e.g., 'Make it look like sunset')"
+                    placeholder="Describe your edit (e.g., 'Make it look like sunset')"
                     disabled={isGenerating}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400/50"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400/50 focus:bg-lime-900/10 transition-all font-medium"
                 />
                 <button
                     type="submit"
                     disabled={isGenerating || !input.trim()}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-lime-400 hover:text-lime-300 disabled:text-white/20 transition-colors"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 text-lime-400 hover:text-lime-300 disabled:text-white/20 transition-colors"
                 >
                     {isGenerating ? (
                         <div className="w-5 h-5 border-2 border-lime-400/20 border-t-lime-400 rounded-full animate-spin" />
                     ) : (
-                        <SendIcon size={18} />
+                        <SendIcon size={16} />
                     )}
                 </button>
             </form>
-            <p className="text-[9px] text-white/20 text-center uppercase tracking-tighter">Uses current image as reference</p>
+            <p className="text-[9px] text-white/30 text-center uppercase tracking-tighter">Using previous result as reference</p>
         </div>
     );
 }

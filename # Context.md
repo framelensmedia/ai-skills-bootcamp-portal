@@ -1,0 +1,275 @@
+# Context Document
+
+# AI Skills Bootcamp
+
+## Vision, System Architecture, and Product Roadmap
+
+---
+
+## 1. High-Level Vision
+
+AI Skills Bootcamp is not just a course platform.
+It is an **AI-powered learning and creation ecosystem** designed for everyday entrepreneurs, creators, and business owners who want professional results without becoming technical experts.
+
+The core promise:
+
+> *“You don’t learn AI just to understand it.
+> You learn AI to create, deploy, and win in the real world.”*
+
+The platform is built to remove complexity, reduce friction, and give users **confidence through outcomes**, not theory.
+
+---
+
+## 2. The Two-Layer System (Core Architecture)
+
+AI Skills Bootcamp is intentionally designed as a **two-layer system** that feeds into itself.
+
+### Layer 1: Bootcamps (Learning + Coaching Layer)
+
+This layer handles:
+
+* Education
+* Guidance
+* Strategy
+* Context
+
+**What it includes**
+
+* Short-form bootcamps (3–5 min lessons)
+* Topic-focused programs (content, branding, ads, local business, etc.)
+* Coaches and instructors (including future partners)
+* Clear “what to do next” direction
+
+**Purpose**
+Bootcamps teach users:
+
+* What AI can do for them
+* How to think about using AI in business and creative work
+* When and why to use specific tools or workflows
+
+Bootcamps do **not** aim to make users technical.
+They aim to make users **effective**.
+
+---
+
+### Layer 2: Prompt Studio (Creation + Execution Layer)
+
+This is the heart of the platform.
+
+The Prompt Studio is where users:
+
+* Create real assets
+* Edit and remix visuals
+* Apply what they learned immediately
+* Produce business-ready outputs
+
+**Key idea**
+Users are not “prompting from scratch.”
+They are **editing proven templates**.
+
+The Prompt Studio functions more like:
+
+* Photoshop + Canva + AI
+  and less like:
+* A raw AI playground
+
+**What the Prompt Studio does**
+
+* Uses high-quality template images as the starting point
+* Allows guided remixing through structured edits
+* Preserves identity, pose, body type, and camera angle
+* Produces studio-quality results without guesswork
+
+This is where learning becomes **action**.
+
+---
+
+## 3. Core Differentiator
+
+Most AI platforms are built for:
+
+* Power users
+* Tinkerers
+* Technical creators
+
+AI Skills Bootcamp is built for:
+
+* Everyday entrepreneurs
+* Small business owners
+* Creators who want results, not knobs
+
+The platform prioritizes:
+
+* Confidence over control
+* Outcomes over options
+* Guardrails over freedom
+
+---
+
+## 4. Prompt Studio Philosophy (Why It Works)
+
+### Reference-First, Not Prompt-First
+
+Instead of asking users to describe what they want, the system:
+
+* Starts with a proven template image
+* Treats that image as the composition blueprint
+* Applies controlled edits based on user intent
+
+Users are effectively saying:
+
+> “Change this, keep everything else the same.”
+
+This dramatically improves:
+
+* Consistency
+* Likeness preservation
+* Trust in results
+
+---
+
+### Strict Identity Preservation (V1 Rule)
+
+In V1:
+
+* Uploaded photos are treated as the **sole identity source**
+* No face blending
+* No body reshaping
+* No pose reinterpretation
+* No beautification layers yet
+
+This makes outputs feel like:
+
+> “Photoshop-level edits, not AI guesses.”
+
+---
+
+## 5. MVP Game Plan (V1)
+
+### Goals of the MVP
+
+* Prove the two-layer system works
+* Deliver immediate user wins
+* Keep scope tight and reliable
+
+---
+
+### MVP Features
+
+#### Bootcamp Layer
+
+* Core AI Skills Bootcamp content
+* Clear guidance on how to use the Prompt Studio
+* Focus on practical outcomes (content, branding, ads)
+
+#### Prompt Studio (MVP Scope)
+
+* Template-based image creation
+* Guided Remix chat (edit instead of prompt)
+* Subject replacement with strict identity rules
+* Headline, subheadline, CTA editing
+* Contact info and social link updates
+* Edit Remix vs New Remix flows
+* Prompt copying (user-visible edit summary only)
+* Hidden global system prompts (secret sauce)
+
+#### What MVP Does NOT Include
+
+* Face training or cameo models
+* Beautification or enhancement layers
+* Complex expert controls
+* Video generation (yet)
+
+---
+
+### MVP Success Criteria
+
+* Users say “that looks like me”
+* Users can create something useful in under 5 minutes
+* Users understand what to do next without guessing
+* Prompt Studio feels easier than typing prompts elsewhere
+
+---
+
+## 6. Monetization & Positioning (MVP)
+
+AI Skills Bootcamp is positioned as:
+
+* Education + execution
+* Not just a tool, not just a course
+
+Initial monetization levers:
+
+* Paid bootcamps
+* Studio usage tiers
+* Limited free access with clear upgrade paths
+
+The platform is designed so:
+
+* Free users can create
+* Paid users gain leverage, speed, and depth
+
+---
+
+## 7. Big Ideas for V2 (Expansion Phase)
+
+V2 builds on the same foundation without changing the mental model.
+
+### 1. Identity & Cameo System
+
+* Optional user identity packs
+* Multiple reference photos
+* Eventually video-based identity consistency
+* Still privacy-first and opt-in
+
+### 2. Controlled Enhancement Layers
+
+* Optional polish modes:
+
+  * Clean
+  * Studio
+  * Editorial
+* Never identity-changing
+* Always reversible
+
+### 3. Video Templates
+
+* Reference-first video generation
+* Pose and angle preservation over time
+* Same remix philosophy applied to motion
+
+### 4. Partner & Coach Ecosystem
+
+* Guest instructors
+* Industry-specific bootcamps
+* Revenue sharing model
+* “Record label” approach to courses
+
+### 5. AI Operators & Automation
+
+* Move from creation to deployment
+* Content agents
+* Marketing agents
+* Local business agents
+* Direct integration with AI Biz Flow
+
+---
+
+## 8. Long-Term Vision
+
+AI Skills Bootcamp evolves into:
+
+> **A creative operating system for entrepreneurs.**
+
+Where users:
+
+* Learn → Create → Deploy → Scale
+  all inside one ecosystem.
+
+The end goal is not to teach AI.
+
+The goal is to:
+
+> **Help people build real businesses and creative leverage using AI without fear or friction.**
+
+

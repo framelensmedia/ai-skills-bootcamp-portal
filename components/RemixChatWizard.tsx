@@ -187,16 +187,8 @@ export default function RemixChatWizard({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" role="dialog">
-            <div className="flex h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black">
-                {/* Left Panel Omitted for Brevity (Same as before) */}
-                <div className="hidden w-1/3 border-r border-white/10 bg-black/40 p-6 md:flex md:flex-col md:items-center">
-                    <div className="text-sm font-semibold text-white/80 mb-4">Template Reference</div>
-                    <div className="relative aspect-[9/16] w-full max-w-[280px] overflow-hidden rounded-2xl border border-white/10 bg-black">
-                        <Image src={templatePreviewUrl} alt="Template" fill className="object-contain" unoptimized />
-                    </div>
-                </div>
-
-                <div className="flex w-full flex-col md:w-2/3">
+            <div className="flex flex-col-reverse md:flex-row h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black">
+                <div className="flex w-full flex-col md:w-2/3 h-full overflow-hidden">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-white/10 bg-black/60 p-4">
                         <div className="text-sm font-semibold text-white">Guided Remix</div>
@@ -227,7 +219,7 @@ export default function RemixChatWizard({
                     </div>
 
                     {/* Input Area */}
-                    <div className="border-t border-white/10 bg-black/60 p-4 md:p-6">
+                    <div className="border-t border-white/10 bg-black/60 p-4 md:p-6 shrink-0 z-10">
                         {currentStep === "intro" ? (
                             <button onClick={() => advanceStep()} className="w-full rounded-xl bg-lime-400 py-3 text-sm font-semibold text-black hover:bg-lime-300">
                                 Looks good, start editing
@@ -259,6 +251,14 @@ export default function RemixChatWizard({
                                 </button>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* Right Panel (Template Preview) - Top on Mobile via flex-col-reverse */}
+                <div className="relative flex h-32 w-full shrink-0 flex-row items-center border-b border-white/10 bg-black/40 p-4 md:h-auto md:w-1/3 md:flex-col md:border-b-0 md:border-l md:p-6">
+                    <div className="mr-4 text-xs font-semibold text-white/80 md:mb-4 md:mr-0 md:text-sm">Template</div>
+                    <div className="relative h-full aspect-[9/16] md:w-full md:max-w-[280px] md:h-auto overflow-hidden rounded-lg border border-white/10 bg-black">
+                        <Image src={templatePreviewUrl} alt="Template" fill className="object-contain" unoptimized />
                     </div>
                 </div>
             </div>
