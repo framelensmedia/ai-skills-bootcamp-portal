@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import AIAssistant from "@/components/AIAssistant";
 
 export const metadata: Metadata = {
   title: "AI Skills Bootcamp",
@@ -55,6 +56,9 @@ export default function RootLayout({
 
         {/* Main Content */}
         <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+
+        {/* AI Assistant Chat Bubble */}
+        <AIAssistant />
       </body>
     </html>
   );

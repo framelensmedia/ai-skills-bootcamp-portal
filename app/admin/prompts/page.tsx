@@ -12,7 +12,15 @@ export default async function AdminPromptsPage() {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-      <div className="mb-4 text-lg font-semibold">Prompt Queue</div>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-lg font-semibold">Prompt Queue</div>
+        <a
+          href="/admin/prompts/import"
+          className="rounded-xl bg-[#B7FF00] px-4 py-2 text-sm font-semibold text-black transition hover:opacity-90"
+        >
+          Import Template
+        </a>
+      </div>
 
       <div className="grid gap-3">
         {(data ?? []).map((p) => (

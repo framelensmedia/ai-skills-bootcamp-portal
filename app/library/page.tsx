@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import PromptCard from "@/components/PromptCard";
-import { Pencil, Check, X, Trash2, Heart } from "lucide-react";
+import { Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon, Star, Grid3X3, List } from "lucide-react";
+import Link from "next/link";
 
 type SortMode = "newest" | "oldest";
 
@@ -183,8 +184,6 @@ function LibraryContent() {
     }
   }
 
-  const itemsToShow = activeTab === "remixes" ? remixItems : [];
-
   useEffect(() => {
     let cancelled = false;
 
@@ -275,7 +274,6 @@ function LibraryContent() {
 
           if (cancelled) return;
           if (favError) {
-            // If favoriting table doesn't exist yet, just clear
             console.warn("Fav fetch error (table missing?)", favError);
             setFavoriteItems([]);
             setLoading(false);
@@ -284,7 +282,6 @@ function LibraryContent() {
 
           const favRows = favs ?? [];
           const promptIds = favRows.filter(f => f.prompt_id).map(f => f.prompt_id);
-          const genIds = favRows.filter(f => f.generation_id).map(f => f.generation_id);
 
           let fetchedPrompts: PromptPublicRow[] = [];
 
@@ -296,18 +293,13 @@ function LibraryContent() {
             fetchedPrompts = (pData ?? []) as PromptPublicRow[];
           }
 
-          // TODO: Fetch generations if needed. For now assuming minimal generations favorite support or implementation later upon user request.
-          // Mixing lists.
-
           const builtFavs: FavoriteItem[] = [];
 
-          // Map back in order of Favorites
           for (const fav of favRows) {
             if (fav.prompt_id) {
               const p = fetchedPrompts.find(x => x.id === fav.prompt_id);
               if (p) builtFavs.push({ type: "prompt", data: p });
             }
-            // generation handling would go here
           }
 
           setFavoriteItems(builtFavs);
@@ -324,14 +316,8 @@ function LibraryContent() {
     return () => { cancelled = true; };
   }, [activeTab, sortMode, promptSlugFilter]);
 
-  const headerLabel = useMemo(() => {
-    if (promptSlugFilter) return `My Library: ${promptSlugFilter}`;
-    return "My Library";
-  }, [promptSlugFilter]);
-
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
-      {/* Lightbox for Remixes */}
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans">
       <GenerationLightbox
         open={lightboxOpen}
         url={lightboxUrl}
@@ -355,30 +341,51 @@ function LibraryContent() {
         }}
       />
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight md:text-5xl">Library</h1>
-        <p className="mt-3 text-white/60">
-          Your collection of remixes and favorite prompts.
-        </p>
+      {/* Technical Header */}
+      <div className="mb-8 border-b border-white/10 pb-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-white md:text-3xl">
+              {promptSlugFilter ? `Filter: ${promptSlugFilter}` : "My Library"}
+            </h1>
+          </div>
 
-        {/* Tabs */}
-        <div className="mt-8 flex items-center gap-1 border-b border-white/10">
-          <button
-            onClick={() => setActiveTab("remixes")}
-            className={`relative px-6 py-3 text-sm font-medium transition-colors ${activeTab === "remixes" ? "text-[#B7FF00]" : "text-white/60 hover:text-white"
-              }`}
-          >
-            My Remixes
-            {activeTab === "remixes" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B7FF00]" />}
+          {/* Technical Tab Switcher */}
+          <div className="flex bg-zinc-900 border border-white/10 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab("remixes")}
+              className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wide rounded-md transition-all ${activeTab === "remixes"
+                ? "bg-[#B7FF00] text-black"
+                : "text-white/40 hover:text-white"
+                }`}
+            >
+              Remixes
+            </button>
+            <button
+              onClick={() => setActiveTab("favorites")}
+              className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wide rounded-md transition-all ${activeTab === "favorites"
+                ? "bg-[#B7FF00] text-black"
+                : "text-white/40 hover:text-white"
+                }`}
+            >
+              Favorites
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-mono text-white/40 uppercase tracking-wider">
+          <span>{loading ? "LOAD..." : `${activeTab === "remixes" ? remixItems.length : favoriteItems.length} ITEMS`}</span>
+          {promptSlugFilter && <span className="text-[#B7FF00]">• FILTER ACTIVE</span>}
+        </div>
+        <div className="flex gap-2">
+          <button className="p-2 rounded-lg border border-white/10 bg-zinc-900 hover:border-white/20 text-white/60">
+            <Grid3X3 size={16} />
           </button>
-          <button
-            onClick={() => setActiveTab("favorites")}
-            className={`relative px-6 py-3 text-sm font-medium transition-colors ${activeTab === "favorites" ? "text-[#B7FF00]" : "text-white/60 hover:text-white"
-              }`}
-          >
-            Favorites
-            {activeTab === "favorites" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B7FF00]" />}
+          <button className="p-2 rounded-lg border border-transparent hover:bg-white/5 text-white/30">
+            <List size={16} />
           </button>
         </div>
       </div>
@@ -386,58 +393,37 @@ function LibraryContent() {
       {activeTab === "remixes" ? (
         // REMIXES GRID
         <section className="min-h-[300px]">
-          <div className="flex items-center justify-between mb-6">
-            <div className="text-sm text-white/50">{loading ? "Loading..." : `${remixItems.length} remixes`}</div>
-            <div className="flex gap-2">
-              {/* Sort Pill could go here */}
-            </div>
-          </div>
-
-          {errorMsg && <div className="p-4 bg-red-900/20 border border-red-500/20 text-red-200 rounded-xl mb-6">{errorMsg}</div>}
+          {errorMsg && <div className="p-4 bg-red-950/30 border border-red-500/20 text-red-300 font-mono text-xs rounded-lg mb-6">{errorMsg}</div>}
 
           {!loading && remixItems.length === 0 && (
-            <div className="py-20 text-center text-white/40">
-              You haven't generated any remixes yet.
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-xl bg-zinc-900/20">
+              <div className="p-4 rounded-full bg-white/5 mb-3 text-white/20">
+                <ImageIcon size={24} />
+              </div>
+              <div className="text-sm font-medium text-white/40">No assets found</div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {remixItems.map((it) => (
-              <div key={it.id} className="relative group rounded-xl bg-white/5 p-2 transition hover:bg-white/10">
+              <div key={it.id} className="group relative bg-zinc-900/40 border border-white/5 transition-all hover:border-white/20 hover:bg-zinc-900">
                 <button
-                  className="relative aspect-square w-full overflow-hidden rounded-lg bg-black cursor-pointer"
+                  className="relative aspect-square w-full overflow-hidden bg-black"
                   onClick={() => openLightbox(it)}
                 >
-                  <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover transition group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition" />
-                </button>
-                <div className="mt-2 px-1">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="text-xs font-medium text-white/90 line-clamp-1 truncate" title={it.promptTitle}>{it.promptTitle}</div>
-                    <div className="flex items-center gap-1">
-                      {/* Favorite Button for Remix */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // TODO: Toggle favorite for generation
-                          // Since we need state for "isFavorited", we might need to fetch it or store it in items.
-                          // For now, I will skip implementing the full toggle logic here inside the map 
-                          // without a proper component or state.
-                          // I will leave this as a placeholder or implement a simple toggle if I can.
-                        }}
-                        className="text-white/20 hover:text-[#B7FF00] transition hidden"
-                      >
-                        <Heart className="w-3 h-3" />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(it.id); }} className="text-white/20 hover:text-red-400 transition">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                  <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover" />
+
+                  {/* Technical Overlay */}
+                  <div className="absolute inset-x-0 bottom-0 bg-black/80 px-3 py-2 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 flex justify-between items-center">
+                    <span className="text-[10px] font-mono text-white/80 truncate max-w-[80%]">{it.promptTitle}</span>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); handleDelete(it.id); }}
+                      className="text-white/40 hover:text-red-400"
+                    >
+                      <Trash2 size={12} />
                     </div>
                   </div>
-                  <div className="text-[10px] text-white/40 mt-0.5">
-                    {new Date(it.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
+                </button>
               </div>
             ))}
           </div>
@@ -445,19 +431,16 @@ function LibraryContent() {
       ) : (
         // FAVORITES GRID
         <section className="min-h-[300px]">
-          <div className="flex items-center justify-between mb-6">
-            <div className="text-sm text-white/50">{loading ? "Loading..." : `${favoriteItems.length} favorites`}</div>
-          </div>
-
-          {errorMsg && <div className="p-4 bg-red-900/20 border border-red-500/20 text-red-200 rounded-xl mb-6">{errorMsg}</div>}
-
           {!loading && favoriteItems.length === 0 && (
-            <div className="py-20 text-center text-white/40">
-              You haven't favorited any prompts yet.
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-xl bg-zinc-900/20">
+              <div className="p-4 rounded-full bg-white/5 mb-3 text-white/20">
+                <Star size={24} />
+              </div>
+              <div className="text-sm font-medium text-white/40">No favorites designated</div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {favoriteItems.map((item, idx) => {
               if (item.type === "prompt") {
                 const p = item.data;
@@ -477,44 +460,18 @@ function LibraryContent() {
                   />
                 );
               }
-              return null; // Generation favorites not fully implemented UI yet
+              return null;
             })}
           </div>
         </section>
       )}
-
     </main>
-  );
-}
-
-function SelectPill({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected?: boolean;
-  onClick?: () => void;
-}) {
-  const base = "rounded-xl border px-3 py-2 text-sm text-left transition";
-  const idleCls = "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
-  const selectedCls = "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[base, selected ? selectedCls : idleCls].join(" ")}
-      aria-pressed={selected ? "true" : "false"}
-    >
-      {label}
-    </button>
   );
 }
 
 export default function LibraryPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-white">Loading library...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-black text-white"><div className="h-5 w-5 animate-spin rounded-sm border-2 border-[#B7FF00] border-t-transparent"></div></div>}>
       <LibraryContent />
     </Suspense>
   );

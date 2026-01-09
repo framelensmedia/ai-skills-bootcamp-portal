@@ -4,6 +4,19 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import {
+  CreditCard,
+  LayoutGrid,
+  Zap,
+  Library,
+  Settings,
+  Users,
+  FileText,
+  Shield,
+  Crown,
+  Terminal,
+  ArrowUpRight
+} from "lucide-react";
 
 type ProfileRow = {
   plan: string;
@@ -13,47 +26,45 @@ type ProfileRow = {
   is_approved: boolean;
 };
 
-function roleRank(role: string) {
-  const r = String(role || "user").toLowerCase();
-  const order = ["user", "staff", "instructor", "editor", "admin", "super_admin"];
-  const idx = order.indexOf(r);
-  return idx === -1 ? 0 : idx;
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [greeting, setGreeting] = useState("");
 
   const [plan, setPlan] = useState<string>("free");
   const [role, setRole] = useState<string>("user");
   const [staffPro, setStaffPro] = useState<boolean>(false);
 
   const [pendingCount, setPendingCount] = useState<number>(0);
-  const [pendingLoading, setPendingLoading] = useState<boolean>(false);
   const [managingBilling, setManagingBilling] = useState(false);
 
-  const isStaffPlus = useMemo(() => roleRank(role) >= roleRank("staff"), [role]);
-  const isEditorPlus = useMemo(() => roleRank(role) >= roleRank("editor"), [role]);
-  const isAdminPlus = useMemo(() => roleRank(role) >= roleRank("admin"), [role]);
+  // Role Checks
+  const isStaffPlus = useMemo(() => ["staff", "instructor", "editor", "admin", "super_admin"].includes(role), [role]);
+  const isEditorPlus = useMemo(() => ["editor", "admin", "super_admin"].includes(role), [role]);
+  const isAdminPlus = useMemo(() => ["admin", "super_admin"].includes(role), [role]);
 
   const hasProAccess = useMemo(() => {
     const p = String(plan || "free").toLowerCase();
-    if (p === "premium") return true;
-    if (staffPro) return true;
-    if (isStaffPlus) return true;
-    return false;
+    return p === "premium" || staffPro || isStaffPlus;
   }, [plan, staffPro, isStaffPlus]);
 
+  // Greeting Logic
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 18) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
+  }, []);
+
+  // Data Loading
   useEffect(() => {
     let cancelled = false;
 
     async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
         router.push("/login");
@@ -65,215 +76,203 @@ export default function DashboardPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("plan, role, staff_pro, staff_approved, is_approved")
+        .select("plan, role, staff_pro, staff_approved, is_approved, username, full_name")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (cancelled) return;
-
-      if (!error && profile) {
-        const p = profile as ProfileRow;
+      if (!cancelled && !error && profile) {
+        const p = profile as ProfileRow & { username?: string; full_name?: string };
         setPlan(String(p.plan || "free"));
         setRole(String(p.role || "user"));
         setStaffPro(Boolean(p.staff_pro));
-      } else {
-        setPlan("free");
-        setRole("user");
-        setStaffPro(false);
+
+        // Prioritize full_name > username > email
+        const nameToUse = p.full_name || p.username;
+        if (nameToUse) {
+          setUser((prev: any) => ({ ...prev, displayName: nameToUse }));
+        }
       }
 
       setLoading(false);
     }
 
     loadUser();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [router, supabase]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadPending() {
-      if (!isEditorPlus) {
-        setPendingCount(0);
-        return;
-      }
-
-      setPendingLoading(true);
-
-      try {
-        const { count, error } = await supabase
-          .from("prompts")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "submitted");
-
-        if (cancelled) return;
-
-        if (error) {
-          setPendingCount(0);
-        } else {
-          setPendingCount(Number(count || 0));
-        }
-      } finally {
-        if (!cancelled) setPendingLoading(false);
-      }
-    }
-
-    if (!loading) loadPending();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [supabase, isEditorPlus, loading]);
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-white">
-        Loading dashboard…
+      <div className="flex min-h-screen items-center justify-center bg-black text-white">
+        <div className="h-5 w-5 animate-spin rounded-sm border-2 border-[#B7FF00] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:py-10 text-white">
-      {/* Dashboard Header */}
-      <div className="mb-8 rounded-2xl border border-white/10 bg-black/40 p-6 md:p-8">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-3xl font-bold md:text-4xl">Dashboard</h1>
-
-          <p className="text-sm text-white/70 md:text-base">
-            Logged in as <span className="font-medium text-white">{user?.email}</span>
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 text-sm text-white/70 md:text-base">
-            <span>
-              Plan: <span className="font-semibold text-white">{plan}</span>
-            </span>
-
-            <span className="text-white/40">•</span>
-
-            <span>
-              Role: <span className="font-semibold text-white">{role}</span>
-            </span>
-
-            <span className="text-white/40">•</span>
-
-            <span>
-              Pro Access:{" "}
-              <span className={hasProAccess ? "font-semibold text-lime-300" : "font-semibold text-white"}>
-                {hasProAccess ? "Yes" : "No"}
-              </span>
-            </span>
-
-            {String(plan || "free").toLowerCase() !== "free" && (
-              <>
-                <span className="text-white/40">•</span>
-
-                <button
-                  disabled={managingBilling}
-                  onClick={async () => {
-                    try {
-                      setManagingBilling(true);
-                      const res = await fetch("/api/stripe/portal", { method: "POST" });
-                      if (!res.ok) {
-                        const json = await res.json().catch(() => ({}));
-                        alert(json.error || "Failed to load billing portal");
-                        return;
-                      }
-                      const data = await res.json();
-                      if (data?.url) {
-                        window.open(data.url, "_blank", "noopener,noreferrer");
-                      }
-                    } catch (err) {
-                      console.error(err);
-                      alert("An error occurred. Please try again.");
-                    } finally {
-                      setManagingBilling(false);
-                    }
-                  }}
-                  className={`font-medium text-indigo-400 underline underline-offset-4 hover:text-indigo-300 ${managingBilling ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                >
-                  {managingBilling ? "Opening..." : "Manage billing"}
-                </button>
-              </>
-            )}
+    <div className="mx-auto max-w-7xl px-4 py-8 text-white font-sans">
+      {/* Technical Header */}
+      <div className="mb-8 border-b border-white/10 pb-6">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-[#B7FF00]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#B7FF00] animate-pulse"></span>
+            System Active • {role}
           </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+            {greeting}, {user?.displayName || user?.email?.split('@')[0]}
+          </h1>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Link
-          href="/prompts"
-          className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:border-white/20"
-        >
-          <h2 className="mb-1 text-lg font-semibold">Prompts</h2>
-          <p className="text-sm text-white/70">Browse free and premium prompts.</p>
-        </Link>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        {/* Left Column: Quick Actions */}
+        <div className="lg:col-span-3 space-y-6">
 
-        <Link
-          href="/studio"
-          className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:border-white/20"
-        >
-          <h2 className="mb-1 text-lg font-semibold">Prompt Studio</h2>
-          <p className="text-sm text-white/70">Create from scratch and save custom prompts.</p>
-        </Link>
+          {/* Primary Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link
+              href="/studio"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50 p-6 transition-all hover:border-[#B7FF00]/50 hover:bg-zinc-900"
+            >
+              <div className="mb-4">
+                <div className="mb-4 inline-flex items-center justify-center rounded-lg bg-[#B7FF00]/10 p-3 text-[#B7FF00]">
+                  <Zap size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-white">Prompt Studio</h3>
+                <p className="mt-1 text-sm text-white/60">Create custom assets with advanced controls.</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-medium text-[#B7FF00] opacity-0 transition group-hover:opacity-100">
+                Launch Tool <ArrowUpRight size={14} />
+              </div>
+            </Link>
 
-        <Link
-          href="/library"
-          className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:border-white/20"
-        >
-          <h2 className="mb-1 text-lg font-semibold">My Library</h2>
-          <p className="text-sm text-white/70">Your saved generations and inspiration.</p>
-        </Link>
-      </div>
+            <Link
+              href="/prompts"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50 p-6 transition-all hover:border-white/20 hover:bg-zinc-900"
+            >
+              <div className="mb-4">
+                <div className="mb-4 inline-flex items-center justify-center rounded-lg bg-white/5 p-3 text-white">
+                  <LayoutGrid size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-white">Browse Templates</h3>
+                <p className="mt-1 text-sm text-white/60">Explore curated templates and remix them.</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+                View Catalog <ArrowUpRight size={14} />
+              </div>
+            </Link>
+          </div>
 
-      {/* Staff / Editor / Admin Panels */}
-      {isStaffPlus ? (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-black/40 p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Creator Tools</h2>
-              <p className="mt-1 text-sm text-white/70">
-                Create prompts, manage drafts, and submit for review.
-              </p>
+          {/* Secondary Actions Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Link href="/library" className="group flex items-center gap-4 rounded-xl border border-white/10 bg-zinc-900/30 p-4 transition hover:bg-zinc-900 hover:border-white/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white/70 group-hover:text-white transition">
+                <Library size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-white">Library</div>
+                <div className="text-xs text-white/50">Your generations</div>
+              </div>
+            </Link>
+
+            <Link href="/settings" className="group flex items-center gap-4 rounded-xl border border-white/10 bg-zinc-900/30 p-4 transition hover:bg-zinc-900 hover:border-white/20">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white/70 group-hover:text-white transition">
+                <Settings size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-white">Settings</div>
+                <div className="text-xs text-white/50">Manage account</div>
+              </div>
+            </Link>
+
+            <button
+              onClick={async () => {
+                setManagingBilling(true);
+                try {
+                  const res = await fetch("/api/stripe/portal", { method: "POST" });
+                  const data = await res.json();
+                  if (data?.url) window.location.href = data.url;
+                } catch (e) { console.error(e); }
+                setManagingBilling(false);
+              }}
+              disabled={managingBilling}
+              className="group flex items-center gap-4 rounded-xl border border-white/10 bg-zinc-900/30 p-4 transition hover:bg-zinc-900 hover:border-white/20 text-left"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white/70 group-hover:text-white transition">
+                <CreditCard size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-white">Billing</div>
+                <div className="text-xs text-white/50">{hasProAccess ? 'Pro Active' : 'Free Plan'}</div>
+              </div>
+            </button>
+          </div>
+
+          {/* Staff Section */}
+          {isStaffPlus && (
+            <div className="mt-8 rounded-xl border border-white/10 bg-zinc-900/20 p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <Shield size={16} className="text-[#B7FF00]" />
+                <h2 className="text-sm font-bold uppercase tracking-wide text-white">Administrative Tools</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Link href="/dashboard/cms" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
+                  <FileText size={18} className="text-sky-400" />
+                  <span className="text-sm font-medium text-white">CMS</span>
+                </Link>
+                {isEditorPlus && (
+                  <Link href="/dashboard/review" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
+                    <Shield size={18} className="text-purple-400" />
+                    <span className="text-sm font-medium text-white">Review Queue</span>
+                  </Link>
+                )}
+                {isAdminPlus && (
+                  <Link href="/dashboard/admin/users" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
+                    <Users size={18} className="text-orange-400" />
+                    <span className="text-sm font-medium text-white">User Admin</span>
+                  </Link>
+                )}
+              </div>
             </div>
+          )}
+        </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Link
-                href="/dashboard/cms"
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
+        {/* Right Sidebar: Status & Info */}
+        <div className="space-y-6">
+          {/* Upgrade Card */}
+          {!hasProAccess && (
+            <div className="rounded-xl bg-[#B7FF00] p-6 text-black">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-black/10">
+                <Crown size={20} className="text-black" />
+              </div>
+              <h3 className="font-bold">Upgrade to Pro</h3>
+              <p className="mt-1 text-sm text-black/70 font-medium">Unlock advanced features and premium templates.</p>
+              <button
+                onClick={() => router.push('/pricing')}
+                className="mt-4 w-full rounded-lg bg-black py-2.5 text-sm font-bold text-white hover:bg-black/80 transition"
               >
-                Open CMS
-              </Link>
+                Get Pro Access
+              </button>
+            </div>
+          )}
 
-              {isEditorPlus ? (
-                <Link
-                  href="/dashboard/review"
-                  className="inline-flex items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-                >
-                  Review Queue
-                  <span className="ml-2 inline-flex items-center rounded-full bg-black/20 px-2 py-0.5 text-xs font-semibold text-black">
-                    {pendingLoading ? "…" : String(pendingCount)}
-                  </span>
-                </Link>
-              ) : null}
-
-              {isAdminPlus ? (
-                <Link
-                  href="/dashboard/admin/users"
-                  className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
-                >
-                  User Admin
-                </Link>
-              ) : null}
+          <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-5">
+            <h3 className="mb-4 text-xs font-mono uppercase tracking-widest text-white/40">System Status</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/60">Version</span>
+                <span className="font-mono text-white">v2.4.0</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/60">Status</span>
+                <span className="flex items-center gap-2 font-medium text-[#B7FF00]">
+                  <span className="h-2 w-2 rounded-full bg-[#B7FF00]"></span>
+                  Operational
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
