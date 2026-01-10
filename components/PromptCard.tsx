@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useToast } from "@/context/ToastContext";
@@ -142,9 +143,9 @@ export default function PromptCard({
       <button
         type="button"
         onClick={handleClick}
-        className="group block w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition hover:border-white/20 hover:bg-white/10"
+        className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition hover:border-white/20 hover:bg-white/10"
       >
-        <div className="relative aspect-[16/9] w-full overflow-hidden bg-black/40">
+        <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-black/40">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={resolvedImageUrl}
@@ -178,17 +179,19 @@ export default function PromptCard({
           </div>
         </div>
 
-        <div className="p-4 sm:p-5">
+        <div className="flex flex-1 flex-col p-4 sm:p-5">
           <div className="text-lg font-semibold leading-tight pr-6">{title}</div>
 
           <div className="mt-2 line-clamp-2 text-sm text-white/70">
             {summary && summary.trim().length > 0 ? summary : "Open to view and use this prompt."}
           </div>
 
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-xs text-white/50">{isAuthed ? "Open prompt" : "Log in to open"}</div>
-            <div className="text-xs text-lime-300 opacity-0 transition group-hover:opacity-100">
-              {isAuthed ? "View →" : "Log in →"}
+          <div className="mt-auto pt-4 flex items-center justify-between">
+            <div className="text-xs text-white/50">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>
+
+            {/* Icon-only Remix Button (Subtle) */}
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${isAuthed ? "border-[#B7FF00]/30 text-[#B7FF00] bg-[#B7FF00]/5" : "border-white/10 text-white/50 bg-white/5"} transition group-hover:bg-[#B7FF00] group-hover:text-black group-hover:border-[#B7FF00] group-hover:scale-110 shadow-sm`}>
+              <RefreshCw size={14} />
             </div>
           </div>
         </div>
