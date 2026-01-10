@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Loading from "@/components/Loading";
+
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -674,14 +676,7 @@ function PromptContent() {
   }
 
   if (loading) {
-    return (
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10 text-white">
-        <div className="rounded-3xl border border-white/10 bg-black/40 p-6">
-          <div className="text-lg font-semibold">Loading prompt…</div>
-          <div className="mt-2 text-sm text-white/60">Slug: {slug || "(empty)"}</div>
-        </div>
-      </main>
-    );
+    return <Loading />;
   }
 
   if (errorMsg || !metaRow) {

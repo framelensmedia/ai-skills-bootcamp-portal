@@ -6,8 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import PromptCard from "@/components/PromptCard";
-import { Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon, Star, Grid3X3, List } from "lucide-react";
+import {
+  Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon,
+  Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder
+} from "lucide-react";
 import Link from "next/link";
+import Loading from "@/components/Loading";
 
 type SortMode = "newest" | "oldest";
 
@@ -23,6 +27,7 @@ type GenRow = {
   original_prompt_text: string | null;
   remix_prompt_text: string | null;
   combined_prompt_text: string | null;
+  folder_id?: string | null;
 };
 
 type PromptPublicRow = {
@@ -52,11 +57,22 @@ type LibraryItem = {
   originalPromptText: string;
   remixPromptText: string;
   combinedPromptText: string;
+  folder: string | null;
+  folder_id: string | null;
 };
 
-type FavoriteItem =
-  | { type: "prompt"; data: PromptPublicRow }
-  | { type: "generation"; data: LibraryItem };
+type FolderType = {
+  id: string;
+  name: string;
+};
+
+type FavoriteItem = {
+  recordId: string;
+  folder_id: string | null;
+  createdAt: string;
+  type: "prompt" | "generation";
+  data: PromptPublicRow | LibraryItem;
+};
 
 function normalize(v: any) {
   return String(v ?? "").trim();
@@ -65,29 +81,13 @@ function normalize(v: any) {
 function fallbackFromSettings(settings: any) {
   const s = settings || {};
 
-  const original =
-    normalize(s?.original_prompt_text) ||
-    normalize(s?.originalPromptText) ||
-    normalize(s?.originalPrompt) ||
-    normalize(s?.prompt) ||
-    normalize(s?.promptText) ||
-    "";
+  const original = normalize(s?.original_prompt_text) || "";
 
-  const remix =
-    normalize(s?.remix_prompt_text) ||
-    normalize(s?.remixPromptText) ||
-    normalize(s?.remixAdditions) ||
-    normalize(s?.remixPrompt) ||
-    "";
+  const remix = normalize(s?.remix_prompt_text) || "";
 
-  const combined =
-    normalize(s?.combined_prompt_text) ||
-    normalize(s?.combinedPromptText) ||
-    normalize(s?.combinedPrompt) ||
-    normalize(s?.finalPrompt) ||
-    "";
+  const combined = normalize(s?.combined_prompt_text) || "";
 
-  return { original, remix, combined };
+  return { original, remix, combined, folder: normalize(s?.folder) || null };
 }
 
 function LibraryContent() {
@@ -99,6 +99,8 @@ function LibraryContent() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   // "remixes" = My Generations (prompt_generations)
   // "favorites" = My Favorites (prompt_favorites -> prompts_public / prompt_generations)
@@ -106,11 +108,14 @@ function LibraryContent() {
 
   const [remixItems, setRemixItems] = useState<LibraryItem[]>([]);
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
+  const [folders, setFolders] = useState<FolderType[]>([]);
 
-  // Editing logic for Remixes
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Move Modal
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
 
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -120,6 +125,10 @@ function LibraryContent() {
   const [lbCombined, setLbCombined] = useState("");
 
   function openLightbox(it: LibraryItem) {
+    if (isSelectionMode) {
+      toggleSelection(it.id);
+      return;
+    }
     setLbOriginal(it.originalPromptText);
     setLbRemix(it.remixPromptText);
     setLbCombined(it.combinedPromptText);
@@ -127,16 +136,97 @@ function LibraryContent() {
     setLightboxOpen(true);
   }
 
+  function toggleSelection(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  }
+
   function closeLightbox() {
     setLightboxOpen(false);
     setLightboxUrl(null);
-    setLbOriginal("");
-    setLbRemix("");
-    setLbCombined("");
   }
 
   function handleShare(url: string) {
     console.log("Share clicked:", url);
+  }
+
+  async function handleCreateFolder() {
+    const name = window.prompt("Enter new folder name:");
+    if (!name || !name.trim()) return;
+
+    const supabase = createSupabaseBrowserClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase.from("folders").insert({
+      name: name.trim(),
+      user_id: user.id
+    }).select().single();
+
+    if (error) {
+      alert("Failed to create folder: " + error.message);
+      return;
+    }
+
+    if (data) {
+      setFolders(prev => [...prev, data as FolderType].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+  }
+
+  async function handleRenameFolder(id: string, currentName: string) {
+    const name = window.prompt("Rename folder:", currentName);
+    if (!name || !name.trim() || name === currentName) return;
+
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.from("folders").update({ name: name.trim() }).eq("id", id);
+
+    if (error) {
+      alert("Rename failed: " + error.message);
+      return;
+    }
+
+    setFolders(prev => prev.map(f => f.id === id ? { ...f, name: name.trim() } : f).sort((a, b) => a.name.localeCompare(b.name)));
+  }
+
+  async function handleDeleteFolder(id: string) {
+    if (!confirm("Delete this folder? Items inside will remain in your library.")) return;
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.from("folders").delete().eq("id", id);
+    if (error) {
+      alert("Delete failed: " + error.message);
+      return;
+    }
+    setFolders(prev => prev.filter(f => f.id !== id));
+    if (selectedFolder === id) setSelectedFolder(null);
+  }
+
+
+
+  async function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} items permanently?`)) return;
+
+    const ids = Array.from(selectedIds);
+    const supabase = createSupabaseBrowserClient();
+    const table = activeTab === "remixes" ? "prompt_generations" : "prompt_favorites";
+
+    const { error } = await supabase.from(table).delete().in("id", ids);
+
+    if (error) {
+      alert("Delete failed: " + error.message);
+      return;
+    }
+
+    if (activeTab === "remixes") {
+      setRemixItems(prev => prev.filter(i => !selectedIds.has(i.id)));
+    } else {
+      setFavoriteItems(prev => prev.filter(i => !selectedIds.has(i.recordId)));
+    }
+
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
   }
 
   function handleRemix(payload: {
@@ -151,37 +241,10 @@ function LibraryContent() {
     router.push(href);
   }
 
-  async function handleUpdateTitle(id: string, overrideValue?: string) {
-    const val = overrideValue !== undefined ? overrideValue : editingValue;
-    if (!val.trim()) return;
-    setSavingId(id);
-    try {
-      const res = await fetch("/api/library", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, headline: val }),
-      });
-      if (!res.ok) throw new Error("Update failed");
-
-      setRemixItems((prev) => prev.map((it) => (it.id === id ? { ...it, promptTitle: val } : it)));
-    } catch (e) {
-      console.error("Failed to update title", e);
-    } finally {
-      setSavingId(null);
-      setEditingId(null);
-      setEditingValue("");
-    }
-  }
-
   async function handleDelete(id: string) {
-    if (!window.confirm("Are you sure you want to delete this image?")) return;
+    if (!window.confirm("Delete this image?")) return;
     setRemixItems((prev) => prev.filter((it) => it.id !== id));
-    try {
-      const res = await fetch(`/api/library?id=${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-    } catch (e) {
-      console.error("Delete failed", e);
-    }
+    await fetch(`/api/library?id=${id}`, { method: "DELETE" }).catch(console.error);
   }
 
   useEffect(() => {
@@ -202,13 +265,28 @@ function LibraryContent() {
         return;
       }
 
+      // Fetch Folders
+      try {
+        const { data: folderData } = await supabase
+          .from("folders")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("name");
+
+        if (folderData && !cancelled) {
+          setFolders(folderData as FolderType[]);
+        }
+      } catch (e) {
+        // ignore missing table
+      }
+
       try {
         if (activeTab === "remixes") {
           // Fetch Remixes (prompt_generations)
           let q = supabase
             .from("prompt_generations")
             .select(
-              "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text"
+              "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, folder_id"
             )
             .eq("user_id", user.id)
             .limit(200);
@@ -259,6 +337,8 @@ function LibraryContent() {
               originalPromptText,
               remixPromptText,
               combinedPromptText,
+              folder: fb.folder,
+              folder_id: (g as any).folder_id || null,
             } as LibraryItem;
           });
 
@@ -266,27 +346,28 @@ function LibraryContent() {
 
         } else {
           // Fetch Favorites
-          const { data: favs, error: favError } = await supabase
+          const {
+            data: favsRow,
+            error: favError
+          } = await supabase
             .from("prompt_favorites")
-            .select("prompt_id, generation_id, created_at")
+            .select("id, prompt_id, generation_id, created_at, folder_id")
             .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
+            .order("created_at", {
+              ascending: false
+            });
 
           if (cancelled) return;
-          if (favError) {
-            console.warn("Fav fetch error (table missing?)", favError);
-            setFavoriteItems([]);
-            setLoading(false);
-            return;
-          }
+          if (favError) throw favError;
 
-          const favRows = favs ?? [];
+          const favRows = favsRow ?? [];
           const promptIds = favRows.filter(f => f.prompt_id).map(f => f.prompt_id);
 
           let fetchedPrompts: PromptPublicRow[] = [];
-
           if (promptIds.length > 0) {
-            const { data: pData } = await supabase
+            const {
+              data: pData
+            } = await supabase
               .from("prompts_public")
               .select("id, title, slug, category, access_level, summary, featured_image_url, image_url, media_url")
               .in("id", promptIds);
@@ -294,17 +375,22 @@ function LibraryContent() {
           }
 
           const builtFavs: FavoriteItem[] = [];
-
           for (const fav of favRows) {
             if (fav.prompt_id) {
               const p = fetchedPrompts.find(x => x.id === fav.prompt_id);
-              if (p) builtFavs.push({ type: "prompt", data: p });
+              if (p) {
+                builtFavs.push({
+                  recordId: fav.id,
+                  folder_id: fav.folder_id || null,
+                  createdAt: fav.created_at,
+                  type: "prompt",
+                  data: p
+                });
+              }
             }
           }
-
           setFavoriteItems(builtFavs);
         }
-
       } catch (e: any) {
         if (!cancelled) setErrorMsg(e?.message || "Failed to load.");
       } finally {
@@ -316,8 +402,103 @@ function LibraryContent() {
     return () => { cancelled = true; };
   }, [activeTab, sortMode, promptSlugFilter]);
 
+  const displayedItems = useMemo(() => {
+    let items: LibraryItem[] = [];
+    if (activeTab === "remixes") {
+      items = remixItems;
+    } else {
+      // Map favorites to LibraryItem-like structure
+      items = favoriteItems.map(f => {
+        if (f.type === "prompt") {
+          const p = f.data as PromptPublicRow;
+          return {
+            id: f.recordId, // Use favorite record ID for selection/moving
+            imageUrl: p.image_url || p.featured_image_url || "/orb-neon.gif",
+            createdAt: f.createdAt,
+            createdAtMs: Date.parse(f.createdAt),
+            promptTitle: p.title,
+            promptSlug: p.slug,
+            folder_id: f.folder_id,
+            // Favorites don't have generation-specific fields
+            promptId: p.id,
+            aspectRatio: null,
+            promptCategory: p.category,
+            originalPromptText: "",
+            remixPromptText: "",
+            combinedPromptText: "",
+            folder: null,
+          } as LibraryItem;
+        }
+        return null;
+      }).filter(Boolean) as LibraryItem[];
+    }
+
+    return items.filter(it => !selectedFolder || it.folder_id === selectedFolder);
+  }, [activeTab, remixItems, favoriteItems, selectedFolder]);
+
+  async function handleMoveSelected(targetFolderId: string | null) {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    const supabase = createSupabaseBrowserClient();
+    const table = activeTab === "remixes" ? "prompt_generations" : "prompt_favorites";
+
+    // For prompt_favorites, we update by 'id' (PK) which we mapped to 'id' in displayedItems.
+    // prompt_generations also uses 'id'.
+
+    // Optimistic update
+    const updateLocal = (folderId: string | null) => {
+      if (activeTab === "remixes") {
+        setRemixItems(prev => prev.map(item => selectedIds.has(item.id) ? { ...item, folder_id: folderId } : item));
+      } else {
+        setFavoriteItems(prev => prev.map(item => selectedIds.has(item.recordId) ? { ...item, folder_id: folderId } : item));
+      }
+    };
+
+    updateLocal(targetFolderId);
+
+    const { error } = await supabase
+      .from(table)
+      .update({ folder_id: targetFolderId })
+      .in("id", ids);
+
+    if (error) {
+      alert("Failed to move items: " + error.message);
+      // Revert optimistic? 
+      // For now, simple alert.
+      return;
+    }
+
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
+    setIsMoveModalOpen(false);
+  }
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans pb-32">
+      {/* Modal for Moving Items */}
+      {isMoveModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center">
+              <h3 className="font-bold text-white">Move {selectedIds.size} items</h3>
+              <button onClick={() => setIsMoveModalOpen(false)}><X size={20} className="text-white/50 hover:text-white" /></button>
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto p-2">
+              <button onClick={() => handleMoveSelected(null)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
+                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center"><Library size={16} /></div>
+                <span>Main Library (No Folder)</span>
+              </button>
+              {folders.map(f => (
+                <button key={f.id} onClick={() => handleMoveSelected(f.id)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
+                  <div className="w-8 h-8 rounded bg-[#B7FF00]/10 flex items-center justify-center text-[#B7FF00]"><Folder size={16} /></div>
+                  <span className="truncate">{f.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <GenerationLightbox
         open={lightboxOpen}
         url={lightboxUrl}
@@ -327,143 +508,172 @@ function LibraryContent() {
         combinedPromptText={lbCombined}
         onShare={handleShare}
         onRemix={handleRemix}
-        title={remixItems.find(i => i.imageUrl === lightboxUrl)?.promptTitle}
-        onRename={(newTitle) => {
-          const item = remixItems.find(i => i.imageUrl === lightboxUrl);
-          if (item) handleUpdateTitle(item.id, newTitle);
-        }}
-        onDelete={() => {
-          const item = remixItems.find(i => i.imageUrl === lightboxUrl);
-          if (item) {
-            handleDelete(item.id);
-            closeLightbox();
-          }
-        }}
+        title="Remix"
       />
 
-      {/* Technical Header */}
-      <div className="mb-8 border-b border-white/10 pb-6">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-3xl">
-              {promptSlugFilter ? `Filter: ${promptSlugFilter}` : "My Library"}
-            </h1>
+      {/* Header */}
+      <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-1">My Library</h1>
+          <div className="flex items-center gap-2 text-sm text-white/50 font-mono uppercase tracking-wide">
+            <span className={selectedFolder ? "text-white/30" : "text-[#B7FF00]"}>{activeTab === "remixes" ? "Remixes" : "Favorites"}</span>
+            {selectedFolder && (
+              <>
+                <span className="text-white/30">/</span>
+                <span className="text-[#B7FF00]">{folders.find(f => f.id === selectedFolder)?.name}</span>
+              </>
+            )}
           </div>
-
-          {/* Technical Tab Switcher */}
-          <div className="flex bg-zinc-900 border border-white/10 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab("remixes")}
-              className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wide rounded-md transition-all ${activeTab === "remixes"
-                ? "bg-[#B7FF00] text-black"
-                : "text-white/40 hover:text-white"
-                }`}
-            >
-              Remixes
-            </button>
-            <button
-              onClick={() => setActiveTab("favorites")}
-              className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wide rounded-md transition-all ${activeTab === "favorites"
-                ? "bg-[#B7FF00] text-black"
-                : "text-white/40 hover:text-white"
-                }`}
-            >
-              Favorites
-            </button>
-          </div>
+        </div>
+        <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+          <button onClick={() => { setActiveTab("remixes"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "remixes" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Remixes</button>
+          <button onClick={() => { setActiveTab("favorites"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "favorites" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Favorites</button>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-mono text-white/40 uppercase tracking-wider">
-          <span>{loading ? "LOAD..." : `${activeTab === "remixes" ? remixItems.length : favoriteItems.length} ITEMS`}</span>
-          {promptSlugFilter && <span className="text-[#B7FF00]">• FILTER ACTIVE</span>}
-        </div>
+        <div className="text-xs font-mono text-white/40 uppercase">{displayedItems.length} ITEMS</div>
         <div className="flex gap-2">
-          <button className="p-2 rounded-lg border border-white/10 bg-zinc-900 hover:border-white/20 text-white/60">
-            <Grid3X3 size={16} />
+          <button
+            onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
+          >
+            {isSelectionMode ? <CheckSquare size={14} /> : <Square size={14} />}
+            Select
           </button>
-          <button className="p-2 rounded-lg border border-transparent hover:bg-white/5 text-white/30">
-            <List size={16} />
-          </button>
+          <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg border ${viewMode === "grid" ? "border-white/20 bg-white/10" : "border-white/10 bg-zinc-900 text-white/50"}`}><Grid3X3 size={16} /></button>
+          <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg border ${viewMode === "list" ? "border-white/20 bg-white/10" : "border-white/10 bg-zinc-900 text-white/50"}`}><List size={16} /></button>
         </div>
       </div>
 
-      {activeTab === "remixes" ? (
-        // REMIXES GRID
-        <section className="min-h-[300px]">
-          {errorMsg && <div className="p-4 bg-red-950/30 border border-red-500/20 text-red-300 font-mono text-xs rounded-lg mb-6">{errorMsg}</div>}
-
-          {!loading && remixItems.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-xl bg-zinc-900/20">
-              <div className="p-4 rounded-full bg-white/5 mb-3 text-white/20">
-                <ImageIcon size={24} />
-              </div>
-              <div className="text-sm font-medium text-white/40">No assets found</div>
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar / Mobile Dropdown */}
+        <aside className="w-full lg:w-48 shrink-0">
+          <div className="flex items-center justify-between px-2 mb-2 lg:mb-2">
+            <h3 className="text-xs font-bold uppercase text-white/40 hidden lg:block">Folders</h3>
+            {/* Mobile Folder Label is integrated into the dropdown trigger or breadcrumb, so we just show the create button relative */}
+            <div className="flex items-center justify-between w-full lg:w-auto">
+              <span className="lg:hidden text-xs font-bold uppercase text-white/40">Folder:</span>
+              <button onClick={handleCreateFolder} className="text-white/40 hover:text-[#B7FF00] flex items-center gap-1">
+                <Pencil size={12} />
+                <span className="lg:hidden text-[10px] uppercase">New Folder</span>
+              </button>
             </div>
-          )}
+          </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {remixItems.map((it) => (
-              <div key={it.id} className="group relative bg-zinc-900/40 border border-white/5 transition-all hover:border-white/20 hover:bg-zinc-900">
-                <button
-                  className="relative aspect-square w-full overflow-hidden bg-black"
-                  onClick={() => openLightbox(it)}
-                >
-                  <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover" />
+          {/* Mobile Dropdown */}
+          <div className="lg:hidden relative mb-6">
+            <select
+              value={selectedFolder || ""}
+              onChange={(e) => setSelectedFolder(e.target.value || null)}
+              className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-3 py-2.5 appearance-none focus:border-[#B7FF00] focus:outline-none"
+            >
+              <option value="">All {activeTab === "remixes" ? "Remixes" : "Favorites"}</option>
+              {folders.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({activeTab === "remixes" ? remixItems.filter(i => i.folder_id === f.id).length : favoriteItems.filter(i => i.folder_id === f.id).length})
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
+              <Folder size={14} />
+            </div>
+          </div>
 
-                  {/* Technical Overlay */}
-                  <div className="absolute inset-x-0 bottom-0 bg-black/80 px-3 py-2 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 flex justify-between items-center">
-                    <span className="text-[10px] font-mono text-white/80 truncate max-w-[80%]">{it.promptTitle}</span>
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:block space-y-1">
+            <button onClick={() => setSelectedFolder(null)} className={`w-full text-left px-3 py-2 rounded text-sm mb-1 ${!selectedFolder ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}>All {activeTab === "remixes" ? "Remixes" : "Favorites"}</button>
+            {folders.map(f => (
+              <button
+                key={f.id}
+                onClick={() => setSelectedFolder(f.id)}
+                className={`group/folder flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${selectedFolder === f.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
+              >
+                <span className="truncate">{f.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs opacity-50">
+                    {activeTab === "remixes"
+                      ? remixItems.filter(i => i.folder_id === f.id).length
+                      : favoriteItems.filter(i => i.folder_id === f.id).length
+                    }
+                  </span>
+                  <div className="flex items-center gap-1 transition">
                     <div
-                      onClick={(e) => { e.stopPropagation(); handleDelete(it.id); }}
-                      className="text-white/40 hover:text-red-400"
+                      onClick={(e) => { e.stopPropagation(); handleRenameFolder(f.id, f.name); }}
+                      className="text-white/20 hover:text-white p-1"
+                      title="Rename"
+                    >
+                      <Pencil size={12} />
+                    </div>
+                    <div
+                      onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f.id); }}
+                      className="text-white/20 hover:text-red-400 p-1"
+                      title="Delete"
                     >
                       <Trash2 size={12} />
                     </div>
                   </div>
-                </button>
-              </div>
+                </div>
+              </button>
             ))}
           </div>
-        </section>
-      ) : (
-        // FAVORITES GRID
-        <section className="min-h-[300px]">
-          {!loading && favoriteItems.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-xl bg-zinc-900/20">
-              <div className="p-4 rounded-full bg-white/5 mb-3 text-white/20">
-                <Star size={24} />
-              </div>
-              <div className="text-sm font-medium text-white/40">No favorites designated</div>
-            </div>
-          )}
+        </aside>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {favoriteItems.map((item, idx) => {
-              if (item.type === "prompt") {
-                const p = item.data;
-                return (
-                  <PromptCard
-                    key={p.id + idx}
-                    id={p.id}
-                    title={p.title}
-                    summary={p.summary || ""}
-                    slug={p.slug}
-                    featuredImageUrl={p.featured_image_url}
-                    imageUrl={p.image_url}
-                    mediaUrl={p.media_url}
-                    category={p.category || undefined}
-                    accessLevel={p.access_level || "free"}
-                    initialFavorited={true}
-                  />
-                );
-              }
-              return null;
-            })}
-          </div>
+        {/* Content */}
+        <section className="flex-1 min-h-[50vh]">
+          {loading ? <Loading /> : (
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {displayedItems.map(it => (
+                  <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer`} onClick={() => openLightbox(it)}>
+                    <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover" />
+                    {isSelectionMode && (
+                      <div className="absolute top-2 right-2">
+                        {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                      <div className="text-[10px] text-white/80 truncate">{it.promptTitle}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {displayedItems.map(it => (
+                  <div key={it.id} className={`flex items-center gap-4 p-2 rounded border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900`} onClick={() => openLightbox(it)}>
+                    <div className="relative w-12 h-12 bg-black shrink-0">
+                      <Image src={it.imageUrl} alt="" fill className="object-cover" />
+                      {isSelectionMode && selectedIds.has(it.id) && <div className="absolute inset-0 bg-[#B7FF00]/20 flex items-center justify-center"><Check size={16} className="text-[#B7FF00]" /></div>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-white truncate">{it.promptTitle}</div>
+                      <div className="text-xs text-white/40">{new Date(it.createdAt).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </section>
+      </div>
+
+      {/* Mobile Sticky Bottom Bar for Selection Actions */}
+      {isSelectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-[#B7FF00] text-black p-3 rounded-full shadow-2xl z-50 flex items-center justify-between px-6 animate-in slide-in-from-bottom-4">
+          <div className="text-xs font-bold uppercase tracking-wider">{selectedIds.size} SELECTED</div>
+          <div className="flex gap-4">
+            <button onClick={() => setIsMoveModalOpen(true)} className="flex flex-col items-center gap-0.5 hover:opacity-70 transition">
+              <FolderInput size={20} />
+              <span className="text-[9px] font-bold uppercase">Move</span>
+            </button>
+            <button onClick={handleDeleteSelected} className="flex flex-col items-center gap-0.5 hover:opacity-70 transition text-red-900">
+              <Trash2 size={20} />
+              <span className="text-[9px] font-bold uppercase">Delete</span>
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );
@@ -471,7 +681,7 @@ function LibraryContent() {
 
 export default function LibraryPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-black text-white"><div className="h-5 w-5 animate-spin rounded-sm border-2 border-[#B7FF00] border-t-transparent"></div></div>}>
+    <Suspense fallback={<Loading />}>
       <LibraryContent />
     </Suspense>
   );

@@ -14,6 +14,7 @@ import {
     ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
+import Loading from "@/components/Loading";
 
 export default function SettingsPage() {
     const router = useRouter();
@@ -134,11 +135,7 @@ export default function SettingsPage() {
     }
 
     if (loading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-black text-white">
-                <div className="h-5 w-5 animate-spin rounded-sm border-2 border-[#B7FF00] border-t-transparent"></div>
-            </div>
-        );
+        return <Loading />;
     }
 
     return (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Loading from "@/components/Loading";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -101,11 +102,7 @@ export default function DashboardPage() {
   }, [router, supabase]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-white">
-        <div className="h-5 w-5 animate-spin rounded-sm border-2 border-[#B7FF00] border-t-transparent"></div>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
