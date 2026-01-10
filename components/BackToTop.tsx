@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 
+import { usePathname } from "next/navigation";
+
 export default function BackToTop() {
-    // Wrapper to keep file logic clean if we expand later
+    const pathname = usePathname();
+    const isGallery = pathname === "/library" || pathname === "/feed" || pathname?.startsWith("/library/") || pathname?.startsWith("/feed/");
+
+    if (!isGallery) return null;
+
     return <BackToTopContent />;
 }
 
