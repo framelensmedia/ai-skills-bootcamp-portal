@@ -104,7 +104,15 @@ function StudioContent() {
 
   useEffect(() => {
     // apply prefill once on mount
-    if (preImg) setPreviewImageUrl(preImg);
+    if (preImg) {
+      setPreviewImageUrl(preImg);
+    }
+
+    // If we have a remix param or img param, we assume the user wants to start the Remix Wizard
+    // The feed passes 'remix' param with the prompt text usually.
+    if (preImg || sp?.get("remix")) {
+      setWizardOpen(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

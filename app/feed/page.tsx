@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { ArrowBigUp, Heart, RefreshCw, Clock, TrendingUp, User, Bookmark } from "lucide-react";
 import Loading from "@/components/Loading";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import { useToast } from "@/context/ToastContext";
 
 type FeedItem = {
     id: string; // generation id
@@ -28,17 +29,6 @@ type FeedItem = {
     combinedPromptText: string;
 };
 
-// Simple Toast Notification Component
-function Toast({ message, visible }: { message: string; visible: boolean }) {
-    if (!visible) return null;
-    return (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-zinc-900 border border-[#B7FF00]/50 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <div className="text-[#B7FF00]"><RefreshCw size={16} className="animate-spin" /></div>
-            <span className="font-bold text-sm">{message}</span>
-        </div>
-    );
-}
-
 export default function RemixFeedPage() {
     const router = useRouter();
     const [items, setItems] = useState<FeedItem[]>([]);
@@ -47,15 +37,7 @@ export default function RemixFeedPage() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
 
-    // Toast State
-    const [toastMsg, setToastMsg] = useState("");
-    const [toastVisible, setToastVisible] = useState(false);
-
-    const showToast = (msg: string) => {
-        setToastMsg(msg);
-        setToastVisible(true);
-        setTimeout(() => setToastVisible(false), 2000);
-    };
+    const { showToast } = useToast();
 
     // Lightbox state
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -224,7 +206,6 @@ export default function RemixFeedPage() {
 
     return (
         <main className="mx-auto w-full max-w-4xl px-4 py-8 text-white font-sans pb-32 relative">
-            <Toast message={toastMsg} visible={toastVisible} />
 
             <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
                 <div>

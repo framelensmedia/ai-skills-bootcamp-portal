@@ -192,7 +192,13 @@ export default function RemixChatWizard({
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-white/10 bg-black/60 p-4 shrink-0">
                         <div className="text-sm font-semibold text-white">Guided Remix</div>
-                        <button onClick={onClose} className="p-2 text-white/40 hover:text-white">✕</button>
+                        <button
+                            onClick={onClose}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
                     </div>
 
                     {/* Chat Area */}

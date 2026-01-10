@@ -3,6 +3,7 @@
 import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { useToast } from "@/context/ToastContext";
 
 type PromptCardProps = {
   title: string;
@@ -65,6 +66,8 @@ export default function PromptCard({
     };
   }, [supabase]);
 
+  const { showToast } = useToast();
+
   async function handleFavorite(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
@@ -77,6 +80,10 @@ export default function PromptCard({
     const next = !favorited;
     setFavorited(next);
     setLoadingFav(true);
+
+    // Show Optimistic Toast
+    if (next) showToast("Added to Favorites!");
+    else showToast("Removed from Favorites", "info");
 
     try {
       if (next) {
@@ -93,6 +100,7 @@ export default function PromptCard({
       if (onToggleFavorite) onToggleFavorite(next);
     } catch (err) {
       setFavorited(!next); // Revert
+      showToast("Failed to update favorite", "error");
       console.error("Fav error", err);
     } finally {
       setLoadingFav(false);
