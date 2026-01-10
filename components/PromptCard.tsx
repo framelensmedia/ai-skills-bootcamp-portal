@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
+import Image from "next/image";
 import { RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -146,19 +147,23 @@ export default function PromptCard({
         className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition hover:border-white/20 hover:bg-white/10"
       >
         <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-black/40">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={resolvedImageUrl}
-            alt={title}
-            className={[
-              "h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]",
-              isFallbackOrb ? "brightness-[0.55]" : "opacity-90",
-            ].join(" ")}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setImgFailed(true)}
-            onLoad={() => setImgFailed(false)}
-          />
+          {resolvedImageUrl && resolvedImageUrl.length > 5 ? (
+            <Image
+              src={resolvedImageUrl}
+              alt={title}
+              fill
+              className={[
+                "object-cover transition duration-300 group-hover:scale-[1.02]",
+                isFallbackOrb ? "brightness-[0.55]" : "opacity-90",
+              ].join(" ")}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+              onError={() => setImgFailed(true)}
+              onLoadingComplete={() => setImgFailed(false)}
+            />
+          ) : (
+            /* Skeleton / Placeholder if no URL */
+            <div className="h-full w-full bg-white/5 animate-pulse" />
+          )}
 
           {/* Subtle dark overlay ONLY for fallback orb */}
           {isFallbackOrb ? (

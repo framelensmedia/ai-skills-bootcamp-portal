@@ -547,3 +547,249 @@ Notifications
 Public profiles
 
 Sharing outside platform
+
+The Learning Flow™ (MVP System)
+
+(Name is solid. Simple. Ownable.)
+
+Learn briefly → Create immediately → Save permanently → Repeat consistently
+
+This is the core engine of AI Skills Bootcamp.
+
+1. Learning Flow – High-Level Definition
+
+Learning Flow is a structured, repeatable loop used across all bootcamps where:
+
+The user learns one focused concept (≤ 5 minutes)
+
+The user immediately creates a real asset (≤ 2 minutes)
+
+The asset is saved to their library
+
+The user sees visible progress
+
+The loop repeats
+
+No passive learning.
+No long lectures.
+No overwhelm.
+
+2. The Learning Flow Loop (Step-by-Step)
+Step 1: Learn (≤ 5 minutes)
+
+Format
+
+Short video OR short text lesson
+
+One idea only
+
+Clear outcome
+
+Lesson framing
+
+“By the end of this lesson, you will have created: ___”
+
+No theory dumping.
+No history lessons.
+
+Step 2: Create (≤ 2 minutes)
+
+Immediately after the lesson:
+
+Show a single CTA
+
+“Create this now”
+
+Launch:
+
+Prompt Studio
+
+Template pack
+
+Guided Remix
+
+The user does not type prompts.
+They answer guided questions or upload an image.
+
+This creates a win fast moment.
+
+Step 3: Save (Automatic)
+
+Output is automatically saved to:
+
+User’s Remix Library
+
+The user sees:
+
+Thumbnail
+
+Template used
+
+Timestamp
+
+Optional microcopy:
+
+“Saved. You can reuse or remix this anytime.”
+
+This reinforces ownership.
+
+Step 4: Reflect (Optional, 10 seconds)
+
+A short, optional AI nudge:
+
+“Want to tweak this or move to the next step?”
+
+No quizzes.
+No homework.
+
+Step 5: Repeat
+
+User clicks:
+
+“Next lesson”
+
+OR
+
+“Create another version”
+
+Both paths are wins.
+
+3. Why Learning Flow Works (Founder-Level Insight)
+
+This system solves 4 problems at once:
+
+Short attention spans
+
+AI intimidation
+
+Lack of confidence
+
+Low retention in online courses
+
+Users don’t feel like they’re learning.
+They feel like they’re building.
+
+4. Learning Flow as a Product Standard
+
+Every bootcamp lesson must follow this rule:
+
+If there is no “Create” step, the lesson does not ship.
+
+This keeps quality high and content aligned with outcomes.
+
+5. Learning Flow Data Model (MVP)
+
+To support this system technically:
+
+Lesson Fields (Add or Ensure)
+
+lesson_id
+
+title
+
+duration_minutes (target ≤ 5)
+
+learning_objective (string)
+
+create_action_type:
+
+prompt_template
+
+template_pack
+
+guided_remix
+
+create_action_payload:
+
+template_id(s)
+
+pack_id
+
+auto_save_output (boolean = true)
+
+This lets you standardize execution.
+
+6. Learning Flow in the UI (User Experience)
+Lesson View Layout
+
+Lesson content (video/text)
+
+Clear divider
+
+“Create Now” section
+
+Primary CTA button
+
+Secondary CTA:
+
+“Skip for now” (no guilt)
+
+After creation:
+
+Show success state
+
+Progress bar increments
+
+“Next lesson” button appears
+
+7. Learning Flow Example (Concrete)
+
+Lesson: “Create Your First Agency Promo”
+
+Learn (4 min video):
+
+What a promo is
+
+Why it matters
+
+One example shown
+
+Create (2 min):
+
+Click “Create Promo”
+
+Prompt Studio opens with Agency Promo template
+
+User answers 3 questions
+
+Save:
+
+Promo saved to library
+
+Shown in thumbnail view
+
+Repeat:
+
+Next lesson: “Create 3 Social Posts”
+
+This is rinse-and-repeat gold.
+
+8. Internal Rule for Your Team
+
+When creating bootcamp content:
+
+“If the user doesn’t leave with something saved, the lesson isn’t done.”
+
+That’s how you maintain discipline as you scale.
+
+9. How Learning Flow Becomes IP
+
+This isn’t just UX. This is:
+
+a method
+
+a system
+
+a repeatable framework
+
+Later this becomes:
+
+a selling point
+
+a licensing opportunity
+
+part of the acquisition narrative
+
+“We didn’t just teach AI. We built a learning-to-creation system.”
+
+That’s boardroom language.
