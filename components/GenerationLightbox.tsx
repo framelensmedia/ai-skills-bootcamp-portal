@@ -26,6 +26,7 @@ type Props = {
   title?: string;
   onRename?: (newTitle: string) => void;
   onDelete?: () => void;
+  fullQualityUrl?: string | null;
 };
 
 function normalize(v: any) {
@@ -86,6 +87,7 @@ export default function GenerationLightbox({
   title = "Untitled",
   onRename,
   onDelete,
+  fullQualityUrl,
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -111,13 +113,14 @@ export default function GenerationLightbox({
   async function handleDownload(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!safeUrl || downloading) return;
+    const downloadUrl = fullQualityUrl || safeUrl;
+    if (!downloadUrl || downloading) return;
 
     setDownloading(true);
     setDownloadError(null);
 
     try {
-      await downloadImageToDevice(safeUrl);
+      await downloadImageToDevice(downloadUrl);
     } catch (err: any) {
       setDownloadError(
         err?.message || "Download failed. This is often caused by the image host blocking downloads (CORS)."

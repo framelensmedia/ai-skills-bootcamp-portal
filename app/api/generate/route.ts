@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -302,13 +303,35 @@ export async function POST(req: Request) {
         const outBase64 = String(inline.inlineData.data);
 
         const bytes = Buffer.from(outBase64, "base64");
-        const ext = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-        const filePath = `users/${userId}/${Date.now()}.${ext}`;
 
-        // 8. Upload to Supabase Storage
+        // 8a. Upload Original (Full Quality)
+        const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
+        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
+
+        const { error: uploadOriginalError } = await admin.storage
+            .from("generations")
+            .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
+
+        if (uploadOriginalError) {
+            console.error("Failed to upload original:", uploadOriginalError);
+        }
+
+        const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
+        const originalUrl = originalPub.publicUrl;
+
+        // 8b. Optimize with Sharp (webP)
+        const optimizedBytes = await sharp(bytes)
+            .resize({ width: 1080, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+        const ext = "webp";
+        const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
+
+        // Upload Optimized
         const { error: uploadError } = await admin.storage
             .from("generations")
-            .upload(filePath, bytes, { contentType: outMime, upsert: false });
+            .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
 
         if (uploadError) {
             return NextResponse.json({ error: uploadError.message }, { status: 500 });
@@ -340,6 +363,7 @@ export async function POST(req: Request) {
                     edit_instructions,
                     template_reference_image,
                     headline,
+                    full_quality_url: originalUrl, // Save Full Quality URL
                 },
             });
         } catch (e) {

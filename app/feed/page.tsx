@@ -27,6 +27,7 @@ type FeedItem = {
     originalPromptText: string;
     remixPromptText: string;
     combinedPromptText: string;
+    fullQualityUrl?: string | null;
 };
 
 export default function RemixFeedPage() {
@@ -138,6 +139,7 @@ export default function RemixFeedPage() {
                     originalPromptText: original,
                     remixPromptText: remix,
                     combinedPromptText: combined,
+                    fullQualityUrl: settings.full_quality_url || null,
                 };
             });
 
@@ -326,6 +328,7 @@ export default function RemixFeedPage() {
                     onShare={() => { }} // TODO implement share
                     onRemix={handleRemix}
                     title={selectedItem.promptTitle}
+                    fullQualityUrl={selectedItem.fullQualityUrl}
                 />
             )}
         </main>

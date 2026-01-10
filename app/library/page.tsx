@@ -63,6 +63,7 @@ type LibraryItem = {
   folder: string | null;
   folder_id: string | null;
   is_public: boolean;
+  fullQualityUrl?: string | null;
 };
 
 type FolderType = {
@@ -130,6 +131,7 @@ function LibraryContent() {
   const [lbOriginal, setLbOriginal] = useState("");
   const [lbRemix, setLbRemix] = useState("");
   const [lbCombined, setLbCombined] = useState("");
+  const [lbFullQualityUrl, setLbFullQualityUrl] = useState<string | null>(null);
 
   function openLightbox(it: LibraryItem) {
     if (isSelectionMode) {
@@ -141,6 +143,7 @@ function LibraryContent() {
     setLbCombined(it.combinedPromptText);
     setLightboxUrl(it.imageUrl);
     setLightboxItemId(it.id);
+    setLbFullQualityUrl(it.fullQualityUrl || null);
     setLightboxOpen(true);
   }
 
@@ -394,6 +397,7 @@ function LibraryContent() {
               folder: fb.folder,
               folder_id: (g as any).folder_id || null,
               is_public: g.is_public ?? true, // Default to true if null (legacy)
+              fullQualityUrl: g.settings?.full_quality_url || null,
             } as LibraryItem;
           });
 
@@ -629,6 +633,7 @@ function LibraryContent() {
           }
         }}
         title="Remix"
+        fullQualityUrl={lbFullQualityUrl}
       />
 
       {/* Header */}
