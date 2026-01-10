@@ -85,7 +85,7 @@ function StudioContent() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
   }, [supabase]);
 
   function handleAuthGate(e?: any) {

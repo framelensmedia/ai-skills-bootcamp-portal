@@ -434,8 +434,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                     if (favError) throw favError;
 
                     const favRows = favsRow ?? [];
-                    const promptIds = favRows.filter(f => f.prompt_id).map(f => f.prompt_id);
-                    const generationIds = favRows.filter(f => f.generation_id).map(f => f.generation_id);
+                    const promptIds = favRows.filter((f: any) => f.prompt_id).map((f: any) => f.prompt_id);
+                    const generationIds = favRows.filter((f: any) => f.generation_id).map((f: any) => f.generation_id);
 
                     let fetchedPrompts: PromptPublicRow[] = [];
                     if (promptIds.length > 0) {

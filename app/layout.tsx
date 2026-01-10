@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import AIAssistant from "@/components/AIAssistant";
 import BackToTop from "@/components/BackToTop";
 import { ToastContextProvider } from "@/context/ToastContext";
+import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
   title: "AI Skills Bootcamp",
@@ -28,42 +29,44 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-black text-white" suppressHydrationWarning={true}>
-        <ToastContextProvider>
-          {/* Header */}
-          <header className="bg-black border-b border-white/10">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-              {/* Logo / Brand */}
-              <Link href="/" className="flex min-w-0 items-center gap-3">
-                <Image
-                  src="/logo-symbol.png"
-                  alt="AI Skills Bootcamp"
-                  width={36}
-                  height={36}
-                  priority
-                  className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
-                />
+        <AuthProvider>
+          <ToastContextProvider>
+            {/* Header */}
+            <header className="bg-black border-b border-white/10">
+              <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+                {/* Logo / Brand */}
+                <Link href="/" className="flex min-w-0 items-center gap-3">
+                  <Image
+                    src="/logo-symbol.png"
+                    alt="AI Skills Bootcamp"
+                    width={36}
+                    height={36}
+                    priority
+                    className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+                  />
 
-                {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
-                <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
-                  <span className="text-lime-400">AI Skills</span>{" "}
-                  <span className="text-white">Bootcamp</span>
-                </span>
-              </Link>
+                  {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
+                  <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
+                    <span className="text-lime-400">AI Skills</span>{" "}
+                    <span className="text-white">Bootcamp</span>
+                  </span>
+                </Link>
 
-              {/* Navigation */}
-              <div className="shrink-0">
-                <Nav />
+                {/* Navigation */}
+                <div className="shrink-0">
+                  <Nav />
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
 
-          {/* Main Content */}
-          <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+            {/* Main Content */}
+            <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
 
-          {/* AI Assistant Chat Bubble */}
-          <AIAssistant />
-          <BackToTop />
-        </ToastContextProvider>
+            {/* AI Assistant Chat Bubble */}
+            <AIAssistant />
+            <BackToTop />
+          </ToastContextProvider>
+        </AuthProvider>
       </body>
     </html>
   );

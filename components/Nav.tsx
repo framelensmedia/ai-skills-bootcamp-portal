@@ -4,61 +4,47 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { useAuth } from "@/context/AuthProvider";
 
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const { user, session, initialized, signOut } = useAuth();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const loggedIn = !!user;
+  const loading = !initialized;
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    async function checkUser() {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      setLoggedIn(!!data.session);
-
-      if (data.session) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("profile_image")
-          .eq("user_id", data.session.user.id)
-          .maybeSingle();
-
-        if (mounted && profile) {
-          setAvatarUrl(profile.profile_image);
-        }
+    async function fetchProfile() {
+      if (!user) {
+        setAvatarUrl(null);
+        return;
       }
-      setLoading(false);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("profile_image")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (mounted && profile) {
+        setAvatarUrl(profile.profile_image);
+      }
     }
 
-    checkUser();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setLoggedIn(!!session);
-      if (session) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("profile_image")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-        setAvatarUrl(profile?.profile_image || null);
-      } else {
-        setAvatarUrl(null);
-      }
-    });
+    fetchProfile();
 
     return () => {
       mounted = false;
-      sub?.subscription?.unsubscribe();
     };
-  }, [supabase]);
+  }, [user, supabase]);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -79,11 +65,10 @@ export default function Nav() {
   }, [mobileOpen, dropdownOpen]);
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    await signOut();
     setMobileOpen(false);
     setDropdownOpen(false);
     router.push("/login");
-    router.refresh();
   }
 
   const linkClass = (href: string) => {

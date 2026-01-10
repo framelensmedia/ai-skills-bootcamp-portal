@@ -16,7 +16,7 @@ function PricingContent() {
   const canceled = searchParams.get("canceled");
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
       setUserId(data.user?.id ?? null);
     });
   }, [supabase]);

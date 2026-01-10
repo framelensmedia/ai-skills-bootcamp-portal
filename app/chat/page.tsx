@@ -27,7 +27,7 @@ function ChatContent() {
 
     // Load User
     useEffect(() => {
-        supabase.auth.getUser().then(({ data }) => {
+        supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
             if (data.user) {
                 setUser(data.user);
                 fetchProfile(data.user.id);

@@ -5,6 +5,7 @@ import Loading from "@/components/Loading";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { useAuth } from "@/context/AuthProvider";
 import {
   CreditCard,
   LayoutGrid,
@@ -29,15 +30,19 @@ type ProfileRow = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const { user, initialized } = useAuth();
+  const supabase = createSupabaseBrowserClient(); // Singleton
 
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const [greeting, setGreeting] = useState("");
 
   const [plan, setPlan] = useState<string>("free");
   const [role, setRole] = useState<string>("user");
   const [staffPro, setStaffPro] = useState<boolean>(false);
+
+  // Local user state for display (merged with profile)
+  const [displayUser, setDisplayUser] = useState<any>(null);
 
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [managingBilling, setManagingBilling] = useState(false);
@@ -60,20 +65,21 @@ export default function DashboardPage() {
     else setGreeting("Good evening");
   }, []);
 
-  // Data Loading
+  // Redirect if not logged in
+  useEffect(() => {
+    if (initialized && !user) {
+      router.push("/login?redirectTo=/dashboard");
+    }
+  }, [initialized, user, router]);
+
+  // Load Profile Data
   useEffect(() => {
     let cancelled = false;
 
-    async function loadUser() {
-      const { data: { user } } = await supabase.auth.getUser();
+    async function loadProfile() {
+      if (!user) return;
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      if (cancelled) return;
-      setUser(user);
+      setDisplayUser(user);
 
       const { data: profile, error } = await supabase
         .from("profiles")
@@ -89,23 +95,33 @@ export default function DashboardPage() {
 
         // Prioritize full_name > username > email
         const nameToUse = p.full_name || p.username;
-        setUser((prev: any) => ({
+        setDisplayUser((prev: any) => ({
           ...prev,
           displayName: nameToUse,
           avatarUrl: p.profile_image
         }));
       }
 
-      setLoading(false);
+      setLoadingProfile(false);
     }
 
-    loadUser();
-    return () => { cancelled = true; };
-  }, [router, supabase]);
+    if (initialized && user) {
+      loadProfile();
+    }
 
-  if (loading) {
+    return () => { cancelled = true; };
+  }, [user, initialized, supabase]);
+
+  if (!initialized || (user && loadingProfile)) {
     return <Loading />;
   }
+
+  if (!user) return null; // Will redirect via effect
+
+  // Use displayUser for rendering
+  const finalUser = displayUser || user;
+
+
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 text-white font-sans">
@@ -118,14 +134,14 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4 mt-1">
             <div className="h-12 w-12 rounded-full bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} className="h-full w-full object-cover" alt="Profile" />
+              {finalUser?.avatarUrl ? (
+                <img src={finalUser.avatarUrl} className="h-full w-full object-cover" alt="Profile" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-white/20"><Users size={20} /></div>
               )}
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
-              {greeting}, {user?.displayName || user?.email?.split('@')[0]}
+              {greeting}, {finalUser?.displayName || finalUser?.email?.split('@')[0]}
             </h1>
           </div>
         </div>

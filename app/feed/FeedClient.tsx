@@ -121,27 +121,27 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
             if (data.length < 8) setHasMore(false);
 
-            const userIds = Array.from(new Set(data.map(d => d.user_id)));
+            const userIds = Array.from(new Set(data.map((d: any) => d.user_id)));
             let profileMap = new Map();
             if (userIds.length > 0) {
                 const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
-                profiles?.forEach(p => profileMap.set(p.user_id, p));
+                profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
             }
 
             // Upvotes/Saved
             let myUpvotedSet = new Set();
             let mySavedSet = new Set();
             if (user) {
-                const genIds = data.map(d => d.id);
+                const genIds = data.map((d: any) => d.id);
                 if (genIds.length > 0) {
                     const { data: myUpvotes } = await supabase.from("remix_upvotes").select("generation_id").eq("user_id", user.id).in("generation_id", genIds);
-                    myUpvotedSet = new Set(myUpvotes?.map(u => u.generation_id));
+                    myUpvotedSet = new Set(myUpvotes?.map((u: any) => u.generation_id));
                     const { data: mySaved } = await supabase.from("prompt_favorites").select("generation_id").eq("user_id", user.id).in("generation_id", genIds);
-                    mySavedSet = new Set(mySaved?.map(u => u.generation_id));
+                    mySavedSet = new Set(mySaved?.map((u: any) => u.generation_id));
                 }
             }
 
-            const newItems: FeedItem[] = data.map(d => {
+            const newItems: FeedItem[] = data.map((d: any) => {
                 const profile = profileMap.get(d.user_id) || {};
                 const settings = d.settings || {};
                 const original = d.original_prompt_text || settings.original_prompt_text || "";
