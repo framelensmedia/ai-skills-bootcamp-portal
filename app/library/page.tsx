@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Loading from "@/components/Loading";
+import { useToast } from "@/context/ToastContext";
 
 type SortMode = "newest" | "oldest";
 
@@ -96,8 +97,10 @@ function fallbackFromSettings(settings: any) {
 function LibraryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
 
   const promptSlugFilter = normalize(searchParams?.get("promptSlug") || "").toLowerCase();
+
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -123,6 +126,7 @@ function LibraryContent() {
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxItemId, setLightboxItemId] = useState<string | null>(null);
   const [lbOriginal, setLbOriginal] = useState("");
   const [lbRemix, setLbRemix] = useState("");
   const [lbCombined, setLbCombined] = useState("");
@@ -136,6 +140,7 @@ function LibraryContent() {
     setLbRemix(it.remixPromptText);
     setLbCombined(it.combinedPromptText);
     setLightboxUrl(it.imageUrl);
+    setLightboxItemId(it.id);
     setLightboxOpen(true);
   }
 
@@ -149,7 +154,22 @@ function LibraryContent() {
   function closeLightbox() {
     setLightboxOpen(false);
     setLightboxUrl(null);
+    setLightboxItemId(null);
   }
+
+  // ... (handleShare)
+
+  // ... (handleCreateFolder .. handleDeleteSelected)
+
+  // Skip down to render
+
+  // Update GenerationLightbox usage
+
+  // Wait, I can't skip within replace_file_content unless I target the block properly.
+  // I will replace from `const [lightboxOpen` down to `closeLightbox`... 
+  // And also the render of GenerationLightbox. 
+  // Since they are far apart, I'll do two replacements.
+
 
   function handleShare(url: string) {
     console.log("Share clicked:", url);
@@ -212,24 +232,33 @@ function LibraryContent() {
     if (!confirm(`Delete ${selectedIds.size} items permanently?`)) return;
 
     const ids = Array.from(selectedIds);
-    const supabase = createSupabaseBrowserClient();
-    const table = activeTab === "remixes" ? "prompt_generations" : "prompt_favorites";
+    // Use API to delete (bypassing Client RLS issues)
+    const tableIdentifier = activeTab === "remixes" ? "prompt_generations" : "favorites";
 
-    const { error } = await supabase.from(table).delete().in("id", ids);
+    try {
+      const res = await fetch("/api/library/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, table: tableIdentifier })
+      });
+      const json = await res.json();
 
-    if (error) {
-      alert("Delete failed: " + error.message);
-      return;
+      if (!res.ok) {
+        throw new Error(json.error || "Delete failed");
+      }
+
+      if (activeTab === "remixes") {
+        setRemixItems(prev => prev.filter(i => !selectedIds.has(i.id)));
+      } else {
+        setFavoriteItems(prev => prev.filter(i => !selectedIds.has(i.recordId)));
+      }
+
+      showToast(`Deleted ${selectedIds.size} items`);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+    } catch (e: any) {
+      showToast(e.message, "error");
     }
-
-    if (activeTab === "remixes") {
-      setRemixItems(prev => prev.filter(i => !selectedIds.has(i.id)));
-    } else {
-      setFavoriteItems(prev => prev.filter(i => !selectedIds.has(i.recordId)));
-    }
-
-    setSelectedIds(new Set());
-    setIsSelectionMode(false);
   }
 
   function handleRemix(payload: {
@@ -246,8 +275,30 @@ function LibraryContent() {
 
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this image?")) return;
+
+    // Optimistic remove
+    const originalRemixes = [...remixItems];
     setRemixItems((prev) => prev.filter((it) => it.id !== id));
-    await fetch(`/api/library?id=${id}`, { method: "DELETE" }).catch(console.error);
+
+    try {
+      const res = await fetch("/api/library/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [id], table: "prompt_generations" })
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Delete failed");
+      }
+      showToast("Item deleted");
+    } catch (e: any) {
+      // Revert behavior is nice but might flicker. 
+      // For now, just show error.
+      console.error(e);
+      showToast("Failed to delete", "error");
+      setRemixItems(originalRemixes); // Revert
+    }
   }
 
   useEffect(() => {
@@ -572,6 +623,11 @@ function LibraryContent() {
         combinedPromptText={lbCombined}
         onShare={handleShare}
         onRemix={handleRemix}
+        onDelete={() => {
+          if (lightboxItemId) {
+            handleDelete(lightboxItemId).then(() => closeLightbox());
+          }
+        }}
         title="Remix"
       />
 

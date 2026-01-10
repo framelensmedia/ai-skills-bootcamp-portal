@@ -118,8 +118,8 @@ export default function AIAssistant() {
                 onClick={() => setIsExpanded(true)}
                 className={`fixed z-[100] flex flex-col transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
                     } ${isExpanded
-                        ? "inset-0 rounded-none bg-black/95 backdrop-blur-xl"
-                        : "inset-[5%] md:inset-[10%] rounded-[2.5rem] bg-black/80 backdrop-blur-md shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-white/10"
+                        ? "inset-0 rounded-none bg-black backdrop-blur-xl"
+                        : "inset-[5%] md:inset-[10%] rounded-[2.5rem] bg-black backdrop-blur-md border animate-border-pulse"
                     }`}
             >
                 {/* Close & Header Controls */}
