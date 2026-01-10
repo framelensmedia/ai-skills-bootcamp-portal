@@ -123,7 +123,7 @@ export default function AIAssistant() {
                     }`}
             >
                 {/* Close & Header Controls */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between bg-black px-6 py-4 border-b border-white/10">
+                <div className={`absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 transition-all duration-500 ${isExpanded ? "bg-black border-b border-white/10" : "bg-transparent border-none"}`}>
                     {/* Left: Branding (Only visible when Expanded) */}
                     <div className={`flex items-center gap-3 pointer-events-auto transition-opacity duration-500 ${isExpanded ? "opacity-100" : "opacity-0"}`}>
                         <div className="relative h-8 w-8 sm:h-9 sm:w-9 shrink-0">
@@ -254,9 +254,9 @@ export default function AIAssistant() {
                                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                                 placeholder={hasMessages ? "Ask follow-up..." : "What would you like to create today?"}
                                 autoFocus={isOpen}
-                                className={`w-full rounded-2xl bg-white/5 border pl-6 pr-16 transition-all shadow-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 focus:bg-black/50 ${hasMessages
-                                    ? "h-14 border-white/10 text-base"
-                                    : "h-20 border-white/10 text-base py-6 hover:border-white/20"
+                                className={`w-full rounded-2xl bg-white/5 border pl-6 pr-24 transition-all shadow-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 focus:bg-black/50 ${hasMessages
+                                    ? "h-14 border-white/10 text-sm"
+                                    : "h-20 border-white/10 text-sm py-6 hover:border-white/20"
                                     }`}
                             />
                             <button
