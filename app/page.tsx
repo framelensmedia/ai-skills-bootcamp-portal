@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
+import { Wand2 } from "lucide-react";
 
 function Tag({ text }: { text: string }) {
   return (
@@ -290,8 +291,8 @@ export default function HomePage() {
               <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
             </h1>
 
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-white/60 md:text-lg">
-              The all-in-one platform to launch your business with AI. Master the skills, create pro-level content, and start generating revenue faster than ever.
+            <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-white/60 md:text-xl">
+              The all-in-one platform to launch your business with AI, and master the skills.
             </p>
 
             {/* MOBILE ONLY: slider goes above search/CTA */}
@@ -384,7 +385,10 @@ export default function HomePage() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-white tracking-tight">Trending Prompts</h2>
-              <p className="text-xs text-white/50 font-medium">Community favorites, ready to remix.</p>
+              <div className="mt-2 inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm ring-1 ring-white/5">
+                <Wand2 className="h-3.5 w-3.5 text-lime-400" />
+                <span>Create pro level content by remixing one of the prompts</span>
+              </div>
             </div>
           </div>
 
@@ -479,7 +483,7 @@ export default function HomePage() {
       <section className="mx-auto max-w-6xl px-4 pb-14">
         <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-black p-6 text-center md:p-10">
           <h2 className="text-2xl font-black md:text-4xl">
-            READY TO <span className="text-[#B7FF00]">GENERATE?</span>
+            READY TO <span className="text-[#B7FF00]">CREATE?</span>
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-white/70 md:text-base">
             Start with free prompts. Upgrade for Pro prompts and the fastest workflow for content production.

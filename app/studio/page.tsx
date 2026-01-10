@@ -81,6 +81,27 @@ function StudioContent() {
   // Copy feedback
   const [copied, setCopied] = useState(false);
 
+  // ✅ Auth State
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, [supabase]);
+
+  function handleAuthGate(e?: any) {
+    if (!user) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // If it's a focus event (textarea), blur it
+        if (e.target && e.target.blur) e.target.blur();
+      }
+      router.push("/login");
+      return false;
+    }
+    return true;
+  }
+
   useEffect(() => {
     // apply prefill once on mount
     if (preImg) setPreviewImageUrl(preImg);
@@ -115,6 +136,8 @@ function StudioContent() {
     remixPromptText: string;
     combinedPromptText: string;
   }) {
+    if (!handleAuthGate()) return;
+
     const href =
       `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
       `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
@@ -138,6 +161,8 @@ function StudioContent() {
   }
 
   async function handleGenerate() {
+    if (!handleAuthGate()) return;
+
     setGenError(null);
 
     if (mediaType === "video") {
@@ -220,6 +245,7 @@ function StudioContent() {
   }
 
   function handleRemixFromLightbox() {
+    if (!handleAuthGate()) return;
     // lightbox "Remix" button now triggers "Edit Remix" flow?
     // Or "New Remix".
     // Requirement: "Edit Remix" opens new chat with previous values.
@@ -278,6 +304,8 @@ function StudioContent() {
 
             <div className="relative transition-all duration-500">
               <textarea
+                onClick={handleAuthGate}
+                onFocus={handleAuthGate}
                 onChange={(e) => setEditSummary(e.target.value)}
                 className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
                 rows={6}
@@ -357,7 +385,7 @@ function StudioContent() {
 
             <button
               type="button"
-              onClick={() => setWizardOpen(true)}
+              onClick={() => { if (handleAuthGate()) setWizardOpen(true); }}
               className="flex-1 inline-flex items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10 px-6 py-4 text-sm font-bold tracking-tight text-lime-200 hover:bg-lime-400/20 transition-all transform hover:scale-[1.02]"
             >
               Start Remix
