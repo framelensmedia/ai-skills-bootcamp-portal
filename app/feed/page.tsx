@@ -185,13 +185,20 @@ export default function RemixFeedPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        let error;
         if (wasSaved) {
-            // Find and delete. We need to match generation_id.
-            // Since we don't have the record ID easily, we delete by match
-            await supabase.from("prompt_favorites").delete().match({ user_id: user.id, generation_id: item.id });
+            const { error: err } = await supabase.from("prompt_favorites").delete().match({ user_id: user.id, generation_id: item.id });
+            error = err;
         } else {
-            // Insert
-            await supabase.from("prompt_favorites").insert({ user_id: user.id, generation_id: item.id, type: 'generation' });
+            const { error: err } = await supabase.from("prompt_favorites").insert({ user_id: user.id, generation_id: item.id });
+            error = err;
+        }
+
+        if (error) {
+            console.error("Save failed:", error);
+            showToast("Failed to save: " + error.message, "error");
+            // Revert optimistic
+            setItems(prev => prev.map(i => i.id === item.id ? { ...i, isSaved: wasSaved } : i));
         }
     };
 
