@@ -81,7 +81,7 @@ export default function RemixFeedPage() {
                 user_id
             `)
                 .eq("is_public", true)
-                .range(page * 20, (page + 1) * 20 - 1);
+                .range(page * 8, (page + 1) * 8 - 1);
 
             if (sort === "newest") {
                 q = q.order("created_at", { ascending: false });
@@ -97,7 +97,7 @@ export default function RemixFeedPage() {
                 return;
             }
 
-            if (data.length < 20) setHasMore(false);
+            if (data.length < 8) setHasMore(false);
 
             // Fetch User Profiles (manual join)
             const userIds = Array.from(new Set(data.map(d => d.user_id)));
@@ -250,7 +250,14 @@ export default function RemixFeedPage() {
 
                         {/* Image */}
                         <div className="relative aspect-square sm:aspect-video w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
-                            <Image src={item.imageUrl} alt={item.promptTitle} fill className="object-contain sm:object-cover" />
+                            <Image
+                                src={item.imageUrl}
+                                alt={item.promptTitle}
+                                fill
+                                className="object-contain sm:object-cover"
+                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 896px"
+                                loading="lazy"
+                            />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                         </div>
 
