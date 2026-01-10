@@ -348,3 +348,202 @@ MVP Notes
 Implement the import pipeline, draft creation, and field mapping now. Exact schema refinements will be made later. Include basic JSON validation, and fail gracefully without creating drafts if JSON is invalid.
 
 
+Feature: Remix Feed + Public / Private Visibility Controls (MVP)
+Feature Purpose
+
+The Remix Feed is a logged-in-only discovery surface that showcases real user creations to drive inspiration, trust, and organic growth.
+
+This feed is not a social network.
+It is proof-of-work visibility.
+
+Visibility control doubles as a monetization lever and a trust mechanism, ensuring users always feel ownership over what they create.
+
+Core Concepts
+
+Every remix has a visibility state:
+
+Public: visible in the Remix Feed
+
+Private: visible only in the user’s library
+
+Visibility is per remix, not global
+
+Feed access is restricted to authenticated users only
+
+Visibility Rules (MVP)
+Feed Access
+
+Remix Feed is visible only to logged-in users
+
+No public browsing
+
+No guest access
+
+Public / Private Logic
+
+Free users:
+
+Remixes default to Public
+
+Visibility status is visible in their library
+
+(Optional restriction: toggling to Private may be limited or prompt upgrade)
+
+Pro users:
+
+Can toggle Public / Private per remix at any time
+
+Changes apply immediately
+
+Private Remixes
+
+Never appear in the Remix Feed
+
+Never appear in trending
+
+Always remain visible in the user’s personal library
+
+Remix Feed (Logged-In Only)
+Feed Content
+
+Each feed item displays:
+
+Generated image
+
+Username
+
+Profile image (or fallback avatar)
+
+Template name
+
+Timestamp
+
+Upvote count
+
+Action: Remix this
+
+Feed Behavior
+
+Sorting options:
+
+Newest (default)
+
+Trending (upvotes over time)
+
+Pagination or infinite scroll required
+
+No comments (MVP)
+
+No followers (MVP)
+
+No public profile pages (MVP)
+
+User Library (Visibility Management)
+Purpose
+
+The user library is the source of truth for remix ownership and visibility.
+
+Library Requirements
+
+Each remix in the user library must show:
+
+Generated image
+
+Template name
+
+Timestamp
+
+Visibility badge:
+
+Public
+
+Private
+
+Visibility Controls
+
+Pro users can toggle visibility per remix
+
+Toggle updates is_public flag immediately
+
+Feed reflects changes instantly (no delay or caching mismatch)
+
+UX Principles
+
+Visibility state must be obvious at a glance
+
+No warning modals required
+
+No shame language
+
+Optional helper text:
+
+“Public remixes appear in the community feed.”
+
+Upvotes (MVP)
+
+Logged-in users can upvote public remixes
+
+One upvote per user per remix
+
+Upvotes stored in a separate table
+
+Total upvotes displayed on feed items
+
+Private remixes cannot receive upvotes
+
+Monetization Tie-In
+
+Privacy is positioned as control, not restriction
+
+Pro tier unlocks:
+
+Public / Private toggling
+
+Future expansion (analytics, profiles, etc.)
+
+Free users still benefit from visibility and discovery
+
+Data Model (High-Level)
+Remix
+
+remix_id
+
+user_id
+
+template_id
+
+output_asset_url
+
+is_public (boolean)
+
+created_at
+
+Remix Upvotes
+
+remix_id
+
+user_id
+
+created_at
+
+User Profile (extension)
+
+username
+
+display_name
+
+profile_image_url
+
+MVP Scope Guardrails
+
+Explicitly excluded:
+
+Comments
+
+Followers
+
+Notifications
+
+Public profiles
+
+Sharing outside platform

@@ -77,21 +77,23 @@ export default function DashboardPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("plan, role, staff_pro, staff_approved, is_approved, username, full_name")
+        .select("plan, role, staff_pro, staff_approved, is_approved, username, full_name, profile_image")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (!cancelled && !error && profile) {
-        const p = profile as ProfileRow & { username?: string; full_name?: string };
+        const p = profile as ProfileRow & { username?: string; full_name?: string; profile_image?: string };
         setPlan(String(p.plan || "free"));
         setRole(String(p.role || "user"));
         setStaffPro(Boolean(p.staff_pro));
 
         // Prioritize full_name > username > email
         const nameToUse = p.full_name || p.username;
-        if (nameToUse) {
-          setUser((prev: any) => ({ ...prev, displayName: nameToUse }));
-        }
+        setUser((prev: any) => ({
+          ...prev,
+          displayName: nameToUse,
+          avatarUrl: p.profile_image
+        }));
       }
 
       setLoading(false);
@@ -114,9 +116,18 @@ export default function DashboardPage() {
             <span className="h-1.5 w-1.5 rounded-full bg-[#B7FF00] animate-pulse"></span>
             System Active • {role}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
-            {greeting}, {user?.displayName || user?.email?.split('@')[0]}
-          </h1>
+          <div className="flex items-center gap-4 mt-1">
+            <div className="h-12 w-12 rounded-full bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} className="h-full w-full object-cover" alt="Profile" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-white/20"><Users size={20} /></div>
+              )}
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+              {greeting}, {user?.displayName || user?.email?.split('@')[0]}
+            </h1>
+          </div>
         </div>
       </div>
 
@@ -176,8 +187,8 @@ export default function DashboardPage() {
                 <Settings size={20} />
               </div>
               <div>
-                <div className="font-semibold text-white">Settings</div>
-                <div className="text-xs text-white/50">Manage account</div>
+                <div className="font-semibold text-white">Edit Profile</div>
+                <div className="text-xs text-white/50">Update identity</div>
               </div>
             </Link>
 

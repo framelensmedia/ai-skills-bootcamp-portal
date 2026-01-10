@@ -8,7 +8,8 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import PromptCard from "@/components/PromptCard";
 import {
   Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon,
-  Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder
+  Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder,
+  Globe, Lock
 } from "lucide-react";
 import Link from "next/link";
 import Loading from "@/components/Loading";
@@ -28,6 +29,7 @@ type GenRow = {
   remix_prompt_text: string | null;
   combined_prompt_text: string | null;
   folder_id?: string | null;
+  is_public?: boolean;
 };
 
 type PromptPublicRow = {
@@ -59,6 +61,7 @@ type LibraryItem = {
   combinedPromptText: string;
   folder: string | null;
   folder_id: string | null;
+  is_public: boolean;
 };
 
 type FolderType = {
@@ -286,7 +289,7 @@ function LibraryContent() {
           let q = supabase
             .from("prompt_generations")
             .select(
-              "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, folder_id"
+              "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, folder_id, is_public"
             )
             .eq("user_id", user.id)
             .limit(200);
@@ -339,6 +342,7 @@ function LibraryContent() {
               combinedPromptText,
               folder: fb.folder,
               folder_id: (g as any).folder_id || null,
+              is_public: g.is_public ?? true, // Default to true if null (legacy)
             } as LibraryItem;
           });
 
@@ -362,6 +366,7 @@ function LibraryContent() {
 
           const favRows = favsRow ?? [];
           const promptIds = favRows.filter(f => f.prompt_id).map(f => f.prompt_id);
+          const generationIds = favRows.filter(f => f.generation_id).map(f => f.generation_id);
 
           let fetchedPrompts: PromptPublicRow[] = [];
           if (promptIds.length > 0) {
@@ -372,6 +377,12 @@ function LibraryContent() {
               .select("id, title, slug, category, access_level, summary, featured_image_url, image_url, media_url")
               .in("id", promptIds);
             fetchedPrompts = (pData ?? []) as PromptPublicRow[];
+          }
+
+          let fetchedGens: any[] = [];
+          if (generationIds.length > 0) {
+            const { data: gData } = await supabase.from("prompt_generations").select("*").in("id", generationIds);
+            fetchedGens = gData || [];
           }
 
           const builtFavs: FavoriteItem[] = [];
@@ -385,6 +396,33 @@ function LibraryContent() {
                   createdAt: fav.created_at,
                   type: "prompt",
                   data: p
+                });
+              }
+            } else if (fav.generation_id) {
+              const g = fetchedGens.find(x => x.id === fav.generation_id);
+              if (g) {
+                builtFavs.push({
+                  recordId: fav.id,
+                  folder_id: fav.folder_id || null,
+                  createdAt: fav.created_at,
+                  type: "generation",
+                  data: {
+                    id: g.id,
+                    imageUrl: g.image_url,
+                    createdAt: g.created_at,
+                    createdAtMs: Date.parse(g.created_at),
+                    promptId: g.prompt_id,
+                    promptSlug: g.prompt_slug,
+                    aspectRatio: g.settings?.aspectRatio ?? null,
+                    promptTitle: g.settings?.headline || "Untitled Saved Remix",
+                    promptCategory: null,
+                    originalPromptText: g.original_prompt_text || "",
+                    remixPromptText: g.remix_prompt_text || "",
+                    combinedPromptText: g.combined_prompt_text || "",
+                    folder: null,
+                    folder_id: null,
+                    is_public: g.is_public ?? true
+                  } as LibraryItem
                 });
               }
             }
@@ -427,7 +465,15 @@ function LibraryContent() {
             remixPromptText: "",
             combinedPromptText: "",
             folder: null,
+            is_public: true
           } as LibraryItem;
+        } else if (f.type === "generation") {
+          const l = f.data as LibraryItem;
+          return {
+            ...l,
+            id: f.recordId, // Vital for selection
+            folder_id: f.folder_id,
+          };
         }
         return null;
       }).filter(Boolean) as LibraryItem[];
@@ -471,6 +517,24 @@ function LibraryContent() {
     setSelectedIds(new Set());
     setIsSelectionMode(false);
     setIsMoveModalOpen(false);
+  }
+
+  async function handleToggleVisibility(item: LibraryItem) {
+    // Optimistic
+    const newStatus = !item.is_public;
+    setRemixItems(prev => prev.map(i => i.id === item.id ? { ...i, is_public: newStatus } : i));
+
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase
+      .from("prompt_generations")
+      .update({ is_public: newStatus })
+      .eq("id", item.id);
+
+    if (error) {
+      // Revert
+      setRemixItems(prev => prev.map(i => i.id === item.id ? { ...i, is_public: !newStatus } : i));
+      alert("Failed to update visibility");
+    }
   }
 
   return (
@@ -626,15 +690,29 @@ function LibraryContent() {
             viewMode === "grid" ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {displayedItems.map(it => (
-                  <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer`} onClick={() => openLightbox(it)}>
-                    <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover" />
+                  <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => openLightbox(it)}>
+                    <Image src={it.imageUrl} alt={it.promptTitle} fill className="object-cover transition group-hover:scale-105" />
+
+                    {/* Visibility Badge (Top Left) */}
+                    {activeTab === "remixes" && (
+                      <div
+                        onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }}
+                        className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 cursor-pointer transition ${it.is_public ? "bg-white/90 text-black hover:bg-white" : "bg-black/60 text-white/70 hover:bg-black/80 backdrop-blur-md"}`}
+                        title={it.is_public ? "Public: Visible in Feed" : "Private: Only you can see this"}
+                      >
+                        {it.is_public ? <Globe size={9} /> : <Lock size={9} />}
+                        <span className="hidden group-hover:block">{it.is_public ? "Public" : "Private"}</span>
+                      </div>
+                    )}
+
                     {isSelectionMode && (
                       <div className="absolute top-2 right-2">
                         {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
                       </div>
                     )}
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                      <div className="text-[10px] text-white/80 truncate">{it.promptTitle}</div>
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
+                      <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
                     </div>
                   </div>
                 ))}
@@ -642,14 +720,22 @@ function LibraryContent() {
             ) : (
               <div className="space-y-2">
                 {displayedItems.map(it => (
-                  <div key={it.id} className={`flex items-center gap-4 p-2 rounded border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900`} onClick={() => openLightbox(it)}>
-                    <div className="relative w-12 h-12 bg-black shrink-0">
+                  <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => openLightbox(it)}>
+                    <div className="relative w-12 h-12 bg-black shrink-0 rounded overflow-hidden">
                       <Image src={it.imageUrl} alt="" fill className="object-cover" />
                       {isSelectionMode && selectedIds.has(it.id) && <div className="absolute inset-0 bg-[#B7FF00]/20 flex items-center justify-center"><Check size={16} className="text-[#B7FF00]" /></div>}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-white truncate">{it.promptTitle}</div>
-                      <div className="text-xs text-white/40">{new Date(it.createdAt).toLocaleDateString()}</div>
+                      <div className="flex items-center gap-3 text-xs text-white/40">
+                        <span>{new Date(it.createdAt).toLocaleDateString()}</span>
+                        {activeTab === "remixes" && (
+                          <button onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }} className={`flex items-center gap-1 hover:text-white ${it.is_public ? "text-green-400" : ""}`}>
+                            {it.is_public ? <Globe size={10} /> : <Lock size={10} />}
+                            <span>{it.is_public ? "Public" : "Private"}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

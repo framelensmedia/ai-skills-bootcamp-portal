@@ -27,6 +27,8 @@ export default function SettingsPage() {
     // Form State
     const [username, setUsername] = useState("");
     const [fullName, setFullName] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
 
     // Status
     const [saving, setSaving] = useState(false);
@@ -85,13 +87,14 @@ export default function SettingsPage() {
 
             const { data, error } = await supabase
                 .from("profiles")
-                .select("username, full_name")
+                .select("username, full_name, profile_image")
                 .eq("user_id", user.id)
                 .single();
 
             if (!cancelled && data) {
                 setUsername(data.username || "");
                 setFullName(data.full_name || "");
+                setAvatarUrl(data.profile_image || null);
             }
 
             setLoading(false);
@@ -100,6 +103,56 @@ export default function SettingsPage() {
         loadProfile();
         return () => { cancelled = true; };
     }, [router, supabase]);
+
+    async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+        if (!userId) return;
+
+        try {
+            setUploading(true);
+            if (!event.target.files || event.target.files.length === 0) {
+                return;
+            }
+
+            const file = event.target.files[0];
+            const fileExt = file.name.split('.').pop();
+            // Use timestamp to avoid cache issues
+            const fileName = `${userId}-${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            console.log("Uploading avatar:", filePath);
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) {
+                console.error("Upload failed:", uploadError);
+                throw uploadError;
+            }
+
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            console.log("Avatar URL:", publicUrl);
+            setAvatarUrl(publicUrl);
+
+            // Auto-save to profile
+            const { error: dbError } = await supabase
+                .from("profiles")
+                .update({ profile_image: publicUrl, updated_at: new Date().toISOString() })
+                .eq("user_id", userId);
+
+            if (dbError) {
+                console.error("Profile update failed:", dbError);
+                setMessage({ type: 'error', text: "Failed to save avatar to profile." });
+            } else {
+                setMessage({ type: 'success', text: "Profile photo updated!" });
+            }
+
+        } catch (error: any) {
+            alert("Error uploading image: " + error.message);
+        } finally {
+            setUploading(false);
+        }
+    }
 
     async function handleSave() {
         if (!userId) return;
@@ -116,6 +169,7 @@ export default function SettingsPage() {
         const updates = {
             username: username || null,
             full_name: fullName || null,
+            profile_image: avatarUrl,
             updated_at: new Date().toISOString(),
         };
 
@@ -157,7 +211,59 @@ export default function SettingsPage() {
                         <h2 className="text-sm font-bold uppercase tracking-wide text-white">Identity Credentials</h2>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                        {/* Avatar Upload */}
+                        <div>
+                            <label className="block text-xs font-mono text-white/50 mb-3 uppercase">Profile Photo</label>
+                            <div className="flex items-center gap-6">
+                                <div className="relative h-20 w-20 rounded-full bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+                                    {avatarUrl ? (
+                                        <>
+                                            <img
+                                                key={avatarUrl}
+                                                src={avatarUrl}
+                                                alt="Avatar"
+                                                className="h-full w-full object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = "none";
+                                                    // Show fallback
+                                                    const sibling = e.currentTarget.nextElementSibling;
+                                                    if (sibling) sibling.classList.remove('hidden');
+                                                }}
+                                            />
+                                            {/* Hidden fallback shown on error */}
+                                            <div className="hidden absolute inset-0 flex items-center justify-center text-white/20 bg-zinc-800">
+                                                <User size={32} />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-white/20">
+                                            <User size={32} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            id="avatar-upload"
+                                            accept="image/png, image/jpeg, image/webp, image/gif"
+                                            onChange={uploadAvatar}
+                                            className="hidden"
+                                            disabled={uploading}
+                                        />
+                                        <label
+                                            htmlFor="avatar-upload"
+                                            className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-black px-4 py-2 text-sm font-medium text-white hover:bg-white/5 transition"
+                                        >
+                                            {uploading ? 'Uploading...' : 'Upload New Photo'}
+                                        </label>
+                                    </div>
+                                    <p className="mt-2 text-xs text-white/40">JPEGs, PNGs, WebP supported. Max file size 2MB.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Email (Read Only) */}
                         <div>
                             <label className="block text-xs font-mono text-white/50 mb-1.5 uppercase">System Email</label>

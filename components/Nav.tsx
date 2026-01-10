@@ -14,25 +14,44 @@ export default function Nav() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!mounted) return;
-        setLoggedIn(!!data.session);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setLoggedIn(false);
-        setLoading(false);
-      });
+    async function checkUser() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      setLoggedIn(!!data.session);
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (data.session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("profile_image")
+          .eq("user_id", data.session.user.id)
+          .maybeSingle();
+
+        if (mounted && profile) {
+          setAvatarUrl(profile.profile_image);
+        }
+      }
+      setLoading(false);
+    }
+
+    checkUser();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setLoggedIn(!!session);
+      if (session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("profile_image")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        setAvatarUrl(profile?.profile_image || null);
+      } else {
+        setAvatarUrl(null);
+      }
     });
 
     return () => {
@@ -41,21 +60,28 @@ export default function Nav() {
     };
   }, [supabase]);
 
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   useEffect(() => {
     setMobileOpen(false);
+    setDropdownOpen(false);
   }, [pathname]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMobileOpen(false);
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        setDropdownOpen(false);
+      }
     }
-    if (mobileOpen) window.addEventListener("keydown", onKeyDown);
+    if (mobileOpen || dropdownOpen) window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobileOpen]);
+  }, [mobileOpen, dropdownOpen]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     setMobileOpen(false);
+    setDropdownOpen(false);
     router.push("/login");
     router.refresh();
   }
@@ -68,7 +94,6 @@ export default function Nav() {
     ].join(" ");
   };
 
-  // Final nav links (per your update)
   const links = [
     { href: "/", label: "Home" },
     { href: "/pricing", label: "Pricing" },
@@ -77,7 +102,21 @@ export default function Nav() {
     { href: "/library", label: "My Library" },
   ];
 
-  if (loggedIn) links.push({ href: "/dashboard", label: "Dashboard" });
+  if (loggedIn) {
+    links.push({ href: "/feed", label: "Community" });
+    links.push({ href: "/dashboard", label: "Dashboard" });
+  }
+
+  // Visual component for the avatar circle (no longer a link itself)
+  const UserAvatar = () => (
+    <div className="relative h-8 w-8 rounded-full bg-zinc-800 overflow-hidden border border-white/20 hover:border-[#B7FF00] transition cursor-pointer">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="User" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-white/50"><div className="h-4 w-4 rounded-full bg-white/20" /></div>
+      )}
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -95,12 +134,37 @@ export default function Nav() {
         {loading ? (
           <div className="hidden h-9 w-24 animate-pulse rounded-lg border border-white/15 bg-white/5 sm:block" />
         ) : loggedIn ? (
-          <button
-            onClick={handleLogout}
-            className="hidden rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 sm:inline-flex"
-          >
-            Logout
-          </button>
+          <div className="hidden sm:flex items-center relative gap-4 top-[1px]">
+            <div className="relative">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="outline-none focus:ring-2 focus:ring-[#B7FF00]/50 rounded-full"
+              >
+                <UserAvatar />
+              </button>
+
+              {dropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-zinc-900 shadow-xl z-50 overflow-hidden">
+                    <Link
+                      href="/settings"
+                      className="block px-4 py-3 text-sm text-white/80 hover:bg-white/5 hover:text-white transition border-b border-white/5"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      Edit Profile
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 text-sm text-white/60 hover:bg-white/5 hover:text-white transition"
+                    >
+                      Log Out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         ) : (
           <Link
             href="/login"
@@ -176,12 +240,20 @@ export default function Nav() {
                   {loading ? (
                     <div className="h-10 w-full animate-pulse rounded-xl border border-white/15 bg-white/5" />
                   ) : loggedIn ? (
-                    <button
-                      onClick={handleLogout}
-                      className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                    >
-                      Logout
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <Link href="/settings" className="flex items-center gap-3 flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 hover:bg-white/10">
+                        <div className="h-8 w-8 rounded-full bg-zinc-800 overflow-hidden border border-white/10">
+                          {avatarUrl ? <img src={avatarUrl} className="h-full w-full object-cover" /> : null}
+                        </div>
+                        <span className="text-sm font-semibold text-white">Edit Profile</span>
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        Logout
+                      </button>
+                    </div>
                   ) : (
                     <Link
                       href="/login"
