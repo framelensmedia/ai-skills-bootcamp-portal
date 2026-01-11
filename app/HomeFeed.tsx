@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import PromptCard from "@/components/PromptCard";
-import { Wand2 } from "lucide-react";
+import { Wand2, ArrowRight, Flame } from "lucide-react";
 import Image from "next/image";
 import BasicTrainingSection from "@/components/home/BasicTrainingSection";
 import BasicTrainingCards from "@/components/home/BasicTrainingCards";
@@ -377,29 +377,42 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             {/* TRENDING PROMPTS */}
             <section className="mx-auto max-w-6xl px-4 py-8">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" />
-                            </svg>
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/10 pb-8">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
+                                <Wand2 size={12} />
+                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-[#B7FF00]">
+                                Prompt Templates
+                            </span>
                         </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-white tracking-tight">Trending Prompts</h2>
-                            <div className="mt-2 inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm ring-1 ring-white/5">
-                                <Wand2 className="h-3.5 w-3.5 text-lime-400" />
-                                <span>Create pro level content by remixing one of the prompts</span>
-                            </div>
-                        </div>
+                        <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-3">
+                            Remix & Create
+                        </h2>
+                        <p className="text-lg text-white/60 max-w-2xl">
+                            Pick a professional template and remix it to create stunning content for your brand in seconds.
+                        </p>
                     </div>
 
-                    <Link href="/prompts" className="group hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
-                        <span>View More Prompts</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:text-white">
-                            <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
-                        </svg>
+                    <Link href="/prompts" className="group flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0">
+                        <span>View All Prompts</span>
+                        <ArrowRight size={16} className="text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
                     </Link>
+                </div>
+
+                {/* Trending Community Sub-header */}
+                <div className="mb-6 flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#B7FF00]/5 border border-[#B7FF00]/20 text-[#B7FF00]">
+                        <Flame size={24} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-1">Trending Prompts</h3>
+                        <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+                            <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
+                            <span>Create pro level content in just a few clicks</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
