@@ -17,6 +17,14 @@ export const metadata: Metadata = {
     description: "Learn high-value AI skills and build real projects.",
     url: "https://aiskillsbootcamp.com",
     siteName: "AI Skills Bootcamp",
+    images: [
+      {
+        url: "https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png",
+        width: 1200,
+        height: 630,
+        alt: "AI Skills Bootcamp",
+      },
+    ],
     locale: "en_US",
     type: "website",
   },
@@ -24,6 +32,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "AI Skills Bootcamp",
     description: "Learn high-value AI skills and build real projects.",
+    images: ["https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png"],
   },
 };
 
