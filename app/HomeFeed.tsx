@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import PromptCard from "@/components/PromptCard";
 import { Wand2 } from "lucide-react";
 import Image from "next/image";
+import BasicTrainingSection from "@/components/home/BasicTrainingSection";
+import BasicTrainingCards from "@/components/home/BasicTrainingCards";
 
 // --- Subcomponents ---
 
@@ -63,7 +65,32 @@ export type PublicPrompt = {
     media_url: string | null;
 };
 
-function FeaturedPromptSlider({ items }: { items: PublicPrompt[] }) {
+export type InstructorBootcamp = {
+    id: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    featured_image_url: string | null;
+    status: string;
+    notify_enabled: boolean;
+    // Discriminator to help runtime checks if needed, but we can check properties
+    type?: "instructor_bootcamp";
+};
+
+type SliderItem = PublicPrompt | InstructorBootcamp;
+
+function isInstructorBootcamp(item: SliderItem): item is InstructorBootcamp {
+    return (item as any).status !== undefined || (item as any).type === "instructor_bootcamp";
+}
+
+function getBootcampTagline(slug: string): string {
+    if (slug.includes("kids-clothing")) return "Launch a global brand from your laptop.";
+    if (slug.includes("social-content") || slug.includes("agency")) return "Scale to $10k/mo with AI automation.";
+    if (slug.includes("sleep-music") || slug.includes("youtube")) return "Build a passive income stream on YouTube.";
+    return "Master this high-value skill.";
+}
+
+function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
     const [idx, setIdx] = useState(0);
 
     useEffect(() => {
@@ -81,29 +108,40 @@ function FeaturedPromptSlider({ items }: { items: PublicPrompt[] }) {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-white/10 to-black/50" />
                 <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-                    <p className="text-xs text-white/60">Featured prompts</p>
+                    <p className="text-xs text-white/60">Featured content</p>
                     <p className="mt-1 text-sm font-semibold text-white">Loading…</p>
                 </div>
             </div>
         );
     }
 
-    const href = `/prompts/${encodeURIComponent(active.slug)}`;
+    const isBootcamp = isInstructorBootcamp(active);
 
-    const bestImage =
-        (active.featured_image_url ?? "").trim() ||
-        (active.image_url ?? "").trim() ||
-        (active.media_url ?? "").trim();
+    const href = isBootcamp
+        ? `/bootcamps/${encodeURIComponent(active.slug)}`
+        : `/prompts/${encodeURIComponent(active.slug)}`;
 
-    // Guard image rendering
+    const bestImage = isBootcamp
+        ? (active.featured_image_url ?? "")
+        : (
+            ((active as PublicPrompt).featured_image_url ?? "").trim() ||
+            ((active as PublicPrompt).image_url ?? "").trim() ||
+            ((active as PublicPrompt).media_url ?? "").trim()
+        );
+
     const hasImage = bestImage.length > 0;
+
+    // Labels
+    const categoryLabel = isBootcamp ? "Instructor Led Bootcamp" : (active as PublicPrompt).category ?? "general";
+    const bottomLabel = isBootcamp ? "Instructor Led Bootcamp" : "Featured prompt";
+    const actionText = isBootcamp ? "Coming Soon" : "Open →";
+    const actionColor = isBootcamp ? "text-white/40" : "text-[#B7FF00]";
+    const actionCursor = isBootcamp ? "cursor-default" : "cursor-pointer"; // But user said "remain clickable", so keep pointer? "appear disabled but remain clickable" -> styles disabled but link works.
 
     return (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <Link href={href} className="block">
+            <Link href={href} className={`block ${isBootcamp ? "cursor-pointer" : ""}`}>
                 <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                    {/* Use next/image for optimization, or simple img if we prefer not to mess with sizes right now. 
-               User requested next/image where possible. */}
                     {hasImage ? (
                         <Image
                             src={bestImage}
@@ -111,33 +149,45 @@ function FeaturedPromptSlider({ items }: { items: PublicPrompt[] }) {
                             fill
                             className="object-cover transition duration-300 opacity-90"
                             sizes="(max-width: 768px) 100vw, 50vw"
+                            priority
+                            unoptimized // Fix for local file loading issues in dev
                         />
                     ) : (
                         <div className="h-full w-full bg-black/50 brightness-[0.55]" />
                     )}
 
                     <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
-                        <span className="rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85">
-                            {(active.category ?? "general").toUpperCase()}
+                        <span className="rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85 uppercase">
+                            {categoryLabel}
                         </span>
 
-                        {String(active.access_level || "free").toLowerCase() === "premium" ? (
+                        {!isBootcamp && String((active as PublicPrompt).access_level || "free").toLowerCase() === "premium" ? (
                             <span className="rounded-full border border-lime-400/30 bg-lime-400/15 px-3 py-1 text-[11px] text-lime-200">
                                 PRO
                             </span>
                         ) : null}
                     </div>
+
+                    {/* Bootcamp Enticing Summary Overlay - REMOVED */}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/40 p-3">
-                    <div className="min-w-0">
-                        <p className="text-xs text-white/60">Featured prompt</p>
-                        <p className="truncate text-sm font-semibold text-white">{active.title}</p>
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-4">
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 pr-4">
+                            <p className="text-xs text-white/60 mb-1">{bottomLabel}</p>
+                            <p className="truncate text-base font-bold text-white">{active.title}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                            <p className={`text-sm font-semibold ${actionColor}`}>{actionText}</p>
+                        </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-xs text-white/60">Action</p>
-                        <p className="text-sm font-semibold text-[#B7FF00]">Open →</p>
-                    </div>
+
+                    {/* Tagline for Bootcamps */}
+                    {isBootcamp && (
+                        <p className="text-sm text-white/70 line-clamp-2 leading-relaxed">
+                            {getBootcampTagline(active.slug)}
+                        </p>
+                    )}
                 </div>
             </Link>
 
@@ -219,12 +269,19 @@ function Typewriter({ text, className = "", gradientWords = [] }: { text: string
 
 type HomeFeedProps = {
     prompts: PublicPrompt[];
+    instructorBootcamps?: InstructorBootcamp[];
     favoriteIds: string[]; // Set is not serializable
 };
 
-export default function HomeFeed({ prompts, favoriteIds }: HomeFeedProps) {
+export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteIds }: HomeFeedProps) {
     const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
-    const sliderPrompts = useMemo(() => prompts.slice(0, 5), [prompts]);
+
+    const sliderPrompts = useMemo(() => {
+        const markedBootcamps = instructorBootcamps.map(b => ({ ...b, type: "instructor_bootcamp" } as InstructorBootcamp));
+        // ONLY show instructor bootcamps in the slider as requested
+        return markedBootcamps;
+    }, [instructorBootcamps]);
+
     const trendingPrompts = useMemo(() => prompts, [prompts]); // Use all fetched prompts (already limited by server)
 
     // We are now Server Component based for initial data, so no loading state needed for initial content!
@@ -315,6 +372,9 @@ export default function HomeFeed({ prompts, favoriteIds }: HomeFeedProps) {
                 </div>
             </section>
 
+            {/* BASIC TRAINING - Inserted after hero */}
+            <BasicTrainingSection />
+
             {/* TRENDING PROMPTS */}
             <section className="mx-auto max-w-6xl px-4 py-8">
                 <div className="flex items-center justify-between border-b border-white/10 pb-4">
@@ -369,33 +429,16 @@ export default function HomeFeed({ prompts, favoriteIds }: HomeFeedProps) {
                 </div>
             </section>
 
-            {/* TUTORIALS AND FOOTER SECTIONS REMAINED STATIC */}
+            {/* BASIC TRAINING MODULES - Repurposed Tutorials section */}
             <section className="mx-auto max-w-6xl px-4 pt-20 pb-10 md:pt-32 md:pb-14">
                 <div className="text-center">
                     <p className="text-xs font-semibold uppercase tracking-wider text-[#B7FF00]">Learn the system</p>
-                    <h2 className="mt-2 text-2xl font-bold md:text-3xl">Tutorials</h2>
-                    <p className="mt-2 text-sm text-white/60">Quick guides so users understand how to remix prompts the right way.</p>
+                    <h2 className="mt-2 text-2xl font-bold md:text-3xl">Basic Training Modules</h2>
+                    <p className="mt-2 text-sm text-white/60">Master AI creation with these free guided missions.</p>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <MiniCard
-                        tag="REMIXING"
-                        title="How to remix prompts for your offer"
-                        desc="Swap in product images, change the headline, and keep the style locked."
-                        comingSoon
-                    />
-                    <MiniCard
-                        tag="REFERENCE IMAGES"
-                        title="How to use uploads for better results"
-                        desc="Upload up to 10 images to guide style, layout, and branding."
-                        comingSoon
-                    />
-                    <MiniCard
-                        tag="WORKFLOW"
-                        title="Prompt → Studio → Library"
-                        desc="Use prompts for speed, Studio for custom work, Library to reuse winners."
-                        comingSoon
-                    />
+                <div className="mt-6">
+                    <BasicTrainingCards />
                 </div>
             </section>
 

@@ -81,6 +81,7 @@ export default function Nav() {
 
   const links = [
     { href: "/", label: "Home" },
+    { href: "/learn", label: "Learn" },
     { href: "/pricing", label: "Pricing" },
     { href: "/prompts", label: "Prompts" },
     { href: "/studio", label: "Studio" },

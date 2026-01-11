@@ -793,3 +793,406 @@ part of the acquisition narrative
 “We didn’t just teach AI. We built a learning-to-creation system.”
 
 That’s boardroom language.
+
+Context Doc Update
+Learning Flow™ System + CMS Architecture (Locked)
+
+Last updated: January 11, 2026
+
+1. Core Concept: Learning Flow™
+
+A Learning Flow™ is the atomic unit of education on AI Skills Bootcamp.
+
+A Learning Flow combines:
+
+Micro-learning (AI avatar videos + text)
+
+Immediate creation using AI tools
+
+Automatic saving and progress tracking
+
+Learning Flows are:
+
+Built by staff in the CMS
+
+Assembled into Bootcamps
+
+Experienced by users as Missions
+
+Users never see the term “Learning Flow.”
+They see Bootcamps → Missions.
+
+2. Learning Flow Structure (Final)
+
+Each Learning Flow consists of three required sections:
+
+A) Learn
+
+Delivered via 2–5 AI avatar micro-videos
+
+Each video ~45–75 seconds
+
+One idea per video
+
+Optional supporting text (recap, checklist, examples)
+
+Total learning time target: ≤5 minutes
+
+Purpose:
+Prepare the user to create without overwhelm.
+
+B) Create
+
+Exactly one create action per Learning Flow
+
+Launches the AI creation experience
+
+Uses existing Prompt Studio templates
+
+Create actions support:
+
+Single template
+
+Template pack
+
+Guided Remix mode
+
+Create actions are never blank canvases.
+
+C) Outcome
+
+Output is automatically saved to the user’s Library
+
+Mission is marked complete (or skipped)
+
+Progress updates instantly
+
+“Next Mission” CTA is shown
+
+No quizzes.
+No grades.
+Completion is action-based.
+
+3. Mission Studio (Learning Flow Creation Experience)
+
+To guarantee reliable completion tracking, Learning Flows use a dedicated Mission Studio route.
+
+Mission Studio
+
+Route: /studio/mission/[lessonId]
+
+UI is the same Guided Remix experience
+
+Difference from regular Studio:
+
+Always launched with mission context
+
+Always saves output
+
+Always marks mission complete
+
+Always redirects back to the mission
+
+Mission Studio behavior:
+
+Load Learning Flow by lessonId
+
+Load referenced template(s)
+
+Run Guided Remix as normal
+
+On save:
+
+Save to Library
+
+Complete mission
+
+Redirect back to bootcamp mission page
+
+Generic /studio remains unchanged.
+
+4. Templates in Learning Flows
+
+Templates are unified across the platform.
+
+There is no separate “mission template” type.
+
+Template Visibility
+
+Templates have a visibility setting:
+
+public – visible in Studio browsing
+
+learning_only – hidden from public, used only in Learning Flows
+
+staff_only – internal use
+
+Learning Flow Template Selection
+
+Inside the Learning Flow builder, staff can:
+
+Select an existing Learning Only template
+
+Select an existing Public template
+
+Upload a new template (image + JSON) directly in the builder
+
+Upload behavior:
+
+Uses the same import pipeline as the Prompt Editor
+
+Defaults visibility to learning_only
+
+Auto-selects the new template for the Learning Flow
+
+Learning-only templates never appear in public Studio browsing but are fully usable in Mission Studio.
+
+5. CMS: Learning Flow Builder (Staff Experience)
+
+The CMS is updated to be Learning Flow–first.
+
+CMS Terminology
+
+“Lessons” → Learning Flows
+
+Public UI: Learning Flows appear as Missions
+
+Learning Flow Editor Capabilities
+
+Manage micro-videos (add, edit, reorder)
+
+Add supporting text
+
+Configure exactly one Create Action
+
+Select or upload templates inline
+
+Preview selected template
+
+Set duration targets
+
+Publish or draft flows
+
+Staff never need to leave the builder to create a complete Learning Flow.
+
+6. Gamified, Premium Learning Experience
+
+The learning UI is:
+
+Modern
+
+Clean
+
+Lightly gamified (Duolingo-inspired, not childish)
+
+Key elements:
+
+Mission Cards with status pills
+
+Progress HUD showing next action
+
+Micro-celebrations on completion
+
+“Flow Streak” (lightweight, optional)
+
+Gamification reinforces momentum, not competition.
+
+7. Notifications & Re-engagement
+In-App Notifications (MVP)
+
+Resume banners for unfinished missions
+
+Onboarding nudges for new users
+
+Contextual prompts via assistant bubble
+
+Triggers include:
+
+Mission started but not completed
+
+Returning users with unfinished missions
+
+New bootcamp availability
+
+Automation-Ready Event System
+
+The app emits structured events for:
+
+mission_started
+
+mission_completed
+
+mission_skipped
+
+bootcamp_started
+
+bootcamp_completed
+
+mission_incomplete_24h
+
+user_inactive_24h
+
+These events will later connect to GoHighLevel webhooks for email and SMS automation.
+
+No email logic is hardcoded into the app.
+
+8. Future-Ready (Not MVP)
+
+Interface tour missions
+
+Advanced analytics on learning flows
+
+AI assistant function calling
+
+User content organization and search
+
+Social remix feed enhancements
+
+––––––––––––––––––––
+CONTEXT DOC UPDATE
+Feature: Instructor-Led Bootcamp Hero Slider (Coming Soon)
+––––––––––––––––––––
+
+Overview
+The homepage hero currently displays a featured prompt slider. This slider will be extended to support a new content type called Instructor-Led Bootcamps. The goal is to tease premium bootcamps, capture interest, and build anticipation without changing the existing homepage layout or visual design.
+
+This update does not replace any existing functionality and should reuse the same slider component, transitions, animations, and layout.
+
+––––––––––––––––––––
+Hero Slider Behavior (Instructor-Led Bootcamps)
+––––––––––––––––––––
+
+Purpose
+Instructor-Led Bootcamps represent high-value, premium courses that will be launched as events. They are not part of the Basic Training or learning flow system and should feel exclusive and aspirational.
+
+Visual Changes (Minimal and Targeted)
+
+When a slider item is an Instructor-Led Bootcamp:
+
+• The category pill at the top of the card should display:
+Instructor Led Bootcamp
+
+• The bottom info bar label should change from:
+Featured Prompt
+to:
+Instructor Led Bootcamp
+
+• The main title should display the bootcamp title, for example:
+Start a Kids Clothing Brand with AI
+Start a Social Content Agency with AI
+Start a YouTube Sleep Music Channel with AI
+
+• The action button text should change from:
+Open →
+to:
+Coming Soon
+
+• The action button should appear disabled visually but remain clickable.
+
+––––––––––––––––––––
+Click Behavior
+––––––––––––––––––––
+
+Clicking an Instructor-Led Bootcamp card routes the user to a dedicated landing page at:
+/bootcamps/[slug]
+
+This page exists even if the bootcamp is not live.
+
+––––––––––––––––––––
+Instructor-Led Bootcamp Landing Page
+––––––––––––––––––––
+
+Each Instructor-Led Bootcamp has a simple “Coming Soon” landing page with the following elements:
+
+• Featured image (4:5 aspect ratio)
+• Bootcamp title
+• Short teaser description
+• Status indicator: Coming Soon
+• Primary call-to-action button: Get Notified
+
+There is no access, purchase, or content visible at this stage.
+
+––––––––––––––––––––
+Get Notified Behavior
+––––––––––––––––––––
+
+When a user clicks Get Notified:
+
+• If logged in: associate interest with their user ID
+• If logged out: collect email address
+
+The action should trigger a webhook (GoHighLevel integration to be connected later) and tag the user with:
+
+• interest_instructor_bootcamp
+• the specific bootcamp slug
+
+This allows segmented launch campaigns later.
+
+––––––––––––––––––––
+Data Model (Lightweight)
+––––––––––––––––––––
+
+Instructor-Led Bootcamps are stored separately from learning flows and prompt templates.
+
+Fields include:
+
+• id
+• title
+• slug
+• description
+• featured_image_url
+• status (coming_soon)
+• notify_enabled (true)
+
+Instructor-Led Bootcamps do NOT appear in:
+
+• Prompt marketplace
+• Learning flows
+• Prompt Studio
+• Basic Training
+
+They only appear in:
+
+• Homepage hero slider
+• Their own landing pages
+
+––––––––––––––––––––
+Relationship to Basic Training
+––––––––––––––––––––
+
+Basic Training:
+
+• Free
+• Always available
+• Designed to get users creating immediately
+• Displayed directly under the homepage hero
+
+Instructor-Led Bootcamps:
+
+• Premium
+• Event-based launches
+• Marketed separately
+• Teased in the hero slider only
+
+This separation is intentional and should remain strict.
+
+––––––––––––––––––––
+Strategic Notes
+––––––––––––––––––––
+
+This feature:
+
+• Signals a long-term roadmap without slowing MVP delivery
+• Creates a second acquisition funnel beyond free tools
+• Builds an interest list before content is released
+• Allows future instructor drops to feel like events
+• Matches how real education startups structure premium offerings
+
+No other homepage sections should be modified as part of this update.
+
+––––––––––––––––––––
+
+If you want, next I can:
+• Write the copy for each “Coming Soon” bootcamp page
+• Draft the GoHighLevel automation logic
+• Or help you define how a bootcamp transitions from Coming Soon to Live without breaking URLs

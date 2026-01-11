@@ -46,7 +46,7 @@ export default function RootLayout({
                   />
 
                   {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
-                  <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
+                  <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
                     <span className="text-lime-400">AI Skills</span>{" "}
                     <span className="text-white">Bootcamp</span>
                   </span>

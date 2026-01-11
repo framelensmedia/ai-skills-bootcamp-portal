@@ -10,7 +10,7 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Parallel fetch
-  const [promptsRes, favRes] = await Promise.all([
+  const [promptsRes, bootcampsRes, favRes] = await Promise.all([
     supabase
       .from("prompts_public")
       .select(
@@ -18,12 +18,18 @@ export default async function HomePage() {
       )
       .order("created_at", { ascending: false })
       .limit(18), // Limit initial fetch as requested
+    supabase
+      .from("instructor_bootcamps")
+      .select("*")
+      .eq("status", "coming_soon")
+      .order("created_at", { ascending: false }),
     user
       ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
       : Promise.resolve({ data: [] })
   ]);
 
   const prompts = (promptsRes.data || []) as PublicPrompt[];
+  const instructorBootcamps = (bootcampsRes.data || []) as any[]; // Cast to any to avoid strict type mismatch with client component types if needed
 
   const favoriteIds: string[] = [];
   if (favRes.data) {
@@ -33,6 +39,10 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeFeed prompts={prompts} favoriteIds={favoriteIds} />
+    <HomeFeed
+      prompts={prompts}
+      instructorBootcamps={instructorBootcamps}
+      favoriteIds={favoriteIds}
+    />
   );
 }
