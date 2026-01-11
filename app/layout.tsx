@@ -9,8 +9,31 @@ import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://aiskillsbootcamp.com"),
   title: "AI Skills Bootcamp",
   description: "Learn high-value AI skills and build real projects.",
+  openGraph: {
+    title: "AI Skills Bootcamp",
+    description: "Learn high-value AI skills and build real projects.",
+    url: "https://aiskillsbootcamp.com",
+    siteName: "AI Skills Bootcamp",
+    images: [
+      {
+        url: "/AI_Skills_Bootcamp_Text_log_Blk-Bg-Picsart-AiImageEnhancer.png",
+        width: 1200,
+        height: 630,
+        alt: "AI Skills Bootcamp",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Skills Bootcamp",
+    description: "Learn high-value AI skills and build real projects.",
+    images: ["/AI_Skills_Bootcamp_Text_log_Blk-Bg-Picsart-AiImageEnhancer.png"],
+  },
 };
 
 export const viewport = {
