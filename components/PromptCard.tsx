@@ -21,6 +21,9 @@ type PromptCardProps = {
   category?: string;
   accessLevel?: string; // free | premium (DB value)
 
+  packName?: string;
+  packSlug?: string;
+
   initialFavorited?: boolean;
   onToggleFavorite?: (newVal: boolean) => void;
 };
@@ -35,6 +38,8 @@ export default function PromptCard({
   mediaUrl,
   category,
   accessLevel = "free",
+  packName,
+  packSlug,
   initialFavorited = false,
   onToggleFavorite,
 }: PromptCardProps) {
@@ -170,8 +175,8 @@ export default function PromptCard({
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
           ) : null}
 
-          {/* Top Categories */}
-          <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+          {/* Top Categories & Labels */}
+          <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85">
               {(category ?? "general").toUpperCase()}
             </span>
@@ -181,6 +186,19 @@ export default function PromptCard({
                 PRO
               </span>
             ) : null}
+
+            {packName && packSlug && (
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/prompts/packs/${packSlug}`);
+                }}
+                className="cursor-pointer rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1"
+              >
+                <span className="opacity-50">PACK:</span> {packName}
+              </div>
+            )}
           </div>
         </div>
 

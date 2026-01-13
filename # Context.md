@@ -1196,3 +1196,480 @@ If you want, next I can:
 • Write the copy for each “Coming Soon” bootcamp page
 • Draft the GoHighLevel automation logic
 • Or help you define how a bootcamp transitions from Coming Soon to Live without breaking URLs
+
+
+CONTEXT DOC UPDATE
+Feature: Template Pack Upload Pipeline (Staff CMS)
+––––––––––––––––––––
+
+Overview
+The goal of the Template Pack pipeline is to allow staff to upload multiple prompt templates at once using a single folder. A template pack consists of one JSON file that defines the pack and its templates, plus one featured image per template. Staff should be able to upload the folder and have the system automatically create all templates, associate them with a pack, and map the correct featured images without any manual entry.
+
+This system must support both single-template uploads and multi-template pack uploads.
+
+––––––––––––––––––––
+Core Use Case
+––––––––––––––––––––
+
+Staff workflow:
+
+Staff prepares a folder on their computer.
+
+The folder contains:
+
+One JSON file named pack.json
+
+One featured image per template
+
+Staff uploads the folder using the CMS.
+
+The system:
+
+Reads pack.json
+
+Detects how many templates to create based on templates array length
+
+Uploads all images
+
+Creates one pack record
+
+Creates one template record per template entry
+
+Links each template to the correct featured image using a naming convention
+
+No manual creation of templates. No manual UUIDs.
+
+––––––––––––––––––––
+Folder Structure and Naming Convention
+––––––––––––––––––––
+
+Folder example:
+
+RestaurantPack/
+
+pack.json
+
+01_featured.webp
+
+02_featured.webp
+
+03_featured.webp
+
+Image naming convention:
+
+Each template references its featured image using the exact file name.
+
+Example: featured_image_file = "01_featured.webp"
+
+This avoids guessing or implicit ordering.
+
+––––––––––––––––––––
+Pack JSON Contract
+––––––––––––––––––––
+
+The pack.json file contains:
+
+A single pack object with metadata
+
+A templates array
+
+The number of templates created equals templates.length
+
+Required structure:
+
+pack:
+
+title
+
+slug
+
+summary
+
+category
+
+tags
+
+version
+
+templates[]:
+
+title
+
+slug
+
+summary
+
+featured_image_file (must match a file in the folder)
+
+prompt_text
+
+output_type (image or video)
+
+aspect_ratios
+
+variables (editable fields)
+
+guided_remix config
+
+visibility flags (draft, pack_only)
+
+Templates can be marked as pack-only so they do not appear in the global template marketplace unless published separately.
+
+––––––––––––––––––––
+Upload Modes (CMS UI)
+––––––––––––––––––––
+
+The Staff Prompt Editor must support two upload modes:
+
+Upload Single Template
+
+Existing behavior remains unchanged
+
+Drag image + JSON for one template
+
+Upload Template Pack (Folder)
+
+Provide a dedicated “Upload Folder” option
+
+Use browser folder selection (webkitdirectory)
+
+Drag-and-drop folders is optional but not required
+
+––––––––––––––––––––
+Template Pack Upload Behavior
+––––––––––––––––––––
+
+When uploading a folder:
+
+Validate:
+
+Exactly one pack.json file exists
+
+pack.json parses correctly
+
+Each template has featured_image_file defined
+
+Each referenced image exists in the folder
+
+Preview:
+
+Display “N templates detected”
+
+Show template titles and matched image filenames
+
+On confirm:
+
+Upload all images to storage
+
+Create pack record in database
+
+Create template records in draft state
+
+Link templates to pack with ordering
+
+Mark templates as pack_only by default
+
+If validation fails:
+
+Show clear error messages
+
+Do not create partial records
+
+Pack uploads should be treated as atomic operations.
+
+––––––––––––––––––––
+Building Packs from Existing Templates
+––––––––––––––––––––
+
+Staff should also be able to create packs from templates already in the system.
+
+Required features:
+
+Search templates
+
+Filter by category, tags, output type
+
+Multi-select templates
+
+“Create Pack from Selection” action
+
+Ability to reorder templates inside the pack
+
+Save pack as draft or publish later
+
+This allows flexible curation without reuploading assets.
+
+––––––––––––––––––––
+Data Model Notes
+––––––––––––––––––––
+
+Recommended additions:
+
+template_packs table:
+
+id
+
+title
+
+slug
+
+summary
+
+category
+
+tags
+
+featured_image_url (optional)
+
+is_published
+
+created_at
+
+template_pack_items table:
+
+id
+
+pack_id
+
+template_id
+
+sort_index
+
+Optional template fields:
+
+pack_only (boolean, default false)
+
+Templates marked pack_only should not appear in the global marketplace.
+
+––––––––––––––––––––
+Visibility Rules
+––––––––––––––––––––
+
+Pack-only templates:
+
+Visible inside their pack
+
+Visible in learning flow builder (if selected)
+
+Visible in staff editor
+
+Hidden from public marketplace
+
+Packs can be published or kept in draft state.
+
+––––––––––––––––––––
+Design and UX Expectations
+––––––––––––––––––––
+
+Staff should never need to manually paste UUIDs.
+
+Pack upload should feel fast, safe, and predictable.
+
+Errors must be explicit and non-destructive.
+
+Draft-first workflow allows staff to review and tweak before publishing.
+
+––––––––––––––––––––
+END CONTEXT DOC UPDATE
+––––––––––––––––––––
+
+––––––––––––––––––––
+PROMPT FOR ANTIGRAVITY (COPY / PASTE)
+––––––––––––––––––––
+
+We need to finish the Template Pipeline to support uploading Template Packs in one action.
+
+Current state: the Staff Prompt Editor supports drag-and-drop upload for a single template only.
+
+Goal:
+Staff should be able to upload a folder that contains:
+
+one pack.json file
+
+one featured image per template
+
+The system must:
+
+read pack.json
+
+determine how many templates to create based on templates.length
+
+upload all images
+
+create one template pack record
+
+create individual template records linked to the pack
+
+map each template to the correct featured image using featured_image_file
+
+UI changes required:
+
+Add an Upload Type selector:
+
+Upload Single Template
+
+Upload Template Pack (Folder)
+
+For Template Pack uploads:
+
+Provide a reliable folder upload using input type webkitdirectory
+
+Validate presence of exactly one pack.json
+
+Validate that each featured_image_file exists in the folder
+
+Show a preview listing detected templates and matched image filenames
+
+On confirm, upload assets and create records
+
+Add ability to create packs from existing templates:
+
+Search and filter templates
+
+Multi-select templates
+
+“Create Pack from Selection”
+
+Reorder templates inside a pack
+
+Save pack as draft or publish
+
+Data model:
+
+Add template_packs table
+
+Add template_pack_items table
+
+Add optional pack_only flag on templates to control visibility
+
+Behavior requirements:
+
+Pack uploads should be atomic
+
+If validation fails, do not partially create records
+
+Pack-only templates should not appear in the global marketplace unless published separately
+
+No manual UUID entry anywhere in this flow.
+
+––––––––––––––––––––
+
+Yes. This is a clean upgrade and it’ll make the library feel like a real product.
+
+Here’s the spec to drop into your context doc + a prompt for Antigravity.
+
+---
+
+## Context doc update: Prompt Packs in Library + CMS
+
+Goal: Add first-class “Prompt Packs” to the Prompt Library and Staff Prompt Editor. Packs should be browseable on the Prompts page above single templates and displayed as an inline horizontal swipe row. Staff must be able to upload a Pack thumbnail image during pack upload. Each template must indicate which pack it belongs to, and staff can click to view the pack details.
+
+### User-facing (Prompts page)
+
+1. Add a “Prompt Packs” section above single prompts.
+2. Display packs as a horizontal swipe carousel (inline swipe cards).
+3. Each pack card includes:
+
+   * Pack thumbnail
+   * Pack name
+   * Short description
+   * Template count
+   * Category and/or tags
+   * Access badge (Free or Pro)
+4. Clicking a pack opens a Pack detail page:
+
+   * Pack header (thumbnail, title, summary, tags)
+   * Grid/list of templates in the pack
+   * “Remix” starts remix from the selected template (not from the pack itself)
+
+### Staff CMS (Prompt Editor + Pack Manager)
+
+1. Add Pack entity and pack CRUD:
+
+   * Create pack
+   * Upload pack thumbnail
+   * Add/edit title, summary, category, tags, access level
+2. Pack upload flow supports:
+
+   * Upload a folder or zip containing:
+
+     * pack.json
+     * pack thumbnail (ex: pack_thumb.png)
+     * per-template featured images (naming convention)
+   * System creates:
+
+     * 1 pack record
+     * N template records linked to that pack
+3. Prompt Editor changes:
+
+   * Staff can filter view mode: “All / Templates / Packs”
+   * Templates show “Pack: [Pack Name]” (clickable)
+   * Pack detail view shows all member templates and allows reordering/removal
+4. Template records store pack reference:
+
+   * pack_id nullable FK
+   * pack_order_index for ordering within pack
+
+### Data model (minimum)
+
+Add a packs table and link templates to packs.
+
+packs:
+
+* id (uuid)
+* title
+* slug
+* summary
+* category
+* tags (text[])
+* access_level (free/pro)
+* thumbnail_url
+* is_published
+* created_at / updated_at
+
+prompt_templates (existing):
+
+* pack_id (uuid nullable FK to packs.id)
+* pack_order_index (int nullable)
+* existing fields unchanged
+
+Rules:
+
+* A template can belong to 0 or 1 pack (MVP)
+* Packs contain many templates
+* Pack publish state controls visibility of pack and its templates as a group (optional: templates also have their own publish state)
+
+### JSON pack format update
+
+pack.json should support pack metadata + template array.
+
+Required:
+
+* pack: { title, summary, category, tags, access_level, thumbnail_filename }
+* templates: [ { title, slug, summary, tags, category, featured_image_filename, template_config_json, prompt_text } ]
+
+Upload logic maps:
+
+* thumbnail_filename -> packs.thumbnail_url
+* featured_image_filename -> template.featured_image_url
+* templates[] length -> number of templates to create
+
+---
+
+## Prompt for Antigravity (copy/paste)
+
+Add first-class Prompt Packs to the platform.
+
+1. Create a new `packs` table (uuid id, title, slug unique, summary, category, tags text[], access_level enum free/pro, thumbnail_url, is_published boolean, created_at, updated_at). Add `pack_id` (uuid FK) and `pack_order_index` (int) to existing prompt_templates table.
+
+2. Update Prompts page UI: add a “Prompt Packs” section above single templates. Render packs as a horizontal swipe carousel (inline swipe cards). Each pack card shows pack thumbnail, title, summary, template count, access badge. Clicking opens /prompts/packs/[slug] showing pack detail and the list/grid of templates inside it. Remix happens at the template level.
+
+3. Update Staff CMS: add “Packs” management view and allow pack upload with a pack thumbnail. Staff should be able to toggle list view: All / Templates / Packs. In template editor, show “Pack: [Pack Name]” if pack_id is set, and make it clickable to open the pack.
+
+4. Update pack upload pipeline: accept pack.json containing pack metadata and templates array. Support pack thumbnail filename in pack.json. On upload, create 1 pack record + N template records linked via pack_id, set pack_order_index based on templates array order. Map filenames to uploaded storage URLs.
+
+5. Ensure templates display pack membership everywhere: prompt cards show a small “In Pack: [Pack Name]” label and allow click to view the pack.
+
+---
+
+If you want my opinion on the cleanest UX: keep the Prompts page exactly like you described (packs row above templates), and on each template card only show the pack label on hover or as a small pill, so it feels premium and not cluttered.

@@ -1,9 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import {
+  ChevronLeft, Save, Trash2, Maximize2, Image as ImageIcon,
+  Sparkles, CheckCircle, AlertCircle, Clock, LayoutGrid,
+  Type, Globe, Tag, Layers, ArrowUpRight
+} from "lucide-react";
 
 type PromptRow = {
   id: string;
@@ -26,66 +32,84 @@ type PromptRow = {
   submitted_at: string | null;
   approved_by: string | null;
   published_at: string | null;
-
   remix_placeholder: string | null;
+  template_pack_id: string | null;
+  pack_order_index: number | null;
 };
 
+type PackSimple = { id: string; pack_name: string; };
 type ProfileRow = { role: string };
 
 function roleRank(role: string) {
   const r = String(role || "user").toLowerCase();
   const order = ["user", "staff", "instructor", "editor", "admin", "super_admin"];
-  const idx = order.indexOf(r);
-  return idx === -1 ? 0 : idx;
+  return Math.max(0, order.indexOf(r));
 }
 
 function slugify(input: string) {
-  return String(input || "")
-    .trim()
-    .toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
+  return String(input || "").trim().toLowerCase()
+    .replace(/['"]/g, "").replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "").slice(0, 80);
 }
 
-function safeExtFromName(name: string) {
-  const parts = name.split(".");
-  const ext = parts.length > 1 ? parts.pop()!.toLowerCase() : "png";
-  if (!["png", "jpg", "jpeg", "webp"].includes(ext)) return "png";
-  return ext;
-}
+const DEFAULT_REMIX_PLACEHOLDER = "Try: upload a product photo, swap the headline, match brand colors...";
 
-const DEFAULT_REMIX_PLACEHOLDER =
-  "Try: upload a product photo, swap the headline, match brand colors, change background, add a logo, make it 9:16 for Reels, and add a CTA.";
+// --- UI COMPONENTS ---
+const Label = ({ children, icon: Icon }: { children: React.ReactNode; icon?: any }) => (
+  <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/40">
+    {Icon && <Icon size={10} />}
+    {children}
+  </div>
+);
+
+const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-sm transition-all hover:bg-white/[0.04] ${className}`}>
+    {children}
+  </div>
+);
+
+const Input = (props: any) => (
+  <input
+    {...props}
+    className={`w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:border-[#B7FF00]/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-[#B7FF00]/50 transition-all ${props.className}`}
+  />
+);
+
+const TextArea = (props: any) => (
+  <textarea
+    {...props}
+    className={`w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:border-[#B7FF00]/50 focus:bg-black/40 focus:outline-none focus:ring-1 focus:ring-[#B7FF00]/50 transition-all ${props.className}`}
+  />
+);
+
+const Toggle = ({ label, value, setValue, disabled }: any) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={() => setValue(!value)}
+    className={`group flex items-center justify-between w-full rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5 transition-all hover:bg-white/[0.05] disabled:opacity-50 ${value ? 'border-[#B7FF00]/30 bg-[#B7FF00]/5' : ''}`}
+  >
+    <span className={`text-xs font-medium ${value ? 'text-[#B7FF00]' : 'text-white/60 group-hover:text-white'}`}>{label}</span>
+    <div className={`relative h-4 w-7 rounded-full transition-colors ${value ? 'bg-[#B7FF00]' : 'bg-white/10'}`}>
+      <div className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-black shadow transition-transform ${value ? 'translate-x-3' : 'translate-x-0'}`} />
+    </div>
+  </button>
+);
 
 export default function CmsPromptEditorPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-
   const id = String(params?.id || "");
 
   const [loading, setLoading] = useState(true);
-  const [me, setMe] = useState<any>(null);
-  const [role, setRole] = useState<string>("user");
-
-  const isEditorPlus = useMemo(() => roleRank(role) >= roleRank("editor"), [role]);
-
+  const [role, setRole] = useState("user");
   const [row, setRow] = useState<PromptRow | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (successMsg) {
-      const t = setTimeout(() => setSuccessMsg(null), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [successMsg]);
-
-  // form state
+  // Form State
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [summary, setSummary] = useState("");
@@ -97,667 +121,420 @@ export default function CmsPromptEditorPage() {
   const [featuredImageUrl, setFeaturedImageUrl] = useState("");
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [mediaUrl, setMediaUrl] = useState("");
-
   const [isTrending, setIsTrending] = useState(false);
   const [isEditorsChoice, setIsEditorsChoice] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
+  const [remixPlaceholder, setRemixPlaceholder] = useState("");
 
-  // NEW: remix placeholder/inspiration
-  const [remixPlaceholder, setRemixPlaceholder] = useState<string>("");
+  // Pack
+  const [packInfo, setPackInfo] = useState<{ id: string | null; name: string; index: number | null }>({ id: null, name: "", index: null });
+  const [packs, setPacks] = useState<PackSimple[]>([]);
 
-  // upload state
-  const fileRef = useRef<HTMLInputElement | null>(null);
+  // Upload
+  const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const isEditorPlus = roleRank(role) >= roleRank("editor");
+  const canEdit = status !== "published" || isEditorPlus;
 
   useEffect(() => {
-    let cancelled = false;
+    if (successMsg) {
+      const t = setTimeout(() => setSuccessMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [successMsg]);
 
+  useEffect(() => {
     async function boot() {
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.push("/login");
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+      setRole((profile as ProfileRow)?.role || "user");
 
-      if (cancelled) return;
-      setMe(user);
+      const { data: allPacks } = await supabase.from("template_packs").select("id, pack_name").order("pack_name");
+      if (allPacks) setPacks(allPacks);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-      setRole(String((profile as ProfileRow | null)?.role || "user"));
-
-      const { data: promptRow, error } = await supabase
-        .from("prompts")
-        .select(
-          "id, title, slug, summary, prompt_text, prompt, access_level, status, category, tags, featured_image_url, media_type, media_url, is_trending, is_editors_choice, is_featured, author_id, submitted_at, approved_by, published_at, remix_placeholder"
-        )
-        .eq("id", id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (error || !promptRow) {
-        setError(error?.message || "Prompt not found");
+      const { data: r, error } = await supabase.from("prompts").select("*").eq("id", id).maybeSingle();
+      if (error || !r) {
+        setError(error?.message || "Not found");
         setLoading(false);
         return;
       }
 
-      const r = promptRow as PromptRow;
       setRow(r);
-
+      // Init Form
       setTitle(r.title || "");
       setSlug(r.slug || "");
       setSummary(r.summary || "");
-      setPromptText((r.prompt && r.prompt.trim().length ? r.prompt : r.prompt_text) || "");
-      setAccessLevel((String(r.access_level || "free").toLowerCase() as any) || "free");
-      setStatus((String(r.status || "draft").toLowerCase() as any) || "draft");
+      setPromptText(r.prompt || r.prompt_text || "");
+      setAccessLevel(r.access_level || "free");
+      setStatus(r.status || "draft");
       setCategory(r.category || "");
       setTags((r.tags || []).join(", "));
       setFeaturedImageUrl(r.featured_image_url || "");
-      setMediaType((String(r.media_type || "image").toLowerCase() as any) || "image");
+      setMediaType(r.media_type || "image");
       setMediaUrl(r.media_url || "");
+      setIsTrending(r.is_trending);
+      setIsEditorsChoice(r.is_editors_choice);
+      setIsFeatured(r.is_featured);
+      setRemixPlaceholder(r.remix_placeholder || "");
 
-      setIsTrending(Boolean(r.is_trending));
-      setIsEditorsChoice(Boolean(r.is_editors_choice));
-      setIsFeatured(Boolean(r.is_featured));
-
-      setRemixPlaceholder(String(r.remix_placeholder || ""));
-
+      if (r.template_pack_id) {
+        setPackInfo({
+          id: r.template_pack_id,
+          name: allPacks?.find((p: any) => p.id === r.template_pack_id)?.pack_name || "",
+          index: r.pack_order_index
+        });
+      }
       setLoading(false);
     }
-
     boot();
-    return () => {
-      cancelled = true;
-    };
-  }, [id, router, supabase]);
+  }, [id]);
 
-  function validateForSubmit() {
-    if (!title.trim()) return "Title is required.";
-    if (!slug.trim()) return "Slug is required.";
-    if (!promptText.trim()) return "Prompt text is required.";
-    return null;
-  }
-
-  async function saveDraft(nextStatus?: "draft" | "submitted" | "published") {
+  async function handleSave(nextStatus?: string) {
     if (!row?.id) return;
-
     const nextSlug = slug.trim() ? slug.trim() : slugify(title);
-    const tagList = tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .slice(0, 50);
-
     setSaving(true);
-    setError(null);
 
     try {
       const payload: any = {
         title: title.trim(),
         slug: nextSlug,
-        summary: summary.trim() || null,
-        prompt_text: promptText.trim(),
-        prompt: promptText.trim(),
+        summary: summary.trim(),
+        prompt_text: promptText,
+        prompt: promptText,
         access_level: accessLevel,
         status: nextStatus || status,
-        category: category.trim() || null,
-        tags: tagList.length ? tagList : null,
-        featured_image_url: featuredImageUrl.trim() || null,
+        category: category.trim(),
+        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+        featured_image_url: featuredImageUrl,
         media_type: mediaType,
-        media_url: mediaUrl.trim() || null,
+        media_url: mediaUrl,
         is_trending: isTrending,
         is_editors_choice: isEditorsChoice,
         is_featured: isFeatured,
-        remix_placeholder: remixPlaceholder.trim() || null,
+        remix_placeholder: remixPlaceholder,
+        template_pack_id: packInfo.id
       };
 
-      if ((nextStatus || status) === "submitted") payload.submitted_at = new Date().toISOString();
-      if ((nextStatus || status) === "published") payload.published_at = new Date().toISOString();
+      if (nextStatus === "submitted") payload.submitted_at = new Date().toISOString();
+      if (nextStatus === "published") {
+        payload.published_at = new Date().toISOString();
+        if (isEditorPlus) payload.approved_by = (await supabase.auth.getUser()).data.user?.id;
+      }
 
       const { error } = await supabase.from("prompts").update(payload).eq("id", row.id);
-
       if (error) throw error;
 
       setStatus((nextStatus || status) as any);
       setSlug(nextSlug);
-
-      setSuccessMsg(
-        nextStatus === "submitted"
-          ? "Prompt submitted for review!"
-          : nextStatus === "published"
-            ? "Prompt published!"
-            : "Draft saved!"
-      );
+      setSuccessMsg(nextStatus === "published" ? "Published Successfully!" : "Saved Successfully!");
       router.refresh();
     } catch (e: any) {
-      setError(e?.message || "Failed to save");
+      setError(e.message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function submitForReview() {
-    const v = validateForSubmit();
-    if (v) {
-      setError(v);
-      return;
-    }
-    await saveDraft("submitted");
-  }
-
-  async function approveAndPublish() {
-    if (!isEditorPlus) return;
-
-    const v = validateForSubmit();
-    if (v) {
-      setError(v);
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const nextSlug = slug.trim() ? slug.trim() : slugify(title);
-
-      const tagList = tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .slice(0, 50);
-
-      const payload: any = {
-        title: title.trim(),
-        slug: nextSlug,
-        summary: summary.trim() || null,
-        prompt_text: promptText.trim(),
-        prompt: promptText.trim(),
-        access_level: accessLevel,
-        status: "published",
-        category: category.trim() || null,
-        tags: tagList.length ? tagList : null,
-        featured_image_url: featuredImageUrl.trim() || null,
-        media_type: mediaType,
-        media_url: mediaUrl.trim() || null,
-        is_trending: isTrending,
-        is_editors_choice: isEditorsChoice,
-        is_featured: isFeatured,
-        remix_placeholder: remixPlaceholder.trim() || null,
-        approved_by: me?.id || null,
-        published_at: new Date().toISOString(),
-      };
-
-      const { error } = await supabase.from("prompts").update(payload).eq("id", row!.id);
-      if (error) throw error;
-
-      setStatus("published");
-      setSlug(nextSlug);
-      setSuccessMsg("Approved and published!");
-      router.refresh();
-    } catch (e: any) {
-      setError(e?.message || "Failed to publish");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function sendBackToDraft() {
-    if (!isEditorPlus) return;
-    await saveDraft("draft");
-  }
-
-  async function handlePickFile() {
-    setUploadError(null);
-    fileRef.current?.click();
-  }
-
-  async function deleteDraft() {
-    if (!row?.id || status !== "draft") return;
-    if (!confirm("Are you sure you want to delete this draft? This cannot be undone.")) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase.from("prompts").delete().eq("id", row.id);
-      if (error) throw error;
-      router.push("/dashboard/cms");
-    } catch (e: any) {
-      setError(e?.message || "Failed to delete");
-      setSaving(false);
-    }
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !me?.id || !row?.id) return;
-
+    if (!file) return;
     setUploading(true);
-    setUploadError(null);
-
     try {
-      const ext = safeExtFromName(file.name);
-      const path = `featured/${row.id}-${Date.now()}.${ext}`;
-
-      const { error: upErr } = await supabase.storage
-        .from("prompt-images")
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: true,
-          contentType: file.type || undefined,
-        });
-
-      if (upErr) throw upErr;
-
-      const { data } = supabase.storage.from("prompt-images").getPublicUrl(path);
-      const publicUrl = data?.publicUrl;
-
-      if (!publicUrl) throw new Error("Upload succeeded but no public URL returned.");
-
+      const path = `featured/${row!.id}-${Date.now()}.${file.name.split(".").pop()}`;
+      await supabase.storage.from("prompt-images").upload(path, file, { upsert: true });
+      const { data: { publicUrl } } = supabase.storage.from("prompt-images").getPublicUrl(path);
       setFeaturedImageUrl(publicUrl);
-
-      const { error: dbErr } = await supabase
-        .from("prompts")
-        .update({ featured_image_url: publicUrl })
-        .eq("id", row.id);
-
-      if (dbErr) throw dbErr;
-      setSuccessMsg("Featured image uploaded!");
-    } catch (err: any) {
-      setUploadError(err?.message || "Upload failed");
+      setSuccessMsg("Image uploaded");
+    } catch (e) {
+      alert("Upload failed");
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center text-white">
-        Loading editor…
-      </div>
-    );
-  }
-
-  if (error || !row) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-10 text-white">
-        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-6">
-          <div className="text-lg font-semibold text-red-200">Editor error</div>
-          <div className="mt-2 text-sm text-red-200/80">{error || "Unknown error"}</div>
-
-          <button
-            className="mt-5 rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
-            onClick={() => router.push("/dashboard/cms")}
-          >
-            Back to CMS
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const canSubmit = status === "draft";
-  const canEdit = status !== "published" || isEditorPlus;
+  if (loading) return <div className="flex h-screen items-center justify-center text-white/50">Loading Studio...</div>;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 md:py-10 text-white">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Prompt Editor</h1>
-          <p className="mt-1 text-sm text-white/70">
-            Status: <span className="text-white">{status.toUpperCase()}</span>
-          </p>
-        </div>
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-[#B7FF00]/30 selection:text-[#B7FF00]">
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {/* Delete Draft Button */}
-          {status === "draft" && (
+      {/* --- HEADER --- */}
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/cms/prompts" className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white">
+              <ChevronLeft size={16} />
+            </Link>
+            <div className="h-6 w-[1px] bg-white/10" />
+            <div>
+              <h1 className="text-sm font-bold tracking-wide text-white">Prompt Editor</h1>
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-white/40">
+                <span className={status === 'published' ? 'text-[#B7FF00]' : 'text-white/40'}>{status}</span>
+                <span>•</span>
+                <span className="font-mono">{row?.id.slice(0, 8)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {status === 'draft' && (
+              <button
+                onClick={() => { if (confirm("Delete draft?")) { supabase.from("prompts").delete().eq("id", id).then(() => router.push("/dashboard/cms")) } }}
+                className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+
             <button
               disabled={saving}
-              onClick={deleteDraft}
-              className="rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-2 text-sm text-red-300 hover:bg-red-950/40"
+              onClick={() => handleSave()}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-bold text-white hover:bg-white/10 disabled:opacity-50"
             >
-              Delete
+              <Save size={12} />
+              Save Draft
             </button>
-          )}
 
-          <button
-            onClick={() => router.push("/dashboard/cms")}
-            className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
-          >
-            Back to CMS
-          </button>
-
-          <button
-            disabled={!canEdit || saving}
-            onClick={() => saveDraft("draft")}
-            className={[
-              "rounded-xl border px-4 py-2 text-sm",
-              !canEdit || saving
-                ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                : "border-white/15 bg-black/30 hover:bg-black/50",
-            ].join(" ")}
-          >
-            {saving ? "Saving…" : "Save Draft"}
-          </button>
-
-          <button
-            disabled={!canEdit || !canSubmit || saving}
-            onClick={submitForReview}
-            className={[
-              "rounded-xl px-4 py-2 text-sm font-semibold",
-              !canEdit || !canSubmit || saving
-                ? "cursor-not-allowed bg-white/10 text-white/40"
-                : "bg-lime-400 text-black hover:bg-lime-300",
-            ].join(" ")}
-          >
-            Submit for Review
-          </button>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="mb-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
-          {error}
-        </div>
-      ) : null}
-
-      {successMsg ? (
-        <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-lime-400/30 bg-lime-400/10 p-4 text-sm font-semibold text-lime-300">
-          {successMsg}
-        </div>
-      ) : null}
-
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
-        <div className="grid grid-cols-1 gap-4">
-          {/* Featured image upload */}
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold">Featured Image</div>
-                <p className="mt-1 text-xs text-white/60">
-                  Upload a thumbnail so staff can create prompts without burning credits.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
-                <button
-                  type="button"
-                  onClick={handlePickFile}
-                  disabled={!canEdit || uploading}
-                  className={[
-                    "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm",
-                    !canEdit || uploading
-                      ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                      : "border-white/15 bg-black/30 hover:bg-black/50",
-                  ].join(" ")}
-                >
-                  {uploading ? "Uploading…" : "Upload Image"}
-                </button>
-              </div>
-            </div>
-
-            {uploadError ? (
-              <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">
-                {uploadError}
-              </div>
-            ) : null}
-
-            {featuredImageUrl ? (
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[180px_1fr] sm:items-start">
-                <div className="relative aspect-square w-full max-w-[180px] overflow-hidden rounded-xl border border-white/10 bg-black">
-                  <Image src={featuredImageUrl} alt="Featured image" fill className="object-cover" />
-                </div>
-                <div className="text-xs text-white/60 break-all">
-                  <div className="text-white/80 font-semibold">URL</div>
-                  <div className="mt-1">{featuredImageUrl}</div>
-                </div>
-              </div>
+            {isEditorPlus ? (
+              <button
+                disabled={saving}
+                onClick={() => handleSave("published")}
+                className="flex items-center gap-2 rounded-lg bg-[#B7FF00] px-4 py-1.5 text-xs font-bold text-black shadow-[0_0_20px_-5px_#B7FF00] hover:bg-[#a3e600] disabled:opacity-50"
+              >
+                <Sparkles size={12} />
+                Publish
+              </button>
             ) : (
-              <div className="mt-3 text-xs text-white/50">No featured image uploaded yet.</div>
+              <button
+                onClick={() => handleSave("submitted")}
+                disabled={status !== 'draft' || saving}
+                className="flex items-center gap-2 rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-black hover:bg-white/90 disabled:opacity-50"
+              >
+                Submit for Review
+              </button>
             )}
           </div>
+        </div>
+      </header>
 
-          {/* NEW: Remix inspiration / placeholder */}
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">Remix Inspiration (placeholder)</div>
-                <p className="mt-1 text-xs text-white/60">
-                  This shows inside the Remix box to guide users on how to best use this prompt.
-                </p>
-              </div>
+      {/* --- MAIN CONTENT --- */}
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-8 lg:grid-cols-12">
 
-              <button
-                type="button"
-                disabled={!canEdit}
-                onClick={() => setRemixPlaceholder(DEFAULT_REMIX_PLACEHOLDER)}
-                className={[
-                  "rounded-xl border px-3 py-2 text-xs",
-                  !canEdit
-                    ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-                    : "border-white/15 bg-black/30 text-white/80 hover:bg-black/50",
-                ].join(" ")}
-              >
-                Use sample
-              </button>
-            </div>
+        {/* LEFT COLUMN (Content) - 8 Cols */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
 
-            <textarea
-              value={remixPlaceholder}
-              onChange={(e) => setRemixPlaceholder(e.target.value)}
-              disabled={!canEdit}
-              rows={3}
-              placeholder={DEFAULT_REMIX_PLACEHOLDER}
-              className="mt-3 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/20"
-            />
-
-            <div className="mt-2 rounded-xl border border-white/10 bg-black/40 p-3 text-xs text-white/60">
-              Tip examples you can paste:
-              <div className="mt-2 grid gap-1 text-white/55">
-                <div>• Upload your product image, keep the style, change only the background.</div>
-                <div>• Swap headline copy, keep layout, match brand colors, add CTA button.</div>
-                <div>• Make it 9:16 for Reels, higher contrast, and add urgency.</div>
-              </div>
-            </div>
-          </div>
-
-          <label className="text-sm">
-            <div className="mb-1 text-white/70">Title</div>
+          {/* Title & Slug */}
+          <div className="flex flex-col gap-4">
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={!canEdit}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
+              placeholder="Untitled Prompt"
+              className="w-full bg-transparent text-4xl font-bold text-white placeholder:text-white/10 focus:outline-none"
             />
-          </label>
-
-          <label className="text-sm">
-            <div className="mb-1 flex items-center justify-between gap-2 text-white/70">
-              <span>Slug</span>
-              <button
-                type="button"
-                onClick={() => setSlug(slugify(title))}
-                disabled={!canEdit}
-                className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-xs text-white/70 hover:bg-black/40"
-              >
-                Auto-generate
-              </button>
-            </div>
-            <input
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              disabled={!canEdit}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-            />
-          </label>
-
-          <label className="text-sm">
-            <div className="mb-1 text-white/70">Summary</div>
-            <textarea
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              disabled={!canEdit}
-              rows={3}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-            />
-          </label>
-
-          <label className="text-sm">
-            <div className="mb-1 text-white/70">Prompt Text</div>
-            <textarea
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              disabled={!canEdit}
-              rows={10}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-            />
-          </label>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="text-sm">
-              <div className="mb-1 text-white/70">Access Level</div>
-              <select
-                value={accessLevel}
-                onChange={(e) => setAccessLevel(e.target.value as any)}
-                disabled={!canEdit}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-              >
-                <option value="free">free</option>
-                <option value="premium">premium</option>
-              </select>
-            </label>
-
-            <label className="text-sm">
-              <div className="mb-1 text-white/70">Category</div>
+            <div className="flex items-center gap-2 text-sm text-white/40">
+              <Globe size={14} />
+              <span>/prompts/</span>
               <input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={!canEdit}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="slug-goes-here"
+                className="bg-transparent font-mono text-white/60 focus:outline-none focus:text-white"
               />
-            </label>
+            </div>
           </div>
 
-          <label className="text-sm">
-            <div className="mb-1 text-white/70">Tags (comma separated)</div>
-            <input
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              disabled={!canEdit}
-              className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-            />
-          </label>
+          {/* Featured Image - Wide & Cinematic */}
+          <Card className="relative aspect-video w-full group">
+            {featuredImageUrl ? (
+              <Image src={featuredImageUrl} alt="Featured" fill className="object-cover transition-opacity duration-500 group-hover:opacity-75" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-white/20">
+                <ImageIcon size={48} />
+                <span className="text-xs uppercase tracking-widest font-semibold">No Cover Image</span>
+              </div>
+            )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="text-sm">
-              <div className="mb-1 text-white/70">Media Type</div>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/60 backdrop-blur-sm">
+              <button onClick={() => fileRef.current?.click()} className="rounded-full bg-white px-5 py-2 text-xs font-bold text-black hover:scale-105 transition-transform">
+                {uploading ? 'Uploading...' : 'Change Cover'}
+              </button>
+            </div>
+            <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*" />
+          </Card>
+
+          {/* Summary */}
+          <div>
+            <Label icon={LayoutGrid}>Description / Summary</Label>
+            <TextArea
+              value={summary}
+              onChange={(e: any) => setSummary(e.target.value)}
+              rows={3}
+              placeholder="Short description for SEO and preview cards..."
+            />
+          </div>
+
+          {/* Prompt Editor */}
+          <div className="flex-1">
+            <Label icon={Type}>Prompt Template</Label>
+            <div className="relative rounded-2xl border border-white/10 bg-black/40">
+              <div className="absolute top-0 left-0 right-0 h-10 border-b border-white/5 bg-white/5 flex items-center px-4 gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/20" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500/20" />
+                </div>
+                <span className="mx-auto text-[10px] font-mono text-white/30 uppercase tracking-widest">CODE EDITOR</span>
+              </div>
+              <textarea
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                className="w-full min-h-[400px] bg-transparent p-6 pt-14 font-mono text-sm leading-relaxed text-white/80 focus:outline-none resize-y placeholder:text-white/10"
+                placeholder="Paste your prompt template here..."
+              />
+            </div>
+          </div>
+
+          {/* Remix Tips */}
+          <Card className="p-5 border-[#B7FF00]/20 bg-[#B7FF00]/[0.02]">
+            <div className="flex items-center justify-between mb-3">
+              <Label icon={Sparkles}>Remix Guidelines</Label>
+              <button onClick={() => setRemixPlaceholder(DEFAULT_REMIX_PLACEHOLDER)} className="test-xs text-[#B7FF00] hover:underline text-[10px] uppercase font-bold tracking-wider">Use Template</button>
+            </div>
+            <TextArea
+              value={remixPlaceholder}
+              onChange={(e: any) => setRemixPlaceholder(e.target.value)}
+              rows={4}
+              className="bg-black/40 border-white/5"
+              placeholder="Tips for users on how to use this prompt..."
+            />
+          </Card>
+
+        </div>
+
+        {/* RIGHT COLUMN (Metadata) - 4 Cols */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+
+          {/* Status Card */}
+          <Card className="p-5">
+            <Label icon={CheckCircle}>Publishing</Label>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-white/50">Status</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${status === 'published' ? 'bg-[#B7FF00] text-black' : 'bg-white/10 text-white'}`}>
+                  {status}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-xs text-white/50">Access</span>
+                <select
+                  value={accessLevel}
+                  onChange={(e: any) => setAccessLevel(e.target.value)}
+                  className="bg-transparent text-xs font-medium text-right focus:outline-none"
+                >
+                  <option value="free">Free</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Pack Assignment */}
+          <Card className="p-5">
+            <Label icon={Layers}>Pack Assignment</Label>
+            <div className="mt-3">
+              <div className="relative">
+                <select
+                  value={packInfo.id || ""}
+                  onChange={(e) => {
+                    const pid = e.target.value || null;
+                    const pName = packs.find(p => p.id === pid)?.pack_name || "";
+                    setPackInfo({ ...packInfo, id: pid, name: pName });
+                  }}
+                  className="w-full appearance-none rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white focus:border-[#B7FF00] focus:outline-none"
+                  disabled={!canEdit}
+                >
+                  <option value="">No Pack (Standalone)</option>
+                  {packs.map(p => <option key={p.id} value={p.id}>{p.pack_name}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/30">
+                  <Layers size={14} />
+                </div>
+              </div>
+              {packInfo.id && (
+                <div className="mt-2 text-center">
+                  <Link href={`/dashboard/cms/packs/${packInfo.id}`} className="text-[10px] text-[#B7FF00] hover:underline flex items-center justify-center gap-1">
+                    View Pack <ArrowUpRight size={10} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Categorization */}
+          <Card className="p-5">
+            <Label icon={Tag}>Categorization</Label>
+            <div className="flex flex-col gap-4 mt-2">
+              <div>
+                <span className="mb-1.5 block text-xs text-white/50">Category</span>
+                <Input value={category} onChange={(e: any) => setCategory(e.target.value)} placeholder="e.g. Photography" />
+              </div>
+              <div>
+                <span className="mb-1.5 block text-xs text-white/50">Tags</span>
+                <Input value={tags} onChange={(e: any) => setTags(e.target.value)} placeholder="neon, portrait, 8k" />
+              </div>
+            </div>
+          </Card>
+
+          {/* Media Settings */}
+          <Card className="p-5">
+            <Label icon={maximize2IconHelper(Maximize2)}>Media Settings</Label>
+            <div className="flex flex-col gap-4 mt-2">
               <select
                 value={mediaType}
-                onChange={(e) => setMediaType(e.target.value as any)}
-                disabled={!canEdit}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
+                onChange={(e: any) => setMediaType(e.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:outline-none"
               >
-                <option value="image">image</option>
-                <option value="video">video</option>
+                <option value="image">Image</option>
+                <option value="video">Video</option>
               </select>
-            </label>
+              <Input value={mediaUrl} onChange={(e: any) => setMediaUrl(e.target.value)} placeholder="External Media URL (optional)" />
+            </div>
+          </Card>
 
-            <label className="text-sm">
-              <div className="mb-1 text-white/70">Media URL (optional)</div>
-              <input
-                value={mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
-                disabled={!canEdit}
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-white/20"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
+          {/* Visibility Toggles */}
+          <div className="flex flex-col gap-2">
             <Toggle label="Trending" value={isTrending} setValue={setIsTrending} disabled={!canEdit} />
-            <Toggle label="Editor’s Choice" value={isEditorsChoice} setValue={setIsEditorsChoice} disabled={!canEdit} />
+            <Toggle label="Editor's Choice" value={isEditorsChoice} setValue={setIsEditorsChoice} disabled={!canEdit} />
             <Toggle label="Featured" value={isFeatured} setValue={setIsFeatured} disabled={!canEdit} />
           </div>
-        </div>
-      </div>
 
-      {isEditorPlus ? (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Editor Actions</h2>
-              <p className="mt-1 text-sm text-white/70">Approve and publish submitted prompts.</p>
+          {/* Feedback Toast */}
+          {error && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4">
+              <div className="flex gap-2 text-red-400">
+                <AlertCircle size={16} />
+                <span className="text-xs font-bold">Error Saving</span>
+              </div>
+              <p className="mt-1 text-xs text-red-500/80">{error}</p>
             </div>
+          )}
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                onClick={sendBackToDraft}
-                disabled={saving}
-                className="rounded-xl border border-white/15 bg-black/30 px-4 py-2 text-sm hover:bg-black/50"
-              >
-                Send Back to Draft
-              </button>
-
-              <button
-                onClick={approveAndPublish}
-                disabled={saving}
-                className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
-              >
-                Approve + Publish
-              </button>
+          {successMsg && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-[#B7FF00]/20 bg-[#B7FF00]/10 p-4">
+              <div className="flex gap-2 text-[#B7FF00]">
+                <CheckCircle size={16} />
+                <span className="text-xs font-bold">{successMsg}</span>
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
-      ) : null}
+
+      </main>
     </div>
   );
 }
 
-function Toggle({
-  label,
-  value,
-  setValue,
-  disabled,
-}: {
-  label: string;
-  value: boolean;
-  setValue: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => setValue(!value)}
-      className={[
-        "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition",
-        disabled
-          ? "cursor-not-allowed border-white/10 bg-black/20 text-white/30"
-          : value
-            ? "border-lime-400/40 bg-lime-400/10 text-white"
-            : "border-white/10 bg-black/30 text-white/75 hover:border-white/20 hover:text-white",
-      ].join(" ")}
-      aria-pressed={value ? "true" : "false"}
-    >
-      <span className={["h-2.5 w-2.5 rounded-full", value ? "bg-lime-400" : "bg-white/30"].join(" ")} />
-      {label}
-    </button>
-  );
-}
+function maximize2IconHelper(Icon: any) { return Icon } // Wrapper to satisfy type check if needed or just pass Icon

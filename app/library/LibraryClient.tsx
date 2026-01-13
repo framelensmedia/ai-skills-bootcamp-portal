@@ -608,15 +608,15 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 </div>
             </div>
 
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs font-mono text-white/40 uppercase">{displayedItems.length} ITEMS</div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {isSelectionMode && selectedIds.size > 0 && (
                         <>
-                            <button onClick={() => setIsMoveModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-zinc-800 text-white hover:bg-zinc-700">
+                            <button onClick={() => setIsMoveModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-zinc-800 text-white hover:bg-zinc-700 whitespace-nowrap">
                                 <FolderInput size={14} /> Move
                             </button>
-                            <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                            <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20 whitespace-nowrap">
                                 <Trash2 size={14} /> Delete
                             </button>
                         </>
@@ -624,14 +624,17 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
 
                     <button
                         onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
                     >
-                        {/* Guard against potentially rendering issues with lucide icons if incorrect version, but standard imported */}
                         {isSelectionMode ? <CheckSquare size={14} /> : <Square size={14} />}
                         Select
                     </button>
-                    <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg border ${viewMode === "grid" ? "border-white/20 bg-white/10" : "border-white/10 bg-zinc-900 text-white/50"}`}><Grid3X3 size={16} /></button>
-                    <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg border ${viewMode === "list" ? "border-white/20 bg-white/10" : "border-white/10 bg-zinc-900 text-white/50"}`}><List size={16} /></button>
+
+                    <div className="flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden shrink-0">
+                        <button onClick={() => setViewMode("grid")} className={`p-2 hover:bg-white/5 ${viewMode === "grid" ? "bg-white/10 text-white" : "text-white/50"}`}><Grid3X3 size={16} /></button>
+                        <div className="w-px bg-white/10" />
+                        <button onClick={() => setViewMode("list")} className={`p-2 hover:bg-white/5 ${viewMode === "list" ? "bg-white/10 text-white" : "text-white/50"}`}><List size={16} /></button>
+                    </div>
                 </div>
             </div>
 
