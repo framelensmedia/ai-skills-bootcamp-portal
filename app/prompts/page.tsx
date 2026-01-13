@@ -2,7 +2,7 @@ import PromptCard from "@/components/PromptCard";
 import PromptsToolbar from "@/components/PromptsToolbar";
 import PackCarousel from "@/components/PackCarousel";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { Wand2, Layers } from "lucide-react";
+import { Wand2, Layers, Palette } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -149,9 +149,17 @@ export default async function PromptsPage({
 
       {/* Individual Templates */}
       <div className="mt-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Wand2 className="h-5 w-5 text-[#B7FF00]" />
-          <h2 className="text-2xl font-bold">Individual Templates</h2>
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#B7FF00]/5 border border-[#B7FF00]/20 text-[#B7FF00]">
+            <Palette size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Individual Templates</h2>
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm transition hover:bg-white/5 cursor-default">
+              <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
+              <span className="text-xs font-medium text-white">Pick a prompt and remix it</span>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
