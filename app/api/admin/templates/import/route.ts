@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { NextResponse } from "next/server";
 
+export const runtime = "nodejs"; // Ensure Node.js runtime for file handling
+
 export async function POST(req: Request) {
     const supabase = await createSupabaseServerClient();
 
@@ -25,6 +27,7 @@ export async function POST(req: Request) {
     try {
         const formData = await req.formData();
         const jsonString = formData.get("json") as string;
+        const filenameId = formData.get("filename_id") as string;
 
         if (!jsonString) {
             return NextResponse.json(
@@ -33,9 +36,12 @@ export async function POST(req: Request) {
             );
         }
 
+        // Strip comments before parsing
+        const cleanJson = jsonString.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g1) => g1 ? "" : m);
+
         let templateData: any;
         try {
-            templateData = JSON.parse(jsonString);
+            templateData = JSON.parse(cleanJson);
         } catch (e) {
             return NextResponse.json(
                 { error: "Invalid JSON format" },
@@ -82,10 +88,10 @@ export async function POST(req: Request) {
             }
 
             // Build pack insert matching ACTUAL database schema
-            let basePackId = pack.pack_id || pack.slug;
+            let basePackId = filenameId || pack.pack_id || pack.slug;
             const packInsert: any = {
                 pack_id: basePackId,
-                pack_name: pack.pack_name || pack.title,
+                pack_name: pack.pack_name || pack.title || pack.name || pack.pack_title,
                 pack_description: pack.pack_description || pack.summary,
                 category: pack.category,
                 tags: Array.isArray(pack.tags) ? pack.tags : [],
@@ -115,11 +121,29 @@ export async function POST(req: Request) {
 
             // Handle pack thumbnail upload
             const uploadedFiles = formData.getAll("files") as File[];
-            const packThumbFilename = pack.thumbnail_filename || pack.thumbnail || "pack_thumb.png";
-            const packThumbFile = uploadedFiles.find(f => {
+
+            // Build File Map with Flexible Extension Support
+            const fileMap = new Map<string, File>();
+            uploadedFiles.forEach(f => {
                 const basename = f.name.split('/').pop() || f.name;
-                return basename === packThumbFilename;
+                fileMap.set(basename, f);
+
+                const baseNoExt = basename.replace(/\.[^/.]+$/, "");
+                if (baseNoExt && !fileMap.has(baseNoExt)) {
+                    fileMap.set(baseNoExt, f);
+                }
             });
+
+            // Helper to get file ignoring extension
+            const getFile = (name: string) => {
+                if (!name) return undefined;
+                if (fileMap.has(name)) return fileMap.get(name);
+                const base = name.replace(/\.[^/.]+$/, "");
+                return fileMap.get(base);
+            }
+
+            const packThumbFilename = pack.thumbnail_filename || pack.thumbnail || "pack_thumb.png";
+            const packThumbFile = getFile(packThumbFilename);
 
             if (packThumbFile) {
                 try {
@@ -161,15 +185,7 @@ export async function POST(req: Request) {
 
             packId = newPackRecord.id;
 
-            // File map already has uploadedFiles from pack thumbnail handling above
-            const fileMap = new Map<string, File>();
-
-            // Map files by basename only (strip folder paths if present)
-            uploadedFiles.forEach(f => {
-                const basename = f.name.split('/').pop() || f.name;
-                fileMap.set(basename, f);
-                console.log(`Uploaded file: "${f.name}" -> mapped as: "${basename}"`);
-            });
+            // File map already created above
 
             console.log(`Total files uploaded: ${uploadedFiles.length}`);
             console.log(`File map keys:`, Array.from(fileMap.keys()));
@@ -177,9 +193,9 @@ export async function POST(req: Request) {
             let sortIndex = 0;
             for (const tpl of templates) {
                 try {
-                    const imageFilename = tpl.featured_image || tpl.featured_image_file;
-                    const templateTitle = tpl.template_name || tpl.title;
-                    let templateSlug = tpl.template_id || tpl.slug;
+                    const imageFilename = tpl.featured_image || tpl.featured_image_file || tpl.featured_image_filename;
+                    const templateTitle = tpl.template_name || tpl.title || tpl.name;
+                    let templateSlug = tpl.template_id || tpl.slug || tpl.id;
                     const templateDesc = tpl.template_description || tpl.summary;
 
                     // Check if slug already exists
@@ -196,7 +212,7 @@ export async function POST(req: Request) {
                         console.log(`Template slug ${originalSlug} exists. Creating as: ${templateSlug}`);
                     }
 
-                    const file = fileMap.get(imageFilename);
+                    const file = getFile(imageFilename);
 
                     let storagePath = null;
                     let publicUrl = null;
@@ -231,7 +247,12 @@ export async function POST(req: Request) {
                             required_elements: tpl.required_elements || [],
                             aspect_ratios: tpl.aspect_ratios || [],
                             style_mode: tpl.style_mode,
-                            edit_mode: tpl.edit_mode
+                            edit_mode: tpl.edit_mode,
+                            // Remix Overhaul Fields
+                            template_config_json: tpl.template_config_json || tpl.template_config || {},
+                            public_prompt: tpl.public_prompt || "",
+                            system_rules: tpl.system_rules || tpl.internal_rules || "",
+                            subject_mode: tpl.subject_mode || "non_human"
                         })
                         .select("id")
                         .single();
@@ -283,6 +304,11 @@ export async function POST(req: Request) {
                     tags: tpl.tags || [],
                     required_elements: tpl.required_elements || [],
                     required_visual_elements: tpl.required_visual_elements || [],
+                    // Remix Overhaul Fields
+                    template_config_json: tpl.template_config_json || tpl.template_config || {},
+                    public_prompt: tpl.public_prompt || "",
+                    system_rules: tpl.system_rules || tpl.internal_rules || "",
+                    subject_mode: tpl.subject_mode || "non_human",
                 })
                 .select("id")
                 .single();

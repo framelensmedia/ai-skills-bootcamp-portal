@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
+import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 
@@ -56,6 +56,38 @@ function StudioContent() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
   const [editSummary, setEditSummary] = useState<string>("");
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
+
+  // Fetch Template Config if promptId is present
+  useEffect(() => {
+    if (prePromptId) {
+      supabase.from("prompts")
+        .select("template_config_json, subject_mode, featured_image_url, aspect_ratios")
+        .eq("id", prePromptId)
+        .maybeSingle()
+        .then(({ data }: { data: any }) => {
+          if (data) {
+            if (data.featured_image_url) setPreviewImageUrl(data.featured_image_url);
+
+            // Set Aspect Ratio from template if available
+            if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
+              // Validate if it matches our supported types, or just cast if we trust it
+              const validRatios = ["9:16", "16:9", "1:1", "4:5"];
+              if (validRatios.includes(data.aspect_ratios[0])) {
+                setAspectRatio(data.aspect_ratios[0]);
+              }
+            }
+
+            const config = data.template_config_json || {};
+            setTemplateConfig({
+              editable_fields: config.editable_fields || [],
+              editable_groups: config.editable_groups || [],
+              subject_mode: data.subject_mode || config.subject_mode || "non_human"
+            });
+          }
+        });
+    }
+  }, [prePromptId, supabase]);
 
   // Kept for fallback copy? Or should I just use editSummary?
   // "The prompt field... edit-instruction summary". So editSummary is the source of truth.
@@ -71,6 +103,7 @@ function StudioContent() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [lastFullQualityUrl, setLastFullQualityUrl] = useState<string | null>(null);
 
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -226,6 +259,8 @@ function StudioContent() {
       }
 
       const imageUrl = normalize(json?.imageUrl);
+      const fullQualityUrl = normalize(json?.fullQualityUrl);
+
       if (!imageUrl) {
         setGenError("No imageUrl returned.");
         setGenerating(false);
@@ -233,6 +268,7 @@ function StudioContent() {
       }
 
       setLastImageUrl(imageUrl);
+      setLastFullQualityUrl(fullQualityUrl);
       setLightboxOpen(true);
     } catch (e: any) {
       console.error("Generation error:", e);
@@ -270,6 +306,7 @@ function StudioContent() {
         onLogoChange={() => { }}
         businessName=""
         onBusinessNameChange={() => { }}
+        templateConfig={templateConfig}
       />
       <GenerationLightbox
         open={lightboxOpen}
@@ -279,6 +316,7 @@ function StudioContent() {
         combinedPromptText={editSummary}
         onShare={handleShare}
         onRemix={handleRemixFromLightbox}
+        fullQualityUrl={lastFullQualityUrl}
       />
 
       <div className="mb-6">

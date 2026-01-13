@@ -11,15 +11,27 @@ const SYSTEM_CORE = `
 2. Photorealism Default: Generate photorealistic, studio-quality results. Enhance texture, lighting, and detail. Avoid cartoonish or plastic looks unless requested.
 3. Safe Rules: You may change clothing, background, lighting, and style. You must NOT change face geometry or distort the subject.
 4. FRAMING ADAPTATION: If the Subject Reference pose differs significantly from the Template, you may adapt the composition/framing to fit the subject naturally.
+
+[GLOBAL FULL-BLEED LOCK]
+1. MANDATORY: Output must be full-bleed.
+2. FORBIDDEN: Borders, frames, polaroid styles, film strips, padding, or white margins.
+3. The image must extend to the very edge of the canvas on all sides.
 `;
 
-const SYSTEM_IDENTITY = `
+const SYSTEM_HUMAN_RULES = `
 [STRICT SUBJECT REPLACEMENT & LAYOUT ADAPTATION]
 1. REPLACE SUBJECT: Replace the main subject in the template with the person in the Uploaded Photo.
 2. PRESERVE UPLOAD PERSPECTIVE: You MUST keep the same camera angle, perspective, and body size of the person in the Uploaded Photo.
 3. ADAPT DESIGN: Design the new image AROUND the uploaded subject and their perspective. Do NOT warp the subject to fit the template.
 4. LIKENESS LOCK: Keep the facial position, expression, and features exactly consistent with the Uploaded Photo.
 5. INTEGRATION: Blend the subject into the scene naturally (lighting/shadows) but maintain their physical integrity (clothing, body shape, head shape) as provided in the upload.
+`;
+
+const SYSTEM_NON_HUMAN_RULES = `
+[STYLE & OBJECT REFERENCE]
+1. The Uploaded Image is a REFERENCE for Style or Object.
+2. If the user asks to replace an object, use the Uploaded Object as the source.
+3. If the user asks for style transfer, apply the visual style of the Uploaded Image to the Template composition.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
@@ -243,9 +255,31 @@ export async function POST(req: Request) {
             logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
         }
 
+        // Fetch internal secret sauce
+        let internalRules = "";
+        let subjectMode = "non_human";
+
+        if (promptId) {
+            const { data: dbTemplate } = await admin
+                .from("prompts")
+                .select("system_rules, subject_mode")
+                .eq("id", promptId)
+                .maybeSingle();
+
+            if (dbTemplate) {
+                internalRules = dbTemplate.system_rules || "";
+                subjectMode = dbTemplate.subject_mode || "non_human";
+            }
+        }
+
+        const subjectRules = imageFiles.length > 0
+            ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
+            : "";
+
         const finalPrompt = [
             SYSTEM_CORE,
-            imageFiles.length ? SYSTEM_IDENTITY : "",
+            internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules}` : "",
+            subjectRules,
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
@@ -371,7 +405,7 @@ export async function POST(req: Request) {
             // don't fail the request, just log it
         }
 
-        return NextResponse.json({ imageUrl }, { status: 200 });
+        return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
     } catch (e: any) {
         console.error("GENERATE ERROR:", e);
         return NextResponse.json(

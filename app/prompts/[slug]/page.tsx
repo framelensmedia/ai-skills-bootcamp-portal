@@ -238,7 +238,7 @@ function PromptContent() {
       const supabase = createSupabaseBrowserClient();
 
       const { data: meta, error: metaError } = await supabase
-        .from("prompts_public")
+        .from("prompts")
         .select(
           "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at"
         )

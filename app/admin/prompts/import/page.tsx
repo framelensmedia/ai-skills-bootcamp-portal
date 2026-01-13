@@ -67,36 +67,85 @@ export default function TemplateImportPage() {
     const handleJsonSelect = (file: File) => {
         if (file && (file.type === "application/json" || file.name.endsWith(".json"))) {
             setJsonFile(file);
-            // If in pack mode, parse it immediately for preview
-            if (mode === "pack") {
-                parsePackJson(file);
-            }
         }
     };
 
-    const parsePackJson = async (file: File) => {
+    const validateAndParsePackJson = async (file: File, relatedFiles: File[]) => {
         try {
             const text = await file.text();
-            const data = JSON.parse(text);
+            // Strip comments (// and /* */) to handle user-provided JSON
+            const cleanText = text.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m, g1) => g1 ? "" : m);
+            const data = JSON.parse(cleanText);
+
+            // 1. Pack ID Match - validation skipped (filename is authority)
+            /* 
+            const packIdFromFilename = file.name.replace(/\.json$/i, "");
+            const packIdFromJson = data.pack?.id || data.pack?.pack_id;
+            */
+
+            // 2. Image Validation (Relaxed to allow extension mismatch)
+            const missingImages: string[] = [];
+            const fileNames = new Set(relatedFiles.map(f => f.name));
+            const baseNames = new Set(relatedFiles.map(f => f.name.replace(/\.[^/.]+$/, "")));
+
+            const exists = (name: string) => {
+                if (!name) return true;
+                if (fileNames.has(name)) return true;
+                const base = name.replace(/\.[^/.]+$/, "");
+                return baseNames.has(base);
+            };
+
+            // Check Thumbnail
+            if (data.pack?.thumbnail_filename && !exists(data.pack.thumbnail_filename)) {
+                missingImages.push(data.pack.thumbnail_filename);
+            }
+
+            // Check Templates
             if (data.templates && Array.isArray(data.templates)) {
+                data.templates.forEach((t: any) => {
+                    const img = t.featured_image_filename || t.featured_image;
+                    if (img && !exists(img)) {
+                        missingImages.push(img);
+                    }
+                });
                 setDetectedTemplates(data.templates);
             }
+
+            if (missingImages.length > 0) {
+                setResult({
+                    success: false,
+                    message: "Missing referenced images:",
+                    errors: missingImages.map(f => `File not found: ${f}`)
+                });
+                return;
+            }
+
+            setJsonFile(file);
+            setPackFiles(relatedFiles);
+            setResult(null); // Clear errors
+
         } catch (e) {
             console.error("Failed to parse pack json", e);
+            setResult({ success: false, message: "Invalid JSON file." });
         }
     };
 
     // Handle Folder Select (Pack)
     const handleFolderSelect = (files: FileList) => {
         const fileArray = Array.from(files);
-        const json = fileArray.find(f => f.name === "pack.json");
+        const jsonFiles = fileArray.filter(f => f.name.toLowerCase().endsWith(".json"));
         const images = fileArray.filter(f => f.type.startsWith("image/"));
 
-        if (json) {
-            setJsonFile(json);
-            parsePackJson(json);
+        if (jsonFiles.length === 0) {
+            setResult({ success: false, message: "Missing pack JSON file." });
+            return;
         }
-        setPackFiles(images);
+        if (jsonFiles.length > 1) {
+            setResult({ success: false, message: "Only one JSON file is allowed per pack upload." });
+            return;
+        }
+
+        validateAndParsePackJson(jsonFiles[0], images);
     };
 
     // Drag and Drop
@@ -145,6 +194,7 @@ export default function TemplateImportPage() {
         try {
             const formData = new FormData();
             formData.append("json", await jsonFile.text());
+            formData.append("filename_id", jsonFile.name.replace(/\.json$/i, ""));
 
             if (mode === "single" && imageFile) {
                 formData.append("image", imageFile);
@@ -258,7 +308,7 @@ export default function TemplateImportPage() {
                                     {mode === "single" ? "Drag Image & JSON" : "Drag Pack Folder"}
                                 </h3>
                                 <p className="mt-2 text-sm text-white/50 max-w-sm mb-6">
-                                    {mode === "single" ? "Drop .json and image (PNG/JPG)" : "Drop a folder containing pack.json and images (or click below)"}
+                                    {mode === "single" ? "Drop .json and image (PNG/JPG)" : "Drop a folder containing <pack_id>.json and all referenced images."}
                                 </p>
 
                                 <div className="flex gap-3">
