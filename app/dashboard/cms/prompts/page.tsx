@@ -201,7 +201,7 @@ export default function PromptsCMSPage() {
             if (error) throw error;
 
             // Fetch counts
-            const packsWithCounts = await Promise.all((data || []).map(async (p) => {
+            const packsWithCounts = await Promise.all((data || []).map(async (p: any) => {
                 const { count } = await supabase
                     .from("prompts")
                     .select("id", { count: "exact", head: true })
