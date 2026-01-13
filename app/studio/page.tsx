@@ -186,11 +186,20 @@ function StudioContent() {
     setGenerating(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Use state user if available to avoid Safari Private Mode decoding issues 
+      let activeUser = user;
 
-      if (!user?.id) {
+      // Fallback: If no state user, try to fetch
+      if (!activeUser?.id) {
+        try {
+          const { data } = await supabase.auth.getUser();
+          activeUser = data.user;
+        } catch (err) {
+          console.error("Auth fetch failed", err);
+        }
+      }
+
+      if (!activeUser?.id) {
         setGenError("Please log in to generate.");
         setGenerating(false);
         return;
@@ -199,7 +208,7 @@ function StudioContent() {
       const form = new FormData();
 
       form.append("prompt", editSummary); // Using edit summary as the main prompt
-      form.append("userId", user.id);
+      form.append("userId", activeUser.id);
       form.append("aspectRatio", aspectRatio);
 
       // ✅ Standardized prompt columns
@@ -249,10 +258,7 @@ function StudioContent() {
       console.error("Generation error:", e);
       const msg = e?.message || "";
       if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
-        // Handle Safari/Auth corruption
-        await supabase.auth.signOut(); // Clear bad tokens
-        setGenError("Session expired. Redirecting to login...");
-        setTimeout(() => router.push("/login"), 1500);
+        setGenError("Browser security prevented processing. Please turn off Private/Incognito Mode and try again.");
       } else {
         setGenError(msg || "Failed to generate.");
       }
