@@ -246,7 +246,16 @@ function StudioContent() {
       // For now, I'll keep lightbox open behavior as it's good UX.
       setLightboxOpen(true);
     } catch (e: any) {
-      setGenError(e?.message || "Failed to generate.");
+      console.error("Generation error:", e);
+      const msg = e?.message || "";
+      if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
+        // Handle Safari/Auth corruption
+        await supabase.auth.signOut(); // Clear bad tokens
+        setGenError("Session expired. Redirecting to login...");
+        setTimeout(() => router.push("/login"), 1500);
+      } else {
+        setGenError(msg || "Failed to generate.");
+      }
     } finally {
       setGenerating(false);
     }
