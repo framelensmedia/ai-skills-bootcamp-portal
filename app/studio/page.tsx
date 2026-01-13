@@ -186,43 +186,31 @@ function StudioContent() {
     setGenerating(true);
 
     try {
-      // Use state user if available to avoid Safari Private Mode decoding issues 
-      let activeUser = user;
-
-      // Fallback: If no state user, try to fetch
-      if (!activeUser?.id) {
-        try {
-          const { data } = await supabase.auth.getUser();
-          activeUser = data.user;
-        } catch (err) {
-          console.error("Auth fetch failed", err);
-        }
-      }
-
-      if (!activeUser?.id) {
-        setGenError("Please log in to generate.");
+      // User is guaranteed by handleAuthGate
+      if (!user?.id) {
+        setGenError("Please log in.");
         setGenerating(false);
         return;
       }
 
       const form = new FormData();
 
-      form.append("prompt", editSummary); // Using edit summary as the main prompt
-      form.append("userId", activeUser.id);
-      form.append("aspectRatio", aspectRatio);
+      form.append("prompt", normalize(editSummary));
+      form.append("userId", normalize(user.id));
+      form.append("aspectRatio", normalize(aspectRatio));
 
       // ✅ Standardized prompt columns
-      form.append("combined_prompt_text", editSummary);
-      form.append("edit_instructions", editSummary);
-      form.append("template_reference_image", previewImageUrl);
+      form.append("combined_prompt_text", normalize(editSummary));
+      form.append("edit_instructions", normalize(editSummary));
+      form.append("template_reference_image", normalize(previewImageUrl));
 
       // ✅ Upload up to 10 images
       uploads.slice(0, 10).forEach((file) => {
-        form.append("images", file, file.name);
+        form.append("images", file, file.name || "upload");
       });
 
-      if (prePromptId) form.append("promptId", prePromptId);
-      if (prePromptSlug) form.append("promptSlug", prePromptSlug);
+      if (prePromptId) form.append("promptId", normalize(prePromptId));
+      if (prePromptSlug) form.append("promptSlug", normalize(prePromptSlug));
 
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -245,20 +233,12 @@ function StudioContent() {
       }
 
       setLastImageUrl(imageUrl);
-      // We don't open lightbox automatically anymore? "Post-generation buttons... after generation completes, show two buttons: Edit Remix... New Remix".
-      // But usually we show the result.
-      // I'll leave lightbox logic, but maybe update content?
-      // Actually the lightbox is the "Preview" in the requirement?
-      // No, requirement says "After a generation completes, show two buttons...".
-      // Lightbox currently shows buttons. I can add "Edit Remix" button TO the Lightbox?
-      // Or simply show the new image in the 'Preview' panel on the right.
-      // For now, I'll keep lightbox open behavior as it's good UX.
       setLightboxOpen(true);
     } catch (e: any) {
       console.error("Generation error:", e);
       const msg = e?.message || "";
       if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
-        setGenError("Browser security prevented processing. Please turn off Private/Incognito Mode and try again.");
+        setGenError("BROWSER_SECURITY"); // Special flag for UI
       } else {
         setGenError(msg || "Failed to generate.");
       }
@@ -390,7 +370,17 @@ function StudioContent() {
             </button>
           </div>
 
-          {genError ? (
+          {genError === "BROWSER_SECURITY" ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg flex flex-col gap-3">
+              <div>Browser security prevented processing. Please turn off Private/Incognito Mode or try resetting your session.</div>
+              <button
+                onClick={async () => { await supabase.auth.signOut(); window.location.href = "/login"; }}
+                className="self-start rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-red-100 hover:bg-red-500/30 transition"
+              >
+                Reset Session
+              </button>
+            </div>
+          ) : genError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg">
               {genError}
             </div>
