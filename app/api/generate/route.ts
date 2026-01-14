@@ -25,11 +25,21 @@ const SYSTEM_CORE = `
 
 const SYSTEM_HUMAN_RULES = `
 [HUMAN SUBJECT IDENTITY LOCK (MANDATORY)]
-- Completely replace the template’s human subject with the uploaded subject.
-- NO BODY COMPLETION: If the uploaded photo is a headshot or partial body, DO NOT invent missing legs, torso, or hands.
+- Completely replace the template's human subject with the uploaded subject.
+
+[TEMPLATE SUBJECT NULLIFICATION]
+- If a user uploads a subject photo, ignore the template’s human anatomy entirely.
+- Do NOT transfer body, pose, limbs, clothing, or silhouette from the template subject.
+- The template subject exists only as a spatial/layout guide.
+- The uploaded subject must never be extended, completed, or re-rendered to match the template subject.
+
+[COMPOSITE-FIRST RENDERING]
+- Treat the uploaded subject as a 2D photographic cutout.
+- Do not generate new pixels of the subject outside the uploaded image bounds.
+- Allowed operations: crop, scale, rotate slightly, edge feather, shadow, lighting match.
+- Forbidden operations: body generation, limb completion, uniform synthesis, face recreation.
+- The uploaded subject must remain a 2D photographic cutout, not a 3D rendered person.
 - COMPOSITING STRATEGY: You MUST hide missing body areas by cropping tighter, scaling the subject up, or placing them behind foreground elements (badges, text bars, gradients).
-- The result must look like a deliberate design choice (e.g. bust portrait), not a floating head.
-- Preserve the uploaded subject’s camera angle, facial expression, glasses, and body proportions.
 `;
 
 const SYSTEM_NON_HUMAN_RULES = `
