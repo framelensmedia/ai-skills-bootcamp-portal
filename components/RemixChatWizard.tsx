@@ -128,8 +128,8 @@ export default function RemixChatWizard({
         const remainingFields = (templateConfig.editable_fields || []).filter(f => !handledFields.has(f.id));
 
         const sortedFields = [...remainingFields].sort((a, b) => {
-            const ia = priority.indexOf(a.id.toLowerCase());
-            const ib = priority.indexOf(b.id.toLowerCase());
+            const ia = priority.indexOf((a.id || "").toLowerCase());
+            const ib = priority.indexOf((b.id || "").toLowerCase());
             const pa = ia === -1 ? 999 : ia;
             const pb = ib === -1 ? 999 : ib;
             return pa - pb;
