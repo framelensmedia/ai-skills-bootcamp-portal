@@ -58,6 +58,10 @@ function StudioContent() {
   const [editSummary, setEditSummary] = useState<string>("");
   const [templateConfig, setTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
 
+  // Remix Extra State
+  const [logo, setLogo] = useState<File | null>(null);
+  const [businessName, setBusinessName] = useState<string>("");
+
   // Fetch Template Config if promptId is present
   useEffect(() => {
     if (prePromptId) {
@@ -259,6 +263,17 @@ function StudioContent() {
       if (remixAnswers?.subjectLock) {
         form.append("subjectLock", remixAnswers.subjectLock);
       }
+      if (remixAnswers?.industry_intent) {
+        form.append("industry_intent", remixAnswers.industry_intent);
+      }
+      if (remixAnswers?.business_name) {
+        form.append("business_name", remixAnswers.business_name);
+      }
+
+      // Also append logo if present (override previous logic?)
+      // The API handles logo_image.
+      if (logo) form.append("logo_image", logo);
+      if (businessName) form.append("business_name", businessName); // Redundant if in answers, but safe.
 
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -317,10 +332,10 @@ function StudioContent() {
         initialValues={remixAnswers}
         uploads={uploads}
         onUploadsChange={setUploads}
-        logo={null}
-        onLogoChange={() => { }}
-        businessName=""
-        onBusinessNameChange={() => { }}
+        logo={logo}
+        onLogoChange={setLogo}
+        businessName={businessName}
+        onBusinessNameChange={setBusinessName}
         templateConfig={templateConfig}
       />
       <GenerationLightbox

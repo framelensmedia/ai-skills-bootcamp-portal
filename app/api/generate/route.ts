@@ -121,6 +121,7 @@ export async function POST(req: Request) {
         let headline: string | null = null;
         let templateFile: File | null = null;
         let subjectLock = false;
+        let industryIntent: string | null = null;
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -155,6 +156,8 @@ export async function POST(req: Request) {
             headline = String(form.get("headline") ?? "").trim() || null;
             if (!headline) headline = null;
 
+            industryIntent = String(form.get("industry_intent") ?? "").trim() || null;
+
             imageFiles = form.getAll("images") as File[];
             subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
         } else {
@@ -173,6 +176,7 @@ export async function POST(req: Request) {
             // We don't get original_prompt_text explicitly in the current JSON payload from prompt page,
             // but that's okay, it's optional meta.
             subjectLock = String(body.subjectLock ?? "false").trim() === "true";
+            industryIntent = String(body.industry_intent ?? "").trim() || null;
         }
 
         // 2. Validation
@@ -305,11 +309,19 @@ export async function POST(req: Request) {
             ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
 
+        const bgSwapInstruction = industryIntent ? `
+[BACKGROUND SWAP: ACTIVE - Intent: ${industryIntent}]
+- You MUST change the background environment to match the Industry Intent '${industryIntent}'.
+- Keep the user photo as a locked 2D cutout (see SUBJECT LOCK).
+- If background swap cannot be done safely without breaking the layout or subject, fall back to original background.
+` : "";
+
         const finalPrompt = [
             SYSTEM_CORE,
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules}` : "",
             subjectRules,
             (subjectLock && imageFiles.length > 0) ? SUBJECT_LOCK_INSTRUCTIONS : "",
+            bgSwapInstruction,
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",

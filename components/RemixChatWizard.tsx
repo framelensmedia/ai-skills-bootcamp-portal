@@ -75,7 +75,11 @@ export default function RemixChatWizard({
     initialValues,
     uploads,
     onUploadsChange,
-    templateConfig
+    templateConfig,
+    logo,
+    onLogoChange,
+    businessName,
+    onBusinessNameChange
 }: Props) {
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
@@ -92,30 +96,59 @@ export default function RemixChatWizard({
     const steps = useMemo(() => {
         if (!templateConfig) return [];
 
-        const list: { type: "intro" | "field" | "group" | "instructions", data?: any }[] = [];
+        const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo", data?: any }[] = [];
 
-        // 1. Intro (Upload)
+        // 1. Intro (Photo Upload)
         list.push({ type: "intro" });
 
-        // 2. Fields/Groups
+        // 2. Industry Intent
+        list.push({ type: "industry_intent" });
+
+        // 3. Business Name
+        list.push({ type: "business" });
+
+        // 4. Logo
+        list.push({ type: "logo" });
+
+        // 5. Contact Info (Group)
+        // Prioritize "contact" group if it exists
         const handledFields = new Set<string>();
+        let contactGroup = templateConfig.editable_groups?.find(g =>
+            g.label.toLowerCase().includes("contact") ||
+            g.fields.some(f => f.includes("phone") || f.includes("website"))
+        );
 
-        if (templateConfig.editable_groups) {
-            templateConfig.editable_groups.forEach(group => {
-                list.push({ type: "group", data: group });
-                group.fields.forEach(f => handledFields.add(f));
-            });
+        if (contactGroup) {
+            list.push({ type: "group", data: contactGroup });
+            contactGroup.fields.forEach(f => handledFields.add(f));
         }
 
-        if (templateConfig.editable_fields) {
-            templateConfig.editable_fields.forEach(field => {
-                if (!handledFields.has(field.id)) {
-                    list.push({ type: "field", data: field });
-                }
-            });
-        }
+        // 6. Text Fields (Headline, Sub, CTA) in priority order
+        const priority = ["headline", "subheadline", "cta", "call_to_action", "offer"];
+        const remainingFields = (templateConfig.editable_fields || []).filter(f => !handledFields.has(f.id));
 
-        // 3. Instructions
+        const sortedFields = [...remainingFields].sort((a, b) => {
+            const ia = priority.indexOf(a.id.toLowerCase());
+            const ib = priority.indexOf(b.id.toLowerCase());
+            const pa = ia === -1 ? 999 : ia;
+            const pb = ib === -1 ? 999 : ib;
+            return pa - pb;
+        });
+
+        sortedFields.forEach(f => {
+            list.push({ type: "field", data: f });
+            handledFields.add(f.id);
+        });
+
+        // 7. Remaining Groups (non contact)
+        (templateConfig.editable_groups || []).forEach(g => {
+            if (g !== contactGroup) {
+                list.push({ type: "group", data: g });
+                g.fields.forEach(f => handledFields.add(f));
+            }
+        });
+
+        // 8. Instructions
         list.push({ type: "instructions" });
 
         return list;
@@ -159,13 +192,20 @@ export default function RemixChatWizard({
         if (currentStep.type === "field") {
             answerKey = currentStep.data.id;
         } else if (currentStep.type === "group") {
-            // Store group answer under a synthetic key for the summary ref
-            // Using the first field ID + "_group" or similar, or just relying on user input parsing?
-            // For now, we store the raw user text keyed by the group label (sanitized) to preserve it in "RemixAnswers"
-            // The generateEditSummary checks all keys.
             answerKey = `group_${currentStep.data.label.replace(/\s+/g, '_')}`;
         } else if (currentStep.type === "instructions") {
             answerKey = "instructions";
+        } else if (currentStep.type === "industry_intent") {
+            answerKey = "industry_intent";
+        } else if (currentStep.type === "business") {
+            // Also update parent prop
+            if (answerVal && !removed) onBusinessNameChange(answerVal);
+            // We store it in answers too for the summary
+            answerKey = "business_name";
+        } else if (currentStep.type === "logo") {
+            // Logo is handled via component state/callback, but we might want to log user intent
+            // If skipped, nothing. If uploaded, we assume onLogoChange was called.
+            // We won't store file in answers.
         }
 
         if (answerKey && (answerVal || removed)) {
@@ -206,6 +246,12 @@ export default function RemixChatWizard({
             botText = `${g.label}:\n` + lines.join("\n");
         } else if (nextStep.type === "instructions") {
             botText = "Any SPECIAL INSTRUCTIONS? (e.g. 'Make it dark mode', 'Add fire effects')";
+        } else if (nextStep.type === "industry_intent") {
+            botText = "What kind of business is this for? (e.g. 'Coffee Shop', 'Tree Removal')";
+        } else if (nextStep.type === "business") {
+            botText = "What is your Business Name?";
+        } else if (nextStep.type === "logo") {
+            botText = "Upload your logo/brand mark (optional). We will remove the background automatically.";
         }
 
         setMessages([
@@ -281,6 +327,11 @@ export default function RemixChatWizard({
                                             />
                                         </div>
                                     )}
+                                    {/* Logo Upload UI in chat history? No, usually in input area or as a specific step component. 
+                                        But since our chat maps messages to steps, if we want the Logo UI to appear "in the chat bubbles", we'd need to attach it to the Bot message.
+                                        But current logic attaches UI only if `isUploadStep` is true. 
+                                        We should flag the Logo message as `isLogoStep`. 
+                                    */}
                                 </div>
                             </div>
                         ))}
@@ -293,6 +344,19 @@ export default function RemixChatWizard({
                             <button onClick={() => advanceStep()} className="w-full rounded-xl bg-lime-400 py-4 text-sm font-bold text-black hover:bg-lime-300 md:py-3">
                                 {uploads.length > 0 ? "Use these images" : "Skip Upload"}
                             </button>
+                        ) : activeStep?.type === "logo" ? (
+                            <div className="flex flex-col gap-3">
+                                <ImageUploader
+                                    files={logo ? [logo] : []}
+                                    onChange={(fs) => onLogoChange(fs[0] || null)}
+                                    maxFiles={1}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                    <button onClick={() => advanceStep(true)} className="px-3 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
+                                        {logo ? "Confirm Logo" : "Skip / Text Fallback"}
+                                    </button>
+                                </div>
+                            </div>
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">

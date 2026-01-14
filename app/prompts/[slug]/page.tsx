@@ -653,6 +653,12 @@ function PromptContent() {
       if (remixAnswers?.subjectLock) {
         form.append("subjectLock", remixAnswers.subjectLock);
       }
+      if (remixAnswers?.industry_intent) {
+        form.append("industry_intent", remixAnswers.industry_intent);
+      }
+      if (remixAnswers?.business_name) {
+        form.append("business_name", remixAnswers.business_name);
+      }
 
       const res = await fetch("/api/generate", {
         method: "POST",
