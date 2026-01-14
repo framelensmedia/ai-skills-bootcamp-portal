@@ -25,10 +25,11 @@ const SYSTEM_CORE = `
 
 const SYSTEM_HUMAN_RULES = `
 [HUMAN SUBJECT IDENTITY LOCK (MANDATORY)]
-- Completely replace the template’s human subject with the uploaded subject. The template subject must not appear in any form.
-- No face blending, no hybrid features, no resemblance to the template subject.
-- Preserve the uploaded subject’s camera angle, facial expression, glasses, and body proportions. Do not rotate or re-angle the face to match the template.
-- Pass A: identity-only replacement (no beautify, no stylization). Pass B: optional polish (wardrobe/lighting/background) only if identity is already accurate.
+- Completely replace the template’s human subject with the uploaded subject.
+- NO BODY COMPLETION: If the uploaded photo is a headshot or partial body, DO NOT invent missing legs, torso, or hands.
+- COMPOSITING STRATEGY: You MUST hide missing body areas by cropping tighter, scaling the subject up, or placing them behind foreground elements (badges, text bars, gradients).
+- The result must look like a deliberate design choice (e.g. bust portrait), not a floating head.
+- Preserve the uploaded subject’s camera angle, facial expression, glasses, and body proportions.
 `;
 
 const SYSTEM_NON_HUMAN_RULES = `
@@ -44,6 +45,7 @@ const SUBJECT_LOCK_INSTRUCTIONS = `
 - Treated as a Photoshop cutout: Only crop, scale, color-match, and shadow-match are allowed.
 - NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
 - UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
+- SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements. Never generate fake limbs.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
