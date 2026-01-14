@@ -253,6 +253,13 @@ function StudioContent() {
       if (prePromptId) form.append("promptId", normalize(prePromptId));
       if (prePromptSlug) form.append("promptSlug", normalize(prePromptSlug));
 
+      if (remixAnswers?.headline) {
+        form.append("headline", remixAnswers.headline);
+      }
+      if (remixAnswers?.subjectLock) {
+        form.append("subjectLock", remixAnswers.subjectLock);
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         body: form,

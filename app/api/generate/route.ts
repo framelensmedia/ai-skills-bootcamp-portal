@@ -38,6 +38,14 @@ const SYSTEM_NON_HUMAN_RULES = `
 3. If the user asks for style transfer, apply the visual style of the Uploaded Image to the Template composition.
 `;
 
+const SUBJECT_LOCK_INSTRUCTIONS = `
+[SUBJECT LOCK: ACTIVE]
+- STRICTLY PRESERVE the Uploaded Subject's identity, clothing, body type, and pose.
+- Treated as a Photoshop cutout: Only crop, scale, color-match, and shadow-match are allowed.
+- NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
+- UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
+`;
+
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
 
 function mustEnv(name: string) {
@@ -100,6 +108,7 @@ export async function POST(req: Request) {
         let businessName: string | null = null;
         let headline: string | null = null;
         let templateFile: File | null = null;
+        let subjectLock = false;
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -135,6 +144,7 @@ export async function POST(req: Request) {
             if (!headline) headline = null;
 
             imageFiles = form.getAll("images") as File[];
+            subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
         } else {
             // JSON Handling
             const body = await req.json();
@@ -150,6 +160,7 @@ export async function POST(req: Request) {
             combined_prompt_text = rawPrompt;
             // We don't get original_prompt_text explicitly in the current JSON payload from prompt page,
             // but that's okay, it's optional meta.
+            subjectLock = String(body.subjectLock ?? "false").trim() === "true";
         }
 
         // 2. Validation
@@ -276,6 +287,8 @@ export async function POST(req: Request) {
             }
         }
 
+
+
         const subjectRules = imageFiles.length > 0
             ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
@@ -284,6 +297,7 @@ export async function POST(req: Request) {
             SYSTEM_CORE,
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules}` : "",
             subjectRules,
+            (subjectLock && imageFiles.length > 0) ? SUBJECT_LOCK_INSTRUCTIONS : "",
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",

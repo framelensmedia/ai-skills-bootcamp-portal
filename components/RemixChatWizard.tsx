@@ -82,6 +82,9 @@ export default function RemixChatWizard({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [messages, setMessages] = useState<Message[]>([]);
 
+    // Toggle for Subject Lock
+    const [subjectLock, setSubjectLock] = useState(true);
+
     // Steps State
     const [stepIndex, setStepIndex] = useState(0);
 
@@ -216,6 +219,9 @@ export default function RemixChatWizard({
     }
 
     function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers) {
+        // Include subjectLock in answers
+        finalAnswers.subjectLock = String(subjectLock);
+
         const sum = generateEditSummary(finalAnswers, uploads.length > 0);
         setMessages([
             ...currentMsgs,
@@ -267,7 +273,12 @@ export default function RemixChatWizard({
                                     {m.text && <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>}
                                     {m.isUploadStep && (
                                         <div className="mt-3 -mx-1">
-                                            <UploadStepWrapper files={uploads} setFiles={onUploadsChange} />
+                                            <UploadStepWrapper
+                                                files={uploads}
+                                                setFiles={onUploadsChange}
+                                                subjectLock={subjectLock}
+                                                setSubjectLock={setSubjectLock}
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -329,10 +340,35 @@ export default function RemixChatWizard({
     );
 }
 
-function UploadStepWrapper({ files, setFiles }: { files: File[], setFiles: (f: File[]) => void }) {
+function UploadStepWrapper({
+    files,
+    setFiles,
+    subjectLock,
+    setSubjectLock
+}: {
+    files: File[],
+    setFiles: (f: File[]) => void,
+    subjectLock: boolean,
+    setSubjectLock: (v: boolean) => void
+}) {
     return (
         <div className="w-full min-w-0">
             <ImageUploader files={files} onChange={setFiles} maxFiles={10} />
+            {files.length > 0 && (
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <input
+                        type="checkbox"
+                        checked={subjectLock}
+                        onChange={(e) => setSubjectLock(e.target.checked)}
+                        className="h-5 w-5 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400"
+                        id="subject-lock"
+                    />
+                    <label htmlFor="subject-lock" className="flex-1 cursor-pointer select-none text-sm text-white">
+                        <span className="block font-semibold">Keep exact outfit and body</span>
+                        <span className="block text-xs text-white/50">Prevents the AI from changing clothes or pose.</span>
+                    </label>
+                </div>
+            )}
         </div>
     );
 }
