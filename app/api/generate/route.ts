@@ -12,6 +12,11 @@ const SYSTEM_CORE = `
 3. Safe Rules: You may change clothing, background, lighting, and style. You must NOT change face geometry or distort the subject.
 4. FRAMING ADAPTATION: If the Subject Reference pose differs significantly from the Template, you may adapt the composition/framing to fit the subject naturally.
 
+[MANDATORY SEMANTIC TEXT REPLACEMENT]
+1. CONTEXT SYNC: If the user's instructions imply a change in Industry, Service, or Topic (e.g., Plumbing -> Tree Removal), you MUST REGENERATE ALL TEXT fields (Headline, Subhead, CTA, etc.) to match the new topic.
+2. NO LEGACY TEXT: Never leave text from the old industry in the new design. If the template says "Emergency Plumbing" and the user asks for "Bakery", you must change it to something like "Fresh Bread".
+3. AUTO-REWRITE: If the user does not provide specific text for a field, GENERATE it contextually based on the new topic. Do not preserve the original text if it conflicts with the new topic.
+
 [GLOBAL FULL-BLEED LOCK]
 1. MANDATORY: Output must be full-bleed.
 2. FORBIDDEN: Borders, frames, polaroid styles, film strips, padding, or white margins.
