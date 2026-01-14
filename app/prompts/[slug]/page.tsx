@@ -6,7 +6,7 @@ import Loading from "@/components/Loading";
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
+import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
@@ -64,6 +64,8 @@ type PromptMetaRow = {
   created_at: string | null;
 
   access_level: string; // free | premium (DB value)
+  template_config_json?: any;
+  subject_mode?: "human" | "non_human";
 };
 
 type PromptBodyRow = {
@@ -112,6 +114,7 @@ function PromptContent() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
   const [editSummary, setEditSummary] = useState<string>("");
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
@@ -240,7 +243,7 @@ function PromptContent() {
       const { data: meta, error: metaError } = await supabase
         .from("prompts")
         .select(
-          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at"
+          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at, template_config_json, subject_mode"
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -264,6 +267,13 @@ function PromptContent() {
       }
 
       setMetaRow(meta as PromptMetaRow);
+
+      const config = (meta as any).template_config_json || {};
+      setTemplateConfig({
+        editable_fields: config.editable_fields || [],
+        editable_groups: config.editable_groups || [],
+        subject_mode: (meta as any).subject_mode || config.subject_mode || "non_human"
+      });
 
       const promptAccess = String((meta as any).access_level || "free").toLowerCase();
       const proPrompt = promptAccess === "premium";
@@ -730,6 +740,7 @@ function PromptContent() {
         onLogoChange={setLogo}
         businessName={businessName}
         onBusinessNameChange={setBusinessName}
+        templateConfig={templateConfig}
       />
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
         {/* Lightbox */}

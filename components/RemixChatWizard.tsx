@@ -75,7 +75,7 @@ export default function RemixChatWizard({
     initialValues,
     uploads,
     onUploadsChange,
-    templateConfig = DEFAULT_CONFIG
+    templateConfig
 }: Props) {
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
@@ -87,6 +87,8 @@ export default function RemixChatWizard({
 
     // Build steps derived from config
     const steps = useMemo(() => {
+        if (!templateConfig) return [];
+
         const list: { type: "intro" | "field" | "group" | "instructions", data?: any }[] = [];
 
         // 1. Intro (Upload)
@@ -117,7 +119,7 @@ export default function RemixChatWizard({
     }, [templateConfig]);
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && templateConfig) {
             setStepIndex(0);
             const isHuman = templateConfig.subject_mode === "human";
             const introText = isHuman
@@ -140,25 +142,24 @@ export default function RemixChatWizard({
     }, [messages]);
 
     function advanceStep(skip = false, removed = false) {
+        if (!templateConfig) return;
+
         const currentStep = steps[stepIndex];
         const val = inputVal.trim();
         let answerKey: string | null = null;
         let answerVal = val;
 
         if (removed) answerVal = "__REMOVED__";
-        else if (skip) answerVal = ""; // Or keep empty? if skip, we rely on default or previous value
+        else if (skip) answerVal = "";
 
         // Save Answer
         if (currentStep.type === "field") {
             answerKey = currentStep.data.id;
         } else if (currentStep.type === "group") {
-            // For group, we store the whole string as the answer for the group label (or first field?)
-            // We'll store it under a synthetic key "group_INDEX" or just combine?
-            // "Single input box to fill all at once".
-            // Let's store it as the group label key or a joined key.
-            // Actually, simply store it under the first field ID for now, or use a "group_X" key.
-            // Better: use the group.label as key? No, labels have spaces.
-            // Let's use `group_${stepIndex}`.
+            // Store group answer under a synthetic key for the summary ref
+            // Using the first field ID + "_group" or similar, or just relying on user input parsing?
+            // For now, we store the raw user text keyed by the group label (sanitized) to preserve it in "RemixAnswers"
+            // The generateEditSummary checks all keys.
             answerKey = `group_${currentStep.data.label.replace(/\s+/g, '_')}`;
         } else if (currentStep.type === "instructions") {
             answerKey = "instructions";
@@ -186,14 +187,20 @@ export default function RemixChatWizard({
 
         if (nextStep.type === "field") {
             const f = nextStep.data;
-            botText = `The current ${f.label} is '${f.default}'. What would you like to change it to?`;
+            // 1) Logic: User Answer -> Default -> Fallback
+            const currentVal = answers[f.id] || f.default || "(set in template)";
+            botText = `The current ${f.label} is '${currentVal}'. What would you like to change it to?`;
         } else if (nextStep.type === "group") {
             const g = nextStep.data as { label: string, fields: string[] };
-            // Resolve field labels
-            const fieldLabels = g.fields.map(fid =>
-                templateConfig.editable_fields?.find(ef => ef.id === fid)?.label || fid
-            );
-            botText = `${g.label}:\n` + fieldLabels.map((l: string, i: number) => `${i + 1}. ${l}`).join("\n");
+            // Resolve field labels AND current values
+            const lines = g.fields.map((fid, i) => {
+                const ef = templateConfig.editable_fields?.find(e => e.id === fid);
+                const lbl = ef?.label || fid;
+                const def = answers[fid] || ef?.default || "(set in template)";
+                return `${i + 1}. ${lbl}: ${def}`;
+            });
+
+            botText = `${g.label}:\n` + lines.join("\n");
         } else if (nextStep.type === "instructions") {
             botText = "Any SPECIAL INSTRUCTIONS? (e.g. 'Make it dark mode', 'Add fire effects')";
         }
@@ -223,10 +230,19 @@ export default function RemixChatWizard({
 
     if (!isOpen) return null;
 
+    // Loading State
+    if (!templateConfig) {
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 text-white" role="dialog">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-lime-400 border-t-transparent" />
+                    <p className="text-sm font-mono opacity-50">Loading template configuration...</p>
+                </div>
+            </div>
+        );
+    }
+
     const activeStep = steps[stepIndex];
-    // Determine if "Remove" is allowed
-    // Exception: subject (intro) - handled by subject_mode
-    // For fields: yes.
     const showRemove = activeStep?.type === "field" || activeStep?.type === "group";
 
     return (

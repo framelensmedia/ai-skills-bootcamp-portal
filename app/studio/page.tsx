@@ -71,7 +71,6 @@ function StudioContent() {
 
             // Set Aspect Ratio from template if available
             if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
-              // Validate if it matches our supported types, or just cast if we trust it
               const validRatios = ["9:16", "16:9", "1:1", "4:5"];
               if (validRatios.includes(data.aspect_ratios[0])) {
                 setAspectRatio(data.aspect_ratios[0]);
@@ -84,8 +83,17 @@ function StudioContent() {
               editable_groups: config.editable_groups || [],
               subject_mode: data.subject_mode || config.subject_mode || "non_human"
             });
+          } else {
+            console.warn("Template not found or access denied:", prePromptId);
+            setTemplateConfig({ editable_fields: [], subject_mode: "non_human" });
           }
         });
+    } else {
+      // Scratch mode / No template loaded
+      setTemplateConfig({
+        editable_fields: [],
+        subject_mode: "non_human"
+      });
     }
   }, [prePromptId, supabase]);
 
