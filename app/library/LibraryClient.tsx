@@ -169,10 +169,37 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
         setIsEditing(true);
 
         try {
-            // Fetch Source Blob
-            const res = await fetch(lbFullQualityUrl || lightboxUrl);
-            const blob = await res.blob();
-            const file = new File([blob], "source.png", { type: "image/png" });
+            // Fetch Source Blob via server-side proxy (bypasses CORS)
+            // Try full quality URL first, but fallback to lightbox URL if it fails
+            let imageUrl = lbFullQualityUrl || lightboxUrl;
+            let proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+
+            let blob: Blob;
+            let file: File;
+
+            try {
+                let res = await fetch(proxyUrl);
+
+                // If full quality URL fails, always try fallback to lightbox URL
+                if (!res.ok && lightboxUrl && imageUrl !== lightboxUrl) {
+                    console.warn(`Full quality URL failed (${res.status}), trying lightbox URL fallback...`);
+                    imageUrl = lightboxUrl;
+                    proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+                    res = await fetch(proxyUrl);
+                }
+
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error('Both URLs failed:', { lbFullQualityUrl, lightboxUrl, error: errorText });
+                    throw new Error(`Failed to load image (${res.status}): Image file not found in storage`);
+                }
+
+                blob = await res.blob();
+                file = new File([blob], "source_image", { type: blob.type || "image/png" });
+            } catch (fetchError: any) {
+                console.error('Failed to fetch image for editing:', fetchError);
+                throw new Error(`Cannot load image for editing: ${fetchError.message}`);
+            }
 
             const supabase = createSupabaseBrowserClient();
             const { data: { user } } = await supabase.auth.getUser();

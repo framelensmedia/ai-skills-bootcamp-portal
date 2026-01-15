@@ -323,10 +323,26 @@ function StudioContent() {
     setGenError(null);
 
     try {
-      // 1. Convert Source URL to Blob
-      const srcRes = await fetch(lastFullQualityUrl);
-      const srcBlob = await srcRes.blob();
-      const srcFile = new File([srcBlob], "source_image.png", { type: "image/png" });
+      // 1. Convert Source URL to Blob via server-side proxy (bypasses CORS)
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(lastFullQualityUrl)}`;
+
+      let srcBlob: Blob;
+      let srcFile: File;
+
+      try {
+        const srcRes = await fetch(proxyUrl);
+
+        if (!srcRes.ok) {
+          const errorText = await srcRes.text();
+          throw new Error(`Failed to load image: ${errorText}`);
+        }
+
+        srcBlob = await srcRes.blob();
+        srcFile = new File([srcBlob], "source_image", { type: srcBlob.type || "image/png" });
+      } catch (fetchError: any) {
+        console.error('Failed to fetch image for editing:', fetchError);
+        throw new Error(`Cannot load image for editing: ${fetchError.message}`);
+      }
 
       // 2. Build Form Data
       const supabase = createSupabaseBrowserClient();
