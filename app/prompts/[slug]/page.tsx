@@ -67,6 +67,7 @@ type PromptMetaRow = {
   access_level: string; // free | premium (DB value)
   template_config_json?: any;
   subject_mode?: "human" | "non_human";
+  author_id?: string;
 };
 
 type PromptBodyRow = {
@@ -225,6 +226,13 @@ function PromptContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch creator profile
+  const [creatorProfile, setCreatorProfile] = useState<{
+    full_name: string | null;
+    avatar_url: string | null;
+    created_at: string;
+  } | null>(null);
+
   // Load prompt meta + auth + (if allowed) prompt body
   useEffect(() => {
     let cancelled = false;
@@ -244,7 +252,7 @@ function PromptContent() {
       const { data: meta, error: metaError } = await supabase
         .from("prompts")
         .select(
-          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at, template_config_json, subject_mode"
+          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at, template_config_json, subject_mode, author_id"
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -268,6 +276,24 @@ function PromptContent() {
       }
 
       setMetaRow(meta as PromptMetaRow);
+
+      // Fetch Prompt Creator Profile
+      if (meta.author_id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          // Fix: Limit to known columns
+          .select("full_name, profile_image")
+          .eq("user_id", meta.author_id)
+          .maybeSingle();
+
+        if (profile) {
+          setCreatorProfile({
+            full_name: profile.full_name,
+            avatar_url: profile.profile_image,
+            created_at: ""
+          });
+        }
+      }
 
       const config = (meta as any).template_config_json || {};
       setTemplateConfig({
@@ -766,6 +792,46 @@ function PromptContent() {
         <div className="mb-5 sm:mb-7">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
+              {/* Creator Profile */}
+              {creatorProfile && (
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative h-10 w-10 overflow-hidden rounded-full bg-zinc-800 shrink-0">
+                    {creatorProfile.avatar_url ? (
+                      <Image
+                        src={creatorProfile.avatar_url}
+                        alt={creatorProfile.full_name || "Creator"}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-white/40">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white leading-none">
+                      {creatorProfile.full_name || "Anonymous Creator"}
+                    </div>
+                    <div className="text-xs text-white/40 mt-1">
+                      Community Member
+                    </div>
+                  </div>
+                </div>
+              )}
               <h1 className="text-2xl font-semibold tracking-tight sm:text-4xl">{metaRow.title}</h1>
               <p className="mt-2 max-w-3xl text-sm text-white/70 sm:text-base">
                 {metaRow.summary && metaRow.summary.trim().length > 0
