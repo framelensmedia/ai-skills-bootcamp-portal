@@ -128,16 +128,26 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
     const [lbRemix, setLbRemix] = useState("");
     const [lbCombined, setLbCombined] = useState("");
     const [lbFullQualityUrl, setLbFullQualityUrl] = useState<string | null>(null);
+    const [isOwnedByCurrentUser, setIsOwnedByCurrentUser] = useState(false);
 
     // Edit Mode
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
 
-    function openLightbox(it: LibraryItem) {
+    async function openLightbox(it: LibraryItem) {
         if (isSelectionMode) {
             toggleSelection(it.id);
             return;
         }
+
+        // Check if this item belongs to the current user
+        const supabase = createSupabaseBrowserClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        // For remixes tab, check if user_id matches. For favorites, it's always someone else's
+        const isOwned = activeTab === "remixes";
+        setIsOwnedByCurrentUser(isOwned);
+
         setLbOriginal(it.originalPromptText);
         setLbRemix(it.remixPromptText);
         setLbCombined(it.combinedPromptText);
@@ -656,15 +666,15 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 combinedPromptText={lbCombined}
                 onShare={handleShare}
                 onRemix={handleRemix}
-                onEdit={() => {
+                onEdit={isOwnedByCurrentUser ? () => {
                     setLightboxOpen(false);
                     setEditModalOpen(true);
-                }}
-                onDelete={() => {
+                } : undefined}
+                onDelete={isOwnedByCurrentUser ? () => {
                     if (lightboxItemId) {
                         handleDelete(lightboxItemId).then(() => closeLightbox());
                     }
-                }}
+                } : undefined}
                 title="Remix"
                 fullQualityUrl={lbFullQualityUrl}
             />

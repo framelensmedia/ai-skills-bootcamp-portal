@@ -10,6 +10,7 @@ import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/Remi
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
+import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -1001,24 +1002,32 @@ function PromptContent() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <SelectPill
                     label="9:16"
+                    description="Vertical"
+                    icon={<Smartphone size={16} />}
                     selected={aspectRatio === "9:16"}
                     onClick={() => setAspectRatio("9:16")}
                     disabled={isLocked || generating}
                   />
                   <SelectPill
                     label="16:9"
+                    description="Widescreen"
+                    icon={<Monitor size={16} />}
                     selected={aspectRatio === "16:9"}
                     onClick={() => setAspectRatio("16:9")}
                     disabled={isLocked || generating}
                   />
                   <SelectPill
                     label="1:1"
+                    description="Square Feed"
+                    icon={<Square size={16} />}
                     selected={aspectRatio === "1:1"}
                     onClick={() => setAspectRatio("1:1")}
                     disabled={isLocked || generating}
                   />
                   <SelectPill
                     label="4:5"
+                    description="Rectangle Feed"
+                    icon={<RectangleVertical size={16} />}
                     selected={aspectRatio === "4:5"}
                     onClick={() => setAspectRatio("4:5")}
                     disabled={isLocked || generating}
@@ -1031,20 +1040,7 @@ function PromptContent() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
               <button
                 className={[
-                  "flex-1 inline-flex items-center justify-center rounded-2xl px-6 py-4 text-sm font-bold tracking-tight text-white transition-all transform hover:scale-[1.02]",
-                  isLocked
-                    ? "cursor-not-allowed bg-white/5 text-white/20"
-                    : "bg-white/10 hover:bg-white/20 border border-white/10 shadow-lg backdrop-blur-md",
-                ].join(" ")}
-                onClick={handleCopyPromptText}
-                disabled={isLocked}
-              >
-                {copied ? "Copied" : "Copy Prompt Only"}
-              </button>
-
-              <button
-                className={[
-                  "flex-[2] inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
+                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
                   isLocked
                     ? "bg-white/10 text-white/40 hover:bg-white/15"
                     : generating
@@ -1067,7 +1063,7 @@ function PromptContent() {
             {/* COMMUNITY REMIXES (Always Visible) */}
             <div className="mt-8">
               <div className="flex items-center justify-between gap-3 mb-4 px-2">
-                <div className="text-sm font-bold text-white/60 uppercase tracking-widest">User Remixes</div>
+                <div className="text-sm font-bold text-white/60 uppercase tracking-widest">Community Remixes</div>
                 <div className="text-xs font-mono text-white/40">
                   {remixesLoading ? "..." : remixes.length ? `${remixes.length}` : "0"}
                 </div>
@@ -1145,19 +1141,23 @@ function PromptContent() {
 
 function SelectPill({
   label,
+  description,
+  icon,
   disabled,
   selected,
   onClick,
 }: {
   label: string;
+  description?: string;
+  icon?: React.ReactNode;
   disabled?: boolean;
   selected?: boolean;
   onClick?: () => void;
 }) {
-  const base = "rounded-xl border px-3 py-2 text-sm text-left transition";
-  const disabledCls = "cursor-not-allowed border-white/10 bg-black/20 text-white/30";
-  const idleCls = "border-white/15 bg-black/40 text-white/80 hover:bg-black/55 hover:border-white/25";
-  const selectedCls = "border-lime-400/60 bg-lime-400/15 text-white hover:bg-lime-400/20";
+  const base = "group relative flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all active:scale-[0.98]";
+  const disabledCls = "cursor-not-allowed border-white/5 bg-white/5 text-white/20";
+  const idleCls = "border-white/10 bg-zinc-900/50 text-zinc-400 hover:border-white/20 hover:bg-zinc-900 hover:text-white";
+  const selectedCls = "border-[#B7FF00] bg-[#B7FF00]/5 text-[#B7FF00] shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]";
 
   return (
     <button
@@ -1167,7 +1167,17 @@ function SelectPill({
       className={[base, disabled ? disabledCls : selected ? selectedCls : idleCls].join(" ")}
       aria-pressed={selected ? "true" : "false"}
     >
-      {label}
+      {icon || description ? (
+        <>
+          {icon && <div className={`flex-shrink-0 transition-colors ${selected ? "text-[#B7FF00]" : "text-white/40 group-hover:text-white"}`}>{icon}</div>}
+          <div className="flex-1 min-w-0">
+            <div className={`text-xs font-bold uppercase tracking-wider ${selected ? "text-[#B7FF00]" : "text-white group-hover:text-white"}`}>{label}</div>
+            {description && <div className={`text-[10px] mt-0.5 truncate ${selected ? "text-[#B7FF00]/70" : "text-white/30 group-hover:text-white/50"}`}>{description}</div>}
+          </div>
+        </>
+      ) : (
+        <div className={`text-sm font-medium ${selected ? "text-[#B7FF00]" : "text-white"}`}>{label}</div>
+      )}
     </button>
   );
 }

@@ -259,8 +259,8 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     const openLightbox = (item: FeedItem) => {
-        setSelectedItem(item);
-        setLightboxOpen(true);
+        // Navigate to remix detail page instead of opening lightbox
+        router.push(`/remix/${item.id}`);
     };
 
     const handleRemix = (payload: any) => {
