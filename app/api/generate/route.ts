@@ -120,8 +120,11 @@ export async function POST(req: Request) {
         let businessName: string | null = null;
         let headline: string | null = null;
         let templateFile: File | null = null;
+        let canvasFile: File | null = null;
+        let userSubjectFile: File | null = null; // Added this line
         let subjectLock = false;
         let industryIntent: string | null = null;
+        let intentQueue: any[] = [];
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -140,6 +143,11 @@ export async function POST(req: Request) {
                 String(form.get("combined_prompt_text") ?? "").trim() || rawPrompt || null;
 
             // New fields from form
+            const canvasVal = form.get("canvas_image");
+            if (canvasVal instanceof File) {
+                canvasFile = canvasVal;
+            }
+
             const tmplVal = form.get("template_reference_image");
             if (tmplVal instanceof File) {
                 templateFile = tmplVal;
@@ -157,6 +165,13 @@ export async function POST(req: Request) {
             if (!headline) headline = null;
 
             industryIntent = String(form.get("industry_intent") ?? "").trim() || null;
+
+            try {
+                const q = String(form.get("intent_queue") ?? "");
+                if (q) intentQueue = JSON.parse(q);
+            } catch (e) {
+                console.warn("Failed to parse intent_queue", e);
+            }
 
             imageFiles = form.getAll("images") as File[];
             subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
@@ -177,10 +192,17 @@ export async function POST(req: Request) {
             // but that's okay, it's optional meta.
             subjectLock = String(body.subjectLock ?? "false").trim() === "true";
             industryIntent = String(body.industry_intent ?? "").trim() || null;
+            intentQueue = body.intent_queue || [];
         }
 
         // 2. Validation
-        if (!rawPrompt) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+        if (!rawPrompt && intentQueue.length === 0) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+
+        // Strict Edit Mode Validation
+        if (intentQueue.length > 0 && !canvasFile) {
+            return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image." }, { status: 400 });
+        }
+
         if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
         if (imageFiles.length > 10) {
@@ -236,41 +258,55 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
         }
 
-        const model = "gemini-3-pro-image-preview";
+        // User requested "Gemini 3 Image Preview".
+        const model = process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
+
+        // Match nano-banana config
+        // Use declared 'location' (from top of file)
         const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
 
         const imageParts: any[] = [];
 
-        // 1. Add Template Reference Image (if any)
-        if (templateFile) {
-            const mimeType = String(templateFile.type || "image/png");
-            if (mimeType.startsWith("image/")) {
-                const data = await fileToBase64(templateFile);
-                imageParts.push({ inlineData: { mimeType, data } });
-            }
-        } else if (template_reference_image) {
-            try {
-                // If it's a URL, fetch and convert
-                if (template_reference_image.startsWith("http")) {
-                    const { data, mimeType } = await urlToBase64(template_reference_image);
-                    imageParts.push({ inlineData: { mimeType, data } });
-                }
-            } catch (e: any) {
-                console.error("Failed to process template_reference_image:", e);
-                return NextResponse.json(
-                    { error: `Failed to load template image: ${e.message}` },
-                    { status: 400 }
-                );
-            }
-        }
+        const isEditMode = intentQueue.length > 0;
 
-        // 2. Add Uploaded Images (Subjects)
-        for (const f of imageFiles) {
-            const mimeType = String(f.type || "image/png");
-            if (!mimeType.startsWith("image/")) continue;
-            const data = await fileToBase64(f);
-            imageParts.push({ inlineData: { mimeType, data } });
+        if (isEditMode) {
+            // --- EDIT MODE ---
+            // Must use Canvas Image. No Template.
+            if (!canvasFile) {
+                return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image (canvas_image)." }, { status: 400 });
+            }
+            const data = await fileToBase64(canvasFile);
+            imageParts.push({ inlineData: { mimeType: canvasFile.type, data } });
+
+        } else {
+            // --- REMIX MODE ---
+            // Inputs: Template (File or URL) + Optional User Subject
+
+            // 1. Template Image
+            if (templateFile) {
+                const data = await fileToBase64(templateFile);
+                imageParts.push({ inlineData: { mimeType: templateFile.type, data } });
+            } else if (template_reference_image) {
+                try {
+                    const res = await fetch(template_reference_image);
+                    if (res.ok) {
+                        const arrayBuffer = await res.arrayBuffer();
+                        const data = Buffer.from(arrayBuffer).toString("base64");
+                        const mimeType = res.headers.get("content-type") || "image/jpeg";
+                        imageParts.push({ inlineData: { mimeType, data } });
+                    }
+                } catch (e: any) {
+                    console.error("Failed to fetch template_reference_image", e);
+                }
+            }
+
+            // 2. User Subject Image (if provided)
+            if (userSubjectFile) {
+                const f: any = userSubjectFile; // safe cast to avoid TS 'never' issue
+                const data = await fileToBase64(f);
+                imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data } });
+            }
         }
 
         // 3. Add Logo Image (if present)
@@ -316,12 +352,34 @@ export async function POST(req: Request) {
 - If background swap cannot be done safely without breaking the layout or subject, fall back to original background.
 ` : "";
 
+        let editModeInstruction = "";
+        if (intentQueue.length > 0) {
+            const queueList = intentQueue.map((q, i) => `ACTION: ${q.intent.toUpperCase()} -> ${q.value}`).join("\n");
+
+            editModeInstruction = `
+### EDIT INSTRUCTIONS (STRICT)
+You are an expert image editor. Your goal is to apply specific text or element changes to the provided CANVAS IMAGE while preserving everything else perfectly.
+
+### ACTIONS TO PERFORM:
+${queueList}
+
+### GLOBAL CONSTRAINTS:
+1.  **DO NOT REGENERATE THE SCENE**: Keep the background, lighting, and composition exactly as they are.
+2.  **DO NOT REMOVE TEXT**: Unless the action says "Remove", you must PRESERVE all existing text, logos, and contact info (footer).
+3.  **DO NOT CROP**: Maintain the full image canvas.
+4.  **STYLE CONSISTENCY**: Match the font dictation, color, and style of the existing design.
+
+Apply ONLY the actions listed above.
+`;
+        }
+
         const finalPrompt = [
             SYSTEM_CORE,
-            internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules}` : "",
+            internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
             subjectRules,
             (subjectLock && imageFiles.length > 0) ? SUBJECT_LOCK_INSTRUCTIONS : "",
             bgSwapInstruction,
+            editModeInstruction,
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
@@ -343,11 +401,14 @@ export async function POST(req: Request) {
             generationConfig: { temperature: 0.7 },
         };
 
+        // DEBUG: Output full payload
+        console.log(JSON.stringify(payload, null, 2));
+
         // 6. Call Vertex
         const res = await fetch(url, {
             method: "POST",
             headers: {
-                Authorization: `Bearer ${token.token}`,
+                Authorization: `Bearer ${token.token} `,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(payload),
@@ -382,7 +443,7 @@ export async function POST(req: Request) {
 
         // 8a. Upload Original (Full Quality)
         const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
+        const originalFilePath = `users / ${userId}/${Date.now()}.${originalExt}`;
 
         const { error: uploadOriginalError } = await admin.storage
             .from("generations")

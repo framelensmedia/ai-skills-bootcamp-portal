@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
+import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 
@@ -61,6 +62,9 @@ function StudioContent() {
   // Remix Extra State
   const [logo, setLogo] = useState<File | null>(null);
   const [businessName, setBusinessName] = useState<string>("");
+
+  // Edit Mode State
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   // Fetch Template Config if promptId is present
   useEffect(() => {
@@ -313,6 +317,63 @@ function StudioContent() {
     }
   }
 
+  async function handleEditGenerate(queue: QueueItem[]) {
+    if (!lastFullQualityUrl) return;
+    setGenerating(true);
+    setGenError(null);
+
+    try {
+      // 1. Convert Source URL to Blob
+      const srcRes = await fetch(lastFullQualityUrl);
+      const srcBlob = await srcRes.blob();
+      const srcFile = new File([srcBlob], "source_image.png", { type: "image/png" });
+
+      // 2. Build Form Data
+      const supabase = createSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Please log in to edit.");
+
+      const form = new FormData();
+      form.append("userId", user.id);
+      form.append("canvas_image", srcFile); // Explicitly Canvas Image
+      form.append("intent_queue", JSON.stringify(queue));
+
+      // Append Uploads (Subject Lock)
+      uploads.forEach((f) => form.append("images", f));
+
+      // Append Meta (Optional but good context)
+      if (logo) form.append("logo_image", logo);
+      if (businessName) form.append("business_name", businessName);
+      if (remixAnswers?.subjectLock) form.append("subjectLock", remixAnswers.subjectLock);
+
+      // 3. Call API
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const imageUrl = data.imageUrl;
+      const fullQualityUrl = data.full_quality_url || imageUrl;
+
+      setLastImageUrl(imageUrl);
+      setLastFullQualityUrl(fullQualityUrl);
+      setLightboxOpen(true);
+      setEditModalOpen(false);
+
+    } catch (e: any) {
+      console.error("Edit Generation Error:", e);
+      setGenError(e.message || "Failed to appply edits.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   function handleRemixFromLightbox() {
     if (!handleAuthGate()) return;
     // lightbox "Remix" button now triggers "Edit Remix" flow?
@@ -338,6 +399,13 @@ function StudioContent() {
         onBusinessNameChange={setBusinessName}
         templateConfig={templateConfig}
       />
+      <EditModeModal
+        isOpen={editModalOpen}
+        onClose={() => !generating && setEditModalOpen(false)}
+        sourceImageUrl={lastFullQualityUrl || lastImageUrl || ""}
+        onGenerate={handleEditGenerate}
+        isGenerating={generating}
+      />
       <GenerationLightbox
         open={lightboxOpen}
         url={lastImageUrl}
@@ -346,6 +414,10 @@ function StudioContent() {
         combinedPromptText={editSummary}
         onShare={handleShare}
         onRemix={handleRemixFromLightbox}
+        onEdit={() => {
+          setLightboxOpen(false); // Close lightbox to show Edit Modal clearly
+          setEditModalOpen(true);
+        }}
         fullQualityUrl={lastFullQualityUrl}
       />
 

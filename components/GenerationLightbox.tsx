@@ -27,6 +27,7 @@ type Props = {
   onRename?: (newTitle: string) => void;
   onDelete?: () => void;
   fullQualityUrl?: string | null;
+  onEdit?: () => void;
 };
 
 function normalize(v: any) {
@@ -88,6 +89,7 @@ export default function GenerationLightbox({
   onRename,
   onDelete,
   fullQualityUrl,
+  onEdit
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -273,6 +275,22 @@ export default function GenerationLightbox({
                 <span className="hidden md:block">Remix</span>
                 <Sparkles className="w-4 h-4" />
               </button>
+
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 hover:border-white/20"
+                  title="Edit"
+                >
+                  <span className="hidden md:block">Edit</span>
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 type="button"

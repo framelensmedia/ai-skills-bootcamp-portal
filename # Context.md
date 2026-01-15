@@ -1673,3 +1673,431 @@ Add first-class Prompt Packs to the platform.
 ---
 
 If you want my opinion on the cleanest UX: keep the Prompts page exactly like you described (packs row above templates), and on each template card only show the pack label on hover or as a small pill, so it feels premium and not cluttered.
+
+
+Edit Mode v1: Bubble-Gated + Multi-Change Queue
+Core rule
+
+Users do not see the edit chat input until they choose an Edit Bubble.
+Choosing a bubble sets the edit intent, so the model never guesses.
+
+Edit entry point
+
+On a generation detail page (or lightbox):
+
+Button: Edit
+
+Opens: Edit Drawer / Modal
+
+Shows:
+
+Image preview (locked)
+
+Bubble grid
+
+“+ Add change” button
+
+Disabled state for Generate until at least 1 change is queued
+
+Bubble Grid (Intent Selector)
+
+Each bubble maps to an intent enum.
+
+Recommended v1 intents:
+
+fix_typo
+
+change_text
+
+add_element
+
+remove_element
+
+change_background
+
+change_photo
+
+style_colors
+
+other (freeform)
+
+When user clicks a bubble:
+
+Set active intent
+
+Reveal the chat input area for that intent only
+
+Show a short helper prompt tailored to that bubble
+
+Multi-Change Queue (Up to 3)
+UX
+
+Button: + Add change
+
+Users can add up to 3 changes (max) before running generation.
+
+Each change becomes a “chip/card” in a queue:
+
+Example queue cards:
+
+Change Text: “Headline → Trusted Local Electrical Services”
+
+Change Background: “Modern electrical panel room, blue lighting”
+
+Add Element: “Add ‘Free Estimates’ badge”
+
+Rules
+
+Max queue length: 3
+
+“Generate” runs once using the queue
+
+User can:
+
+Edit a queued item
+
+Remove a queued item
+
+Reorder queued items (optional but nice)
+
+Chat Input Behavior
+Bubble-gated input
+
+Chat input is hidden until an intent bubble is selected.
+
+Input placeholder changes per intent:
+
+Fix Typo: “Type the typo and the correction…”
+
+Change Text: “Tell me what text to change and what to replace it with…”
+
+Change Background: “Describe the new background…”
+
+Other: “Describe what you want changed…”
+
+“Other” bubble
+
+This is always available
+
+Allows free typing
+
+Still forces structured output by requiring the model to translate the user request into one of the allowed internal edit actions (or reject if unsafe / too broad)
+
+Backend Contract (What we send to the model)
+
+When user clicks Generate, send:
+
+source_image_id (or signed URL)
+
+template_id (if this came from a template)
+
+intent_queue (1–3 items)
+
+template_semantic_anchors (headline, subheadline, CTA, contact, logo zone, subject zone, background zone)
+
+lock_rules (do not change face/body, do not invent limbs, etc.)
+
+Queue format (example)
+
+{
+  "source_image_id": "gen_123",
+  "intent_queue": [
+    { "intent": "change_text", "targets": ["headline"], "value": "Trusted Local Electrical Services" },
+    { "intent": "change_background", "value": "modern electrical utility room, subtle blue accents, clean lighting" },
+    { "intent": "add_element", "targets": ["badge"], "value": "Free Estimates" }
+  ]
+}
+
+Global Edit Safety Rules (apply to all intents)
+
+Hard rules to prevent uncanny edits:
+
+Never reconstruct the user’s face
+
+Never invent missing body parts
+
+If template has full body but upload is head/torso only: do not generate legs/torso, instead reposition/crop/mask like Photoshop
+
+Background changes must not alter the subject
+
+Text changes must preserve layout unless user explicitly requests layout change
+
+Prompting Strategy
+
+The model should:
+
+Read the intent queue
+
+Apply only those edits
+
+Return:
+
+new image
+
+structured “what changed” log for UI display
+
+If user request is too broad inside “Other”:
+
+Respond with a clarification UI message, or
+
+Suggest which bubble to use
+
+Nice. Here’s a clean, premium-ready v1 bubble set with exact microcopy. This is written so you can drop it straight into the context doc and hand it to Antigravity without interpretation.
+
+Edit Mode v1 – Bubble Set + Microcopy
+Edit Mode Entry
+
+When user clicks Edit on a generation:
+
+Open Edit Drawer / Modal
+
+Show image preview (locked)
+
+Show bubble grid
+
+Hide chat input until a bubble is selected
+
+Disable Generate until at least one change is queued
+
+Bubble Grid (Primary Actions)
+📝 Fix Typo
+
+Intent: fix_typo
+
+Helper text shown after click:
+
+“Tell me the typo and what it should say.”
+
+Placeholder:
+
+“Change ‘Plumming’ to ‘Plumbing’”
+
+Rules:
+
+Text-only update
+
+No layout, background, or subject changes
+
+Re-render text layer only
+
+✏️ Change Text
+
+Intent: change_text
+
+Follow-up options (quick select):
+
+Headline
+
+Subheadline
+
+CTA Button
+
+Footer / Contact Info
+
+Helper text:
+
+“What should it say instead?”
+
+Placeholder:
+
+“Trusted Local Electrical Services”
+
+Rules:
+
+Preserve font, alignment, and hierarchy
+
+Resize text only if needed to fit container
+
+➕ Add Element
+
+Intent: add_element
+
+Options:
+
+Add CTA button
+
+Add logo
+
+Add badge (Free Estimates, 24/7 Service, Licensed & Insured)
+
+Add divider / accent shape
+
+Helper text:
+
+“What do you want to add?”
+
+Rules:
+
+Snap to template safe zones
+
+Never overlap subject’s face
+
+Never trigger full regeneration
+
+➖ Remove Element
+
+Intent: remove_element
+
+Options:
+
+Remove logo
+
+Remove CTA
+
+Remove badge
+
+Remove background effect
+
+Helper text:
+
+“Which element should be removed?”
+
+Rules:
+
+Clean removal
+
+Auto-adjust spacing
+
+Preserve everything else
+
+🖼 Change Photo
+
+Intent: change_photo
+
+Follow-up choice:
+
+Replace subject photo
+
+Replace background image
+
+Helper text:
+
+“Upload a new photo or describe what to replace.”
+
+Rules:
+
+Subject replacement uses cutout compositing
+
+No body completion
+
+No wardrobe or face changes
+
+🌆 Change Background
+
+Intent: change_background
+
+Helper text:
+
+“What kind of background should this have?”
+
+Placeholder:
+
+“Modern electrical utility room with clean lighting”
+
+Rules:
+
+Background-only regeneration
+
+Subject layer is locked
+
+Match lighting direction and depth
+
+🎨 Style & Colors
+
+Intent: style_colors
+
+Options:
+
+Change color palette
+
+Darker / lighter
+
+More contrast
+
+Softer look
+
+Helper text:
+
+“Describe the look you want.”
+
+Rules:
+
+Global color grading only
+
+No subject edits
+
+💬 Other
+
+Intent: other
+
+Helper text:
+
+“Tell me exactly what you want to change.”
+
+Rules:
+
+Must map to allowed intents internally
+
+If request is too broad, prompt user to clarify
+
+Never full regenerate without confirmation
+
+Multi-Change Queue UX
+
+Button: + Add change
+
+Max changes: 3
+
+Each change becomes a card:
+
+Example:
+
+Change Text → Headline
+
+Change Background → Electrical workspace
+
+Add Element → Free Estimates badge
+
+Each card has:
+
+Edit
+
+Remove
+
+Generate button becomes active when ≥1 change exists.
+
+Generate Button Copy
+
+Default: Apply Changes
+
+Loading: Updating…
+
+Success message:
+
+“Your changes are ready.”
+
+Optional subtext:
+
+“Only the requested edits were applied.”
+
+Global Safety Rules (Non-Negotiable)
+
+These apply to all edit intents:
+
+Uploaded subject is treated as a 2D photographic cutout
+
+Never regenerate face, body, or clothing
+
+Never invent missing limbs or torso
+
+If template shows full body but upload does not:
+
+Reposition
+
+Crop
+
+Mask behind UI elements
+
+Subject identity always overrides template subject
+
+If unsure, preserve and reposition instead of generating

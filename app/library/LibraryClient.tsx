@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
+import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 
 type SortMode = "newest" | "oldest";
 
@@ -128,6 +129,10 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
     const [lbCombined, setLbCombined] = useState("");
     const [lbFullQualityUrl, setLbFullQualityUrl] = useState<string | null>(null);
 
+    // Edit Mode
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+
     function openLightbox(it: LibraryItem) {
         if (isSelectionMode) {
             toggleSelection(it.id);
@@ -147,6 +152,77 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
         if (next.has(id)) next.delete(id);
         else next.add(id);
         setSelectedIds(next);
+    }
+
+    async function handleEditGenerate(queue: QueueItem[]) {
+        if (!lightboxUrl) return;
+        setIsEditing(true);
+        // showToast("Generating edits...", "info");
+
+        try {
+            // Fetch Source Blob
+            const res = await fetch(lightboxUrl);
+            const blob = await res.blob();
+            const file = new File([blob], "source.png", { type: "image/png" });
+
+            const supabase = createSupabaseBrowserClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not authenticated");
+
+            const form = new FormData();
+            form.append("userId", user.id);
+            form.append("canvas_image", file);
+            form.append("intent_queue", JSON.stringify(queue));
+
+            const apiRes = await fetch("/api/generate", {
+                method: "POST",
+                body: form
+            });
+
+            if (!apiRes.ok) {
+                const err = await apiRes.text();
+                throw new Error(err);
+            }
+
+            const data = await apiRes.json();
+
+            // Refresh list (simplest for now, or append)
+            // We'll simulate append for instant feedback
+            const newItem: LibraryItem = {
+                id: data.id || `gen-${Date.now()}`,
+                imageUrl: data.imageUrl,
+                createdAt: new Date().toISOString(),
+                createdAtMs: Date.now(),
+                promptId: null,
+                promptSlug: null,
+                aspectRatio: null,
+                promptTitle: "Edited Remix",
+                promptCategory: null,
+                originalPromptText: "",
+                remixPromptText: "",
+                combinedPromptText: queue.map(q => q.value).join(", "),
+                folder: null,
+                folder_id: null,
+                is_public: false,
+                fullQualityUrl: data.full_quality_url
+            };
+
+            setRemixItems(prev => [newItem, ...prev]);
+
+            // Switch lightbox to new image
+            setLightboxUrl(newItem.imageUrl);
+            setLightboxItemId(newItem.id);
+            setLbFullQualityUrl(newItem.fullQualityUrl || null);
+            setLightboxOpen(true);
+            showToast("Edit complete!");
+            setEditModalOpen(false);
+
+        } catch (e: any) {
+            console.error(e);
+            showToast("Edit failed: " + e.message, "error");
+        } finally {
+            setIsEditing(false);
+        }
     }
 
     function closeLightbox() {
@@ -580,6 +656,10 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 combinedPromptText={lbCombined}
                 onShare={handleShare}
                 onRemix={handleRemix}
+                onEdit={() => {
+                    setLightboxOpen(false);
+                    setEditModalOpen(true);
+                }}
                 onDelete={() => {
                     if (lightboxItemId) {
                         handleDelete(lightboxItemId).then(() => closeLightbox());
@@ -587,6 +667,14 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 }}
                 title="Remix"
                 fullQualityUrl={lbFullQualityUrl}
+            />
+
+            <EditModeModal
+                isOpen={editModalOpen}
+                onClose={() => !isEditing && setEditModalOpen(false)}
+                sourceImageUrl={lightboxUrl || ""}
+                onGenerate={handleEditGenerate}
+                isGenerating={isEditing}
             />
 
             <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
