@@ -82,5 +82,5 @@ export default async function RemixPage({ params }: Props) {
         }
     };
 
-    return <RemixClient initialRemix={fullRemixData} />;
+    return <RemixClient key={id} initialRemix={fullRemixData} />;
 }

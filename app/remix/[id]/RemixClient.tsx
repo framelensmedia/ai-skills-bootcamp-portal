@@ -142,7 +142,7 @@ export default function RemixClient({ initialRemix }: Props) {
         }
 
         load();
-    }, [id, initialRemix, remix]); // Dependency on 'remix' is tricky here if we set it inside. 
+    }, [id]); // Only re-run if ID changes. 'remix' state change should not trigger re-fetch. 
     // Handled by defining 'currentRemix' var. 
     // Better: Only trigger if ID changes or on mount.
     // Actually, if we have initialRemix, we skip step 1.
