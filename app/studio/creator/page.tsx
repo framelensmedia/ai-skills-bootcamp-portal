@@ -83,7 +83,7 @@ function CreatorContent() {
                     .select("template_config_json, subject_mode")
                     .eq("id", promptId)
                     .maybeSingle()
-                    .then(({ data }) => {
+                    .then(({ data }: { data: { template_config_json: any; subject_mode: "human" | "non_human" } | null }) => {
                         if (data) {
                             const config = data.template_config_json || {};
                             setTemplateConfig({
