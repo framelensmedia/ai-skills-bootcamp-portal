@@ -1,16 +1,15 @@
-"use client";
-
-import { useState } from "react";
+// ... imports
+import { useState, useRef } from "react";
 import Image from "next/image";
-import { Sparkles, Send, X } from "lucide-react";
+import { Sparkles, Send, X, Paperclip, Trash2 } from "lucide-react";
 
-export type QueueItem = any; // Deprecated, keeping for type drift if any external files ref it, but unused locally.
+export type QueueItem = any;
 
 type Props = {
     isOpen: boolean;
     onClose: () => void;
     sourceImageUrl: string;
-    onGenerate: (prompt: string) => void;
+    onGenerate: (prompt: string, images: File[]) => void;
     isGenerating?: boolean;
 };
 
@@ -25,20 +24,33 @@ const SUGGESTIONS = [
 
 export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGenerate, isGenerating }: Props) {
     const [input, setInput] = useState("");
+    const [images, setImages] = useState<File[]>([]);
+    const fileRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const p = input.trim();
+        // Allow submitting if there are images, even if prompt is empty? Usually prompt is needed.
         if (!p || isGenerating) return;
-        onGenerate(p);
+        onGenerate(p, images);
         setInput("");
+        setImages([]);
     };
 
     const handleSuggestion = (s: string) => {
         if (isGenerating) return;
-        onGenerate(s);
+        onGenerate(s, images); // Pass current images if any
+        setInput("");
+        setImages([]);
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files);
+            setImages(prev => [...prev, ...newFiles].slice(0, 4)); // Max 4 images
+        }
     };
 
     return (
@@ -75,8 +87,8 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         </button>
                     </div>
 
-                    {/* Chat Area (Empty state or history if we implemented history, but for now single turn) */}
-                    <div className="flex-1 flex flex-col justify-end p-4 space-y-4">
+                    {/* Chat Area */}
+                    <div className="flex-1 flex flex-col justify-end p-4 space-y-4 overflow-y-auto">
 
                         <div className="flex-1 flex items-center justify-center text-center opacity-30 px-6">
                             <div>
@@ -84,6 +96,23 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                                 <p className="text-xs mt-1">E.g. Fix a typo, change the background, adjust the vibe...</p>
                             </div>
                         </div>
+
+                        {/* Image Previews */}
+                        {images.length > 0 && (
+                            <div className="flex gap-2 overflow-x-auto py-2">
+                                {images.map((file, i) => (
+                                    <div key={i} className="relative h-16 w-16 shrink-0 rounded-lg border border-white/10 overflow-hidden group">
+                                        <img src={URL.createObjectURL(file)} className="h-full w-full object-cover" alt="preview" />
+                                        <button
+                                            onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
+                                            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Suggestions */}
                         <div className="flex flex-wrap gap-2">
@@ -102,19 +131,38 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         {/* Input */}
                         <form onSubmit={handleSubmit} className="relative">
                             <input
-                                className="w-full rounded-xl bg-black border border-white/10 p-4 pr-12 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all"
-                                placeholder={isGenerating ? "Processing..." : "Type your edit..."}
+                                className="w-full rounded-xl bg-black border border-white/10 p-4 pr-20 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all"
+                                placeholder={isGenerating ? "Processing..." : "Type instruction..."}
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 disabled={isGenerating}
                             />
-                            <button
-                                type="submit"
-                                disabled={!input.trim() || isGenerating}
-                                className="absolute right-2 top-2 p-2 rounded-lg text-[#B7FF00] hover:bg-[#B7FF00]/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                            >
-                                {isGenerating ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : <Send size={18} />}
-                            </button>
+
+                            <div className="absolute right-2 top-2 flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => fileRef.current?.click()}
+                                    disabled={isGenerating || images.length >= 4}
+                                    className="p-2 rounded-lg text-white/50 hover:bg-white/10 disabled:opacity-30 transition-colors"
+                                >
+                                    <Paperclip size={18} />
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!input.trim() || isGenerating}
+                                    className="p-2 rounded-lg text-[#B7FF00] hover:bg-[#B7FF00]/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                                >
+                                    {isGenerating ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : <Send size={18} />}
+                                </button>
+                            </div>
+                            <input
+                                type="file"
+                                ref={fileRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                multiple
+                                accept="image/*"
+                            />
                         </form>
                     </div>
                 </div>

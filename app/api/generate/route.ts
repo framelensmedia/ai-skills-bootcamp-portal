@@ -271,6 +271,12 @@ export async function POST(req: Request) {
             const data = await fileToBase64(canvasFile);
             imageParts.push({ inlineData: { mimeType: canvasFile.type, data } });
 
+            // Also attach any additional images (reference style, object, etc)
+            for (const f of imageFiles) {
+                const d = await fileToBase64(f);
+                imageParts.push({ inlineData: { mimeType: f.type, data: d } });
+            }
+
         } else {
             // --- REMIX MODE ---
             // Inputs: Template (File or URL) + Optional User Subject

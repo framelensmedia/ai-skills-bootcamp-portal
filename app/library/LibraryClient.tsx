@@ -164,7 +164,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
         setSelectedIds(next);
     }
 
-    async function handleEditGenerate(prompt: string) {
+    async function handleEditGenerate(prompt: string, images: File[] = []) {
         if (!lightboxUrl) return;
         setIsEditing(true);
 
@@ -210,6 +210,11 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
             form.append("canvas_image", file);
             form.append("prompt", prompt);
             form.append("edit_instructions", prompt);
+
+            // Append additional user images
+            images.forEach((img) => {
+                form.append("images", img);
+            });
 
             const apiRes = await fetch("/api/generate", {
                 method: "POST",
