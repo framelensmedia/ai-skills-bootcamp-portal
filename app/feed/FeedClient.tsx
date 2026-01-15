@@ -270,7 +270,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     return (
-        <main className="mx-auto w-full max-w-md px-4 py-8 text-white font-sans pb-32 relative">
+        <main className="mx-auto w-full max-w-4xl px-4 py-8 text-white font-sans pb-32 relative">
             <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Community Feed</h1>
@@ -294,7 +294,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 </div>
             </div>
 
-            <div className="space-y-12">
+            <div className="mx-auto max-w-md space-y-12">
                 {items.map((item, index) => (
                     <article ref={index === items.length - 1 ? lastElementRef : null} key={`${item.id}-${index}`} className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden">
                         <div className="p-4 flex items-center gap-3">

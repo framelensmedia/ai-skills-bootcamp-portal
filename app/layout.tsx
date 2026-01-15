@@ -9,20 +9,20 @@ import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aiskillsbootcamp.com"),
-  title: "AI Skills Bootcamp",
+  metadataBase: new URL("https://aiskills.studio"),
+  title: "AI Skills Studio",
   description: "Learn high-value AI skills and build real projects.",
   openGraph: {
-    title: "AI Skills Bootcamp",
+    title: "AI Skills Studio",
     description: "Learn high-value AI skills and build real projects.",
-    url: "https://aiskillsbootcamp.com",
-    siteName: "AI Skills Bootcamp",
+    url: "https://aiskills.studio",
+    siteName: "AI Skills Studio",
     images: [
       {
         url: "https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png",
         width: 1200,
         height: 630,
-        alt: "AI Skills Bootcamp",
+        alt: "AI Skills Studio",
       },
     ],
     locale: "en_US",
@@ -30,12 +30,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Skills Bootcamp",
+    title: "AI Skills Studio",
     description: "Learn high-value AI skills and build real projects.",
     images: ["https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png"],
   },
 };
-
 export const viewport = {
   themeColor: "black",
   width: "device-width",
@@ -61,7 +60,7 @@ export default function RootLayout({
                 <Link href="/" className="flex min-w-0 items-center gap-3">
                   <Image
                     src="/logo-symbol.png"
-                    alt="AI Skills Bootcamp"
+                    alt="AI Skills Studio"
                     width={36}
                     height={36}
                     priority
@@ -71,7 +70,7 @@ export default function RootLayout({
                   {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
                   <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
                     <span className="text-lime-400">AI Skills</span>{" "}
-                    <span className="text-white">Bootcamp</span>
+                    <span className="text-white">Studio</span>
                   </span>
                 </Link>
 
@@ -79,8 +78,8 @@ export default function RootLayout({
                 <div className="shrink-0">
                   <Nav />
                 </div>
-              </div>
-            </header>
+              </div >
+            </header >
 
             {/* Main Content */}
             <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>

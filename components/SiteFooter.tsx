@@ -11,7 +11,7 @@ export default function SiteFooter() {
                 ⚡
               </span>
               <span className="text-sm font-semibold tracking-wide text-white">
-                AI SKILLS BOOTCAMP
+                AI SKILLS STUDIO
               </span>
             </div>
             <p className="mt-3 text-sm text-white/60">
@@ -65,13 +65,13 @@ export default function SiteFooter() {
               Contact
             </p>
             <p className="mt-3 text-sm text-white/60">
-              support@aiskillsbootcamp.com
+              support@aiskills.studio
             </p>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 md:flex-row md:items-center md:justify-between">
-          <p>© {new Date().getFullYear()} AI Skills Bootcamp</p>
+          <p>© {new Date().getFullYear()} AI Skills Studio</p>
           <div className="flex gap-4">
             <Link href="/terms" className="hover:text-white">
               Terms

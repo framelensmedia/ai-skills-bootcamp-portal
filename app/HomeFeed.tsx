@@ -462,7 +462,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         “I stopped guessing and started executing. The prompts and remix tool paid for themselves fast.”
                     </p>
                     <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-white/50">
-                        Member, AI Skills Bootcamp
+                        Member, AI Skills Studio
                     </p>
                 </div>
             </section>
