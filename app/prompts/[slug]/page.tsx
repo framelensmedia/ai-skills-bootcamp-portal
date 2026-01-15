@@ -10,7 +10,7 @@ import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/Remi
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -871,7 +871,18 @@ function PromptContent() {
           <section className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
             <div className="flex items-center justify-between px-2">
               <div className="text-xl font-bold tracking-tight text-white">Prompt Tool</div>
-              <div className="text-xs font-semibold text-lime-400 uppercase tracking-widest">AI Studio</div>
+              {manualMode ? (
+                <button
+                  type="button"
+                  onClick={() => setManualMode(false)}
+                  className="text-xs font-bold text-white/40 hover:text-white uppercase tracking-wider transition-colors flex items-center gap-1 group"
+                >
+                  <ChevronLeft size={12} className="group-hover:-translate-x-0.5 transition-transform" />
+                  Back to Menu
+                </button>
+              ) : (
+                <div className="text-xs font-semibold text-lime-400 uppercase tracking-widest">AI Studio</div>
+              )}
             </div>
 
             {isLocked ? (

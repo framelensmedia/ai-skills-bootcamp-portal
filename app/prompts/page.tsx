@@ -154,7 +154,7 @@ export default async function PromptsPage({
             <Palette size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Individual Templates</h2>
+            <h2 className="text-2xl font-bold text-white mb-1">Professional Templates</h2>
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm transition hover:bg-white/5 cursor-default">
               <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
               <span className="text-xs font-medium text-white">Pick a prompt and remix it</span>

@@ -10,6 +10,7 @@ export type TemplateConfig = {
     editable_fields: { id: string; label: string; default: string }[];
     editable_groups?: { label: string; fields: string[] }[]; // fields are IDs
     subject_mode?: "human" | "non_human";
+    force_minimal_flow?: boolean;
 };
 
 const DEFAULT_CONFIG: TemplateConfig = {
@@ -97,15 +98,16 @@ export default function RemixChatWizard({
         if (!templateConfig) return [];
 
         const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo", data?: any }[] = [];
+        const minimal = templateConfig.force_minimal_flow;
 
         // 1. Intro (Photo Upload)
         list.push({ type: "intro" });
 
-        // 2. Industry Intent
-        list.push({ type: "industry_intent" });
+        // 2. Industry Intent (Skip if minimal)
+        if (!minimal) list.push({ type: "industry_intent" });
 
-        // 3. Business Name
-        list.push({ type: "business" });
+        // 3. Business Name (Skip if minimal)
+        if (!minimal) list.push({ type: "business" });
 
         // 4. Logo
         list.push({ type: "logo" });

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import PromptCard from "@/components/PromptCard";
-import { Wand2, ArrowRight, Flame } from "lucide-react";
+import RemixCard, { RemixItem } from "@/components/RemixCard";
+import { Wand2, ArrowRight, Flame, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import BasicTrainingSection from "@/components/home/BasicTrainingSection";
 import BasicTrainingCards from "@/components/home/BasicTrainingCards";
@@ -271,9 +272,10 @@ type HomeFeedProps = {
     prompts: PublicPrompt[];
     instructorBootcamps?: InstructorBootcamp[];
     favoriteIds: string[]; // Set is not serializable
+    recentRemixes?: RemixItem[];
 };
 
-export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteIds }: HomeFeedProps) {
+export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteIds, recentRemixes = [] }: HomeFeedProps) {
     const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
 
     const sliderPrompts = useMemo(() => {
@@ -377,6 +379,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             {/* TRENDING PROMPTS */}
             <section className="mx-auto max-w-6xl px-4 py-8">
+                {/* ... existing trending prompt header ... */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/10 pb-8">
                     <div>
                         <div className="flex items-center gap-2 mb-3">
@@ -391,7 +394,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             Remix & Create
                         </h2>
                         <p className="text-lg text-white/60 max-w-2xl">
-                            Pick a professional template and remix it to create stunning content for your brand in seconds.
+                            Pick a professional template or find inspiration from the community to remix.
                         </p>
                     </div>
 
@@ -434,6 +437,39 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         <div className="text-sm text-white/60 col-span-4 py-8 text-center">No prompts found.</div>
                     )}
                 </div>
+
+                {/* --- NEW SECTION: COMMUNITY REMIXES --- */}
+                {recentRemixes && recentRemixes.length > 0 && (
+                    <div className="mt-16 pt-8 border-t border-white/10">
+                        {/* Header similar to Trending Prompts */}
+                        <div className="mb-6 flex items-center gap-4">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                                <RefreshCw size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white mb-1">Community Remixes</h3>
+                                <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+                                    <span className="text-blue-400">●</span>
+                                    <span>Fresh inspiration from the studio</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {recentRemixes.map((remix) => (
+                                <RemixCard key={remix.id} item={remix} />
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex justify-center">
+                            <Link href="/feed" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+                                <span>View Community Feed</span>
+                                <ArrowRight size={14} className="opacity-50 group-hover:translate-x-0.5 transition-transform" />
+                            </Link>
+                        </div>
+                    </div>
+                )}
+                {/* --- END NEW SECTION --- */}
 
                 <div className="mt-8 flex justify-center md:hidden">
                     <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">

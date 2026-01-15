@@ -2101,3 +2101,268 @@ Mask behind UI elements
 Subject identity always overrides template subject
 
 If unsure, preserve and reposition instead of generating
+
+
+Below is a **clean, copy-paste-ready Antigravity prompt + context** you can drop straight into your project.
+It is written to be **implementation-focused**, not conceptual, and aligned with everything you’ve already built.
+
+No fluff. This is the “build it” spec.
+
+---
+
+# ANTIGRAVITY CONTEXT: PROMPT STUDIO V2 (AUTO / MANUAL)
+
+## PRODUCT INTENT
+
+Upgrade the Prompt Studio to support two creation modes:
+
+* **AUTO** — guided, chat-based creation for non-technical users
+* **MANUAL** — direct prompt input for power users
+
+Both modes must feed into the **same generation pipeline**, saving outputs to the user’s library and supporting Edit, Remix, and New flows.
+
+The goal is to make creation feel effortless for beginners while still powerful for advanced users.
+
+---
+
+## CORE UX STRUCTURE
+
+### Entry Point: Prompt Studio Page
+
+At the top of the page, add a toggle:
+
+* **AUTO**
+* **MANUAL**
+
+The layout, preview area, and post-generation actions remain consistent with Guided Remix.
+
+---
+
+## AUTO MODE (PRIMARY MODE)
+
+### PURPOSE
+
+AUTO mode acts as an “easy button” that asks the user a short series of questions and generates an asset without requiring them to write a prompt.
+
+### AUTO MODE FLOW (CHAT-BASED)
+
+Implement a chat UI identical to Guided Remix, but with AUTO-specific questions.
+
+#### Step 1: What are you making?
+
+Display chip options:
+
+* Social flyer
+* Ad / promo
+* Logo
+* Album cover
+* Movie poster
+* Book cover
+* YouTube thumbnail
+* Product mockup
+* Other
+
+Store as:
+`asset_type`
+
+---
+
+#### Step 2: What’s this for?
+
+Single input:
+
+* Business name or project name
+
+Store as:
+`project_name`
+
+---
+
+#### Step 3: What should it say?
+
+Single multiline input with numbered placeholders:
+
+1. Headline
+2. Subheadline
+3. CTA
+4. Offer (optional)
+
+Store as:
+`copy_block`
+
+---
+
+#### Step 4: Uploads (optional)
+
+Allow uploads for:
+
+* Subject photo
+* Logo
+* Product image
+
+Store as:
+`assets`
+
+---
+
+#### Step 5: Vibe
+
+Selectable chips:
+
+* Clean & premium
+* Bold & hype
+* Warm & friendly
+* Luxury
+* Minimal
+* Cinematic
+* Fun / playful
+* Other (free text)
+
+Store as:
+`style_vibe`
+
+---
+
+#### Step 6: Colors (optional)
+
+* Toggle: “Use logo colors”
+* Or free text color input
+
+Store as:
+`color_preferences`
+
+---
+
+#### Step 7: Special instructions
+
+Freeform input:
+
+* Fun / creative instructions
+
+Store as:
+`special_instructions`
+
+---
+
+### AUTO MODE OUTPUT
+
+After final step:
+
+* Construct a **structured JSON object** containing all collected fields
+* Pass it into the **existing generation pipeline**
+* Do NOT expose internal system prompts
+* Save output to the user’s library
+
+After generation, show buttons:
+
+* **Edit**
+* **Remix**
+* **New**
+
+---
+
+## MANUAL MODE
+
+### PURPOSE
+
+For users who prefer direct control.
+
+### MANUAL MODE UI
+
+Display:
+
+* Prompt text area
+* Optional uploads (subject/logo/product)
+* Aspect ratio selector
+* Generate button
+
+Manual mode still:
+
+* Applies internal secret sauce
+* Saves output to library
+* Supports Edit, Remix, New
+
+---
+
+## GENERATION PIPELINE (SHARED)
+
+Both AUTO and MANUAL modes must:
+
+* Call the same generation service
+* Save results in the same schema
+* Support:
+
+  * Edit Mode (canvas-based)
+  * Remix (variation)
+  * New (fresh start)
+
+AUTO mode differs only in how inputs are collected.
+
+---
+
+## EDIT MODE (REQUIRED COMPATIBILITY)
+
+* Edit always opens a **new chat session**
+* The latest generated image is always passed as the **canvas image**
+* Each edit produces a new generation version
+* Edit bubbles:
+
+  * Fix typo
+  * Replace text
+  * Add / remove element
+  * Change colors
+  * Change photo
+  * Other
+
+Edits must not regenerate or remove text unless explicitly requested.
+
+---
+
+## IMPLEMENTATION RULES
+
+1. Do NOT introduce template-type standards yet
+2. Do NOT over-optimize semantic anchors yet
+3. Focus on reliability, speed, and user flow
+4. Keep AUTO mode to **7 steps max**
+5. Keep UI playful, modern, and non-technical
+
+---
+
+## ACCEPTANCE CRITERIA
+
+* A first-time user can create an asset in under 2 minutes using AUTO mode
+* Manual mode remains fully functional and flexible
+* Generated outputs are saved and editable
+* Edit mode behaves like Nano Banana (true image editing)
+* No internal prompts are exposed to the user
+
+---
+
+## DELIVERABLES
+
+* Updated Prompt Studio UI with AUTO / MANUAL toggle
+* AUTO mode chat flow implemented
+* Structured output passed into existing generation logic
+* Post-generation actions wired correctly
+* No regressions in Guided Remix or Edit Mode
+
+---
+
+## SUMMARY FOR ANTIGRAVITY
+
+This upgrade is about **UX, not model changes**.
+
+AUTO mode is a guided wrapper around the existing pipeline.
+MANUAL mode remains unchanged.
+
+Build for speed, simplicity, and delight.
+
+---
+
+If you want next, I can:
+
+* Write the **AUTO → generation prompt transformer**
+* Define the **generic user-copyable prompt format**
+* Help you name this feature in-product so it feels iconic
+
+Just say the word.
