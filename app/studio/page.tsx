@@ -317,7 +317,7 @@ function StudioContent() {
     }
   }
 
-  async function handleEditGenerate(queue: QueueItem[]) {
+  async function handleEditGenerate(prompt: string) {
     if (!lastFullQualityUrl) return;
     setGenerating(true);
     setGenError(null);
@@ -336,7 +336,8 @@ function StudioContent() {
       const form = new FormData();
       form.append("userId", user.id);
       form.append("canvas_image", srcFile); // Explicitly Canvas Image
-      form.append("intent_queue", JSON.stringify(queue));
+      form.append("prompt", prompt); // Simple text instruction
+      form.append("edit_instructions", prompt); // Ensure backend sees strict edit instruction
 
       // Append Uploads (Subject Lock)
       uploads.forEach((f) => form.append("images", f));
@@ -376,9 +377,6 @@ function StudioContent() {
 
   function handleRemixFromLightbox() {
     if (!handleAuthGate()) return;
-    // lightbox "Remix" button now triggers "Edit Remix" flow?
-    // Or "New Remix".
-    // Requirement: "Edit Remix" opens new chat with previous values.
     setWizardOpen(true);
     setLightboxOpen(false);
   }

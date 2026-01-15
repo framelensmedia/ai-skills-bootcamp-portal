@@ -121,7 +121,7 @@ export async function POST(req: Request) {
         let headline: string | null = null;
         let templateFile: File | null = null;
         let canvasFile: File | null = null;
-        let userSubjectFile: File | null = null; // Added this line
+        let userSubjectFile: File | null = null;
         let subjectLock = false;
         let industryIntent: string | null = null;
         let intentQueue: any[] = [];
@@ -189,17 +189,16 @@ export async function POST(req: Request) {
             remix_prompt_text = String(body.remix ?? "").trim() || null;
             combined_prompt_text = rawPrompt;
             // We don't get original_prompt_text explicitly in the current JSON payload from prompt page,
-            // but that's okay, it's optional meta.
             subjectLock = String(body.subjectLock ?? "false").trim() === "true";
             industryIntent = String(body.industry_intent ?? "").trim() || null;
             intentQueue = body.intent_queue || [];
         }
 
         // 2. Validation
-        if (!rawPrompt && intentQueue.length === 0) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
+        if (!rawPrompt && (!Array.isArray(intentQueue) || intentQueue.length === 0)) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
 
         // Strict Edit Mode Validation
-        if (intentQueue.length > 0 && !canvasFile) {
+        if (Array.isArray(intentQueue) && intentQueue.length > 0 && !canvasFile) {
             return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image." }, { status: 400 });
         }
 
@@ -231,14 +230,11 @@ export async function POST(req: Request) {
         const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
         const location = (process.env.GOOGLE_CLOUD_LOCATION || "global").trim();
 
-        // Handle CREDENTIALS_JSON potentially being a string or already broken lines
-        // Ideally it's a single line JSON string in env var
         const credsJson = mustEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
         let credentials;
         try {
             credentials = JSON.parse(credsJson);
         } catch {
-            // Some users put file path or malformed json
             throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON");
         }
 
@@ -258,17 +254,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
         }
 
-        // User requested "Gemini 3 Image Preview".
         const model = process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
-
-        // Match nano-banana config
-        // Use declared 'location' (from top of file)
         const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
 
         const imageParts: any[] = [];
 
-        const isEditMode = intentQueue.length > 0;
+        const isEditMode = (Array.isArray(intentQueue) && intentQueue.length > 0) || !!canvasFile;
 
         if (isEditMode) {
             // --- EDIT MODE ---
@@ -339,8 +331,6 @@ export async function POST(req: Request) {
             }
         }
 
-
-
         const subjectRules = imageFiles.length > 0
             ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
@@ -353,8 +343,8 @@ export async function POST(req: Request) {
 ` : "";
 
         let editModeInstruction = "";
-        if (intentQueue.length > 0) {
-            const queueList = intentQueue.map((q, i) => `ACTION: ${q.intent.toUpperCase()} -> ${q.value}`).join("\n");
+        if (Array.isArray(intentQueue) && intentQueue.length > 0) {
+            const queueList = intentQueue.map((q, i) => `ACTION: ${String(q.intent).toUpperCase()} -> ${q.value}`).join("\n");
 
             editModeInstruction = `
 ### EDIT INSTRUCTIONS (STRICT)
@@ -370,6 +360,20 @@ ${queueList}
 4.  **STYLE CONSISTENCY**: Match the font dictation, color, and style of the existing design.
 
 Apply ONLY the actions listed above.
+`;
+        } else if (isEditMode && edit_instructions) {
+            editModeInstruction = `
+### EDIT INSTRUCTIONS
+You are an expert image editor. Your goal is to apply changes to the provided CANVAS IMAGE.
+
+### USER INSTRUCTION:
+"${edit_instructions}"
+
+### GLOBAL CONSTRAINTS:
+1.  **PRESERVE LAYOUT**: Unless asked to change layout, keep the composition.
+2.  **PRESERVE TEXT**: Unless asked to change text, keep existing text legible.
+
+Execute the user's instruction precisely.
 `;
         }
 
@@ -443,7 +447,7 @@ Apply ONLY the actions listed above.
 
         // 8a. Upload Original (Full Quality)
         const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-        const originalFilePath = `users / ${userId}/${Date.now()}.${originalExt}`;
+        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
 
         const { error: uploadOriginalError } = await admin.storage
             .from("generations")

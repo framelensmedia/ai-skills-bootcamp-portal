@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
-import EditModeModal, { QueueItem } from "@/components/EditModeModal";
+import EditModeModal from "@/components/EditModeModal";
 
 type SortMode = "newest" | "oldest";
 
@@ -154,14 +154,13 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
         setSelectedIds(next);
     }
 
-    async function handleEditGenerate(queue: QueueItem[]) {
+    async function handleEditGenerate(prompt: string) {
         if (!lightboxUrl) return;
         setIsEditing(true);
-        // showToast("Generating edits...", "info");
 
         try {
             // Fetch Source Blob
-            const res = await fetch(lightboxUrl);
+            const res = await fetch(lbFullQualityUrl || lightboxUrl);
             const blob = await res.blob();
             const file = new File([blob], "source.png", { type: "image/png" });
 
@@ -172,7 +171,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
             const form = new FormData();
             form.append("userId", user.id);
             form.append("canvas_image", file);
-            form.append("intent_queue", JSON.stringify(queue));
+            form.append("prompt", prompt);
+            form.append("edit_instructions", prompt);
 
             const apiRes = await fetch("/api/generate", {
                 method: "POST",
@@ -186,8 +186,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
 
             const data = await apiRes.json();
 
-            // Refresh list (simplest for now, or append)
-            // We'll simulate append for instant feedback
+            // Create new item with edit applied
             const newItem: LibraryItem = {
                 id: data.id || `gen-${Date.now()}`,
                 imageUrl: data.imageUrl,
@@ -198,21 +197,22 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 aspectRatio: null,
                 promptTitle: "Edited Remix",
                 promptCategory: null,
-                originalPromptText: "",
-                remixPromptText: "",
-                combinedPromptText: queue.map(q => q.value).join(", "),
+                originalPromptText: lbOriginal,
+                remixPromptText: prompt,
+                combinedPromptText: lbCombined ? `${lbCombined} → ${prompt}` : prompt,
                 folder: null,
                 folder_id: null,
                 is_public: false,
-                fullQualityUrl: data.full_quality_url
+                fullQualityUrl: data.fullQualityUrl
             };
 
             setRemixItems(prev => [newItem, ...prev]);
 
-            // Switch lightbox to new image
+            // Update lightbox to show new edited image (for continued editing)
             setLightboxUrl(newItem.imageUrl);
             setLightboxItemId(newItem.id);
             setLbFullQualityUrl(newItem.fullQualityUrl || null);
+            setLbCombined(newItem.combinedPromptText);
             setLightboxOpen(true);
             showToast("Edit complete!");
             setEditModalOpen(false);
