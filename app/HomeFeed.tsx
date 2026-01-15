@@ -438,6 +438,12 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     )}
                 </div>
 
+                <div className="mt-6 flex justify-center md:hidden">
+                    <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+                        <span>View More Prompts</span>
+                    </Link>
+                </div>
+
                 {/* --- NEW SECTION: COMMUNITY REMIXES --- */}
                 {recentRemixes && recentRemixes.length > 0 && (
                     <div className="mt-16 pt-8 border-t border-white/10">
@@ -471,11 +477,6 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                 )}
                 {/* --- END NEW SECTION --- */}
 
-                <div className="mt-8 flex justify-center md:hidden">
-                    <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
-                        <span>View More Prompts</span>
-                    </Link>
-                </div>
             </section>
 
             {/* BASIC TRAINING MODULES - Repurposed Tutorials section */}
@@ -501,10 +502,10 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         Member, AI Skills Studio
                     </p>
                 </div>
-            </section>
+            </section >
 
             {/* FINAL CTA */}
-            <section className="mx-auto max-w-6xl px-4 pb-14">
+            < section className="mx-auto max-w-6xl px-4 pb-14" >
                 <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-black p-6 text-center md:p-10">
                     <h2 className="text-2xl font-black md:text-4xl">
                         READY TO <span className="text-[#B7FF00]">CREATE?</span>
@@ -535,7 +536,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     </div>
                     <p className="mt-4 text-xs text-white/50">Free tier available. Upgrade anytime.</p>
                 </div>
-            </section>
+            </section >
         </>
     );
 }
