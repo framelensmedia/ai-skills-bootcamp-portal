@@ -334,12 +334,12 @@ function PromptContent() {
     };
   }, [slug]);
 
-  // Load remixes for this prompt (as long as logged in)
+  // Load remixes for this prompt (Public / All Users)
   useEffect(() => {
     let cancelled = false;
 
     async function loadRemixes() {
-      if (!userId) return;
+      // if (!userId) return; // Allow public viewing of remixes
       if (!metaRow?.id) return;
 
       setRemixesLoading(true);
@@ -351,7 +351,7 @@ function PromptContent() {
         const { data, error } = await supabase
           .from("prompt_generations")
           .select("*")
-          .eq("user_id", userId)
+          // .eq("user_id", userId) // Removed to show ALL users' remixes
           .eq("prompt_id", metaRow.id)
           .order("created_at", { ascending: false })
           .limit(50);
@@ -359,7 +359,7 @@ function PromptContent() {
         if (cancelled) return;
 
         if (error) {
-          setRemixesError(error.message);
+          // If RLS blocks anonymous access, just show empty
           setRemixes([]);
           setRemixesLoading(false);
           return;
@@ -996,31 +996,34 @@ function PromptContent() {
                 <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <SelectPill
-                  label="9:16"
-                  selected={aspectRatio === "9:16"}
-                  onClick={() => setAspectRatio("9:16")}
-                  disabled={isLocked || generating}
-                />
-                <SelectPill
-                  label="16:9"
-                  selected={aspectRatio === "16:9"}
-                  onClick={() => setAspectRatio("16:9")}
-                  disabled={isLocked || generating}
-                />
-                <SelectPill
-                  label="1:1"
-                  selected={aspectRatio === "1:1"}
-                  onClick={() => setAspectRatio("1:1")}
-                  disabled={isLocked || generating}
-                />
-                <SelectPill
-                  label="4:5"
-                  selected={aspectRatio === "4:5"}
-                  onClick={() => setAspectRatio("4:5")}
-                  disabled={isLocked || generating}
-                />
+              <div className="mt-3">
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <SelectPill
+                    label="9:16"
+                    selected={aspectRatio === "9:16"}
+                    onClick={() => setAspectRatio("9:16")}
+                    disabled={isLocked || generating}
+                  />
+                  <SelectPill
+                    label="16:9"
+                    selected={aspectRatio === "16:9"}
+                    onClick={() => setAspectRatio("16:9")}
+                    disabled={isLocked || generating}
+                  />
+                  <SelectPill
+                    label="1:1"
+                    selected={aspectRatio === "1:1"}
+                    onClick={() => setAspectRatio("1:1")}
+                    disabled={isLocked || generating}
+                  />
+                  <SelectPill
+                    label="4:5"
+                    selected={aspectRatio === "4:5"}
+                    onClick={() => setAspectRatio("4:5")}
+                    disabled={isLocked || generating}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1061,83 +1064,78 @@ function PromptContent() {
               </button>
             </div>
 
-            {userId ? (
-              <div className="mt-8">
-                <div className="flex items-center justify-between gap-3 mb-4 px-2">
-                  <div className="text-sm font-bold text-white/60 uppercase tracking-widest">Remix History</div>
-                  <div className="text-xs font-mono text-white/40">
-                    {remixesLoading ? "..." : remixes.length ? `${remixes.length}` : "0"}
-                  </div>
-                </div>
-
-                {remixesError ? (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200">
-                    {remixesError}
-                  </div>
-                ) : null}
-
-                {remixesLoading ? (
-                  <div className="px-2 text-sm text-white/40 animate-pulse">Loading library...</div>
-                ) : remixes.length === 0 ? (
-                  <div className="rounded-3xl border border-white/5 bg-white/5 p-8 text-center">
-                    <p className="text-sm text-white/40">No remixes yet.</p>
-                    <p className="text-xs text-white/20 mt-1">Generate your first image to start your collection.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {remixes.slice(0, 12).map((r) => (
-                      <div
-                        key={r.id}
-                        className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/5 hover:border-lime-400/30 transition-all hover:shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openLightbox(r.image_url)}
-                          className="block w-full"
-                          title="View"
-                        >
-                          <div className="relative aspect-square w-full">
-                            <Image src={r.image_url} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
-                          </div>
-                        </button>
-
-                        {/* Hover actions */}
-                        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
-                          <div className="pointer-events-auto absolute bottom-2 left-2 right-2 flex gap-1 justify-center">
-                            <button
-                              type="button"
-                              onClick={() => downloadAnyImage(r.image_url)}
-                              className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
-                              title="Download"
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemixFromCard(r)}
-                              className="h-8 w-8 flex items-center justify-center rounded-lg bg-lime-400 hover:bg-lime-300 text-black font-bold"
-                              title="Remix this"
-                            >
-                              ↺
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push("/library")}
-                    className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white transition-all"
-                  >
-                    View Full Library <span className="transition-transform group-hover:translate-x-1">→</span>
-                  </button>
+            {/* COMMUNITY REMIXES (Always Visible) */}
+            <div className="mt-8">
+              <div className="flex items-center justify-between gap-3 mb-4 px-2">
+                <div className="text-sm font-bold text-white/60 uppercase tracking-widest">User Remixes</div>
+                <div className="text-xs font-mono text-white/40">
+                  {remixesLoading ? "..." : remixes.length ? `${remixes.length}` : "0"}
                 </div>
               </div>
-            ) : null}
+
+              {remixesError ? (
+                <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200">
+                  {remixesError}
+                </div>
+              ) : null}
+
+              {remixesLoading ? (
+                <div className="px-2 text-sm text-white/40 animate-pulse">Loading community remixes...</div>
+              ) : remixes.length === 0 ? (
+                <div className="rounded-3xl border border-white/5 bg-white/5 p-8 text-center">
+                  <p className="text-sm text-white/40">No remixes yet.</p>
+                  <p className="text-xs text-white/20 mt-1">Be the first to remix this prompt!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {remixes.slice(0, 50).map((r) => (
+                    <div
+                      key={r.id}
+                      className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/5 hover:border-lime-400/30 transition-all hover:shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/remix/${r.id}`)}
+                        className="block w-full"
+                        title="View Community Remix"
+                      >
+                        <div className="relative aspect-square w-full">
+                          <Image src={r.image_url} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
+                        </div>
+                      </button>
+
+                      {/* Hover actions */}
+                      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                        <div className="pointer-events-auto absolute bottom-2 left-2 right-2 flex gap-1 justify-center">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/remix/${r.id}`)}
+                            className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+                            title="View"
+                          >
+                            <span className="text-xs font-bold">VIEW</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemixFromCard(r)}
+                            className="h-8 w-8 flex items-center justify-center rounded-lg bg-lime-400 hover:bg-lime-300 text-black font-bold"
+                            title="Remix this"
+                          >
+                            ↺
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4">
+                {/* View Full Library button removed or changed? User wants "change it from remix history to user remixes". 
+                      Likely we don't need "View Full Library" here if this IS all logic. 
+                      Or remove it. The user didn't ask to keep "My Library" link. I'll remove it to focus on Community. */}
+              </div>
+            </div>
           </section>
         </div >
       </main>

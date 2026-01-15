@@ -270,7 +270,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     return (
-        <main className="mx-auto w-full max-w-4xl px-4 py-8 text-white font-sans pb-32 relative">
+        <main className="mx-auto w-full max-w-md px-4 py-8 text-white font-sans pb-32 relative">
             <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Community Feed</h1>
@@ -311,15 +311,15 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                             </div>
                         </div>
 
-                        <div className="relative aspect-square sm:aspect-video w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
+                        <div className="relative aspect-[9/16] w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
                             {/* Guard image rendering */}
                             {item.imageUrl ? (
                                 <Image
                                     src={item.imageUrl}
                                     alt={item.promptTitle}
                                     fill
-                                    className="object-contain sm:object-cover"
-                                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 896px"
+                                    className="object-contain"
+                                    sizes="(max-width: 640px) 100vw, 448px"
                                     loading={index < 2 ? "eager" : "lazy"} // Eager load first 2
                                 />
                             ) : (
