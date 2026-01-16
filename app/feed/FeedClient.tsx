@@ -98,6 +98,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             // Although page requires auth generally.
 
             let q = supabase
+                .from("prompt_generations")
                 .select(`
                 id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, is_public,
                 user_id, prompt_id
