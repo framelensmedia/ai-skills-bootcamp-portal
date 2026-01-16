@@ -10,6 +10,8 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
+import LoadingHourglass from "@/components/LoadingHourglass";
+import LoadingOrb from "@/components/LoadingOrb";
 
 type MediaType = "image" | "video";
 
@@ -573,7 +575,12 @@ function StudioContent() {
                 generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
               ].join(" ")}
             >
-              {generating ? "Generating..." : "Generate Artwork"}
+              {generating ? (
+                <span className="flex items-center gap-2">
+                  <LoadingHourglass className="w-5 h-5 text-black" />
+                  <span>Generating...</span>
+                </span>
+              ) : "Generate Artwork"}
             </button>
 
             {/* Secondary Actions Row */}
@@ -600,6 +607,12 @@ function StudioContent() {
         {/* RIGHT: Preview */}
         <div className="order-1 lg:order-2 space-y-4">
           <div className="group relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]">
+            {/* Generating Overlay */}
+            {generating && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
+                <LoadingOrb />
+              </div>
+            )}
             <div className="relative aspect-[9/16] w-full">
               <Image
                 src={lastImageUrl || previewImageUrl}

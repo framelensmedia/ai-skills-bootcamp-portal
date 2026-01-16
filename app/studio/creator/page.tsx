@@ -9,6 +9,8 @@ import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
+import LoadingHourglass from "@/components/LoadingHourglass";
+import LoadingOrb from "@/components/LoadingOrb";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -383,7 +385,12 @@ function CreatorContent() {
                         onClick={mode === "auto" ? undefined : handleManualGenerate}
                         disabled={generating}
                     >
-                        {generating ? "Generating..." : "Generate Artwork"}
+                        {generating ? (
+                            <span className="flex items-center gap-2">
+                                <LoadingHourglass className="w-5 h-5 text-black" />
+                                <span>Generating...</span>
+                            </span>
+                        ) : "Generate Artwork"}
                     </button>
                 </div>
 
@@ -392,9 +399,8 @@ function CreatorContent() {
                     <div className="sticky top-8 aspect-[4/5] w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl">
                         {/* Generating Overlay */}
                         {generating && (
-                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-                                <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/10 border-t-lime-400"></div>
-                                <div className="mt-4 text-sm font-medium text-lime-400 animate-pulse">Creating masterpiece...</div>
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
+                                <LoadingOrb />
                             </div>
                         )}
 
@@ -405,9 +411,9 @@ function CreatorContent() {
                             className="object-cover opacity-80"
                         />
 
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
 
-                        <div className="absolute bottom-8 left-8 right-8 text-center">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
                             <h3 className="text-2xl font-bold text-white mb-2">Your Artwork</h3>
                             <p className="text-sm text-white/50">
                                 Generated images will appear here. You can then edit, download, or share them.
