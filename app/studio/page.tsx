@@ -4,10 +4,12 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
+import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
 import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
+import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
+import SelectPill from "@/components/SelectPill";
 
 type MediaType = "image" | "video";
 
@@ -16,13 +18,6 @@ type AspectRatio = (typeof ASPECTS)[number];
 
 function normalize(v: any) {
   return String(v ?? "").trim();
-}
-
-function pill(selected: boolean) {
-  const base = "rounded-xl border px-4 py-2 text-sm font-semibold transition";
-  const idle = "border-white/15 bg-black/40 text-white/70 hover:bg-black/55 hover:border-white/25";
-  const on = "border-[#B7FF00]/50 bg-[#B7FF00]/15 text-white hover:bg-[#B7FF00]/20";
-  return [base, selected ? on : idle].join(" ");
 }
 
 async function copyToClipboard(text: string) {
@@ -75,7 +70,7 @@ function StudioContent() {
         .maybeSingle()
         .then(({ data }: { data: any }) => {
           if (data) {
-            if (data.featured_image_url) setPreviewImageUrl(data.featured_image_url);
+            if (data.featured_image_url && !preImg) setPreviewImageUrl(data.featured_image_url);
 
             // Set Aspect Ratio from template if available
             if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
@@ -98,10 +93,7 @@ function StudioContent() {
         });
     } else {
       // Scratch mode / No template loaded
-      setTemplateConfig({
-        editable_fields: [],
-        subject_mode: "non_human"
-      });
+      setTemplateConfig(DEFAULT_CONFIG);
     }
   }, [prePromptId, supabase]);
 
@@ -272,6 +264,9 @@ function StudioContent() {
       }
       if (remixAnswers?.business_name) {
         form.append("business_name", remixAnswers.business_name);
+      }
+      if (remixAnswers?.subject_mode) {
+        form.append("subjectMode", remixAnswers.subject_mode);
       }
 
       // Also append logo if present (override previous logic?)
@@ -451,13 +446,10 @@ function StudioContent() {
           </div>
 
           {/* Edit Summary Display */}
-          {/* Edit Summary Display */}
           <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
             <div className="mb-3 flex items-center gap-2">
               <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
             </div>
-
-
 
             <div className="relative transition-all duration-500">
               <textarea
@@ -477,8 +469,6 @@ function StudioContent() {
             </div>
           </div>
 
-
-
           {/* Generator Settings */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -490,21 +480,51 @@ function StudioContent() {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className={pill(mediaType === "image")} onClick={() => setMediaType("image")}>
-                Image
-              </button>
-              <button type="button" className={pill(mediaType === "video")} onClick={() => setMediaType("video")}>
-                Video
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectPill
+                label="Image"
+                selected={mediaType === "image"}
+                onClick={() => setMediaType("image")}
+                disabled={generating}
+              />
+              <SelectPill label="Video" disabled />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {ASPECTS.map((a) => (
-                <button key={a} type="button" className={pill(aspectRatio === a)} onClick={() => setAspectRatio(a)}>
-                  {a}
-                </button>
-              ))}
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="grid grid-cols-4 gap-2">
+                <SelectPill
+                  label="9:16"
+                  description="Vertical"
+                  icon={<Smartphone size={16} />}
+                  selected={aspectRatio === "9:16"}
+                  onClick={() => setAspectRatio("9:16")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="16:9"
+                  description="Wide"
+                  icon={<Monitor size={16} />}
+                  selected={aspectRatio === "16:9"}
+                  onClick={() => setAspectRatio("16:9")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="1:1"
+                  description="Square"
+                  icon={<Square size={16} />}
+                  selected={aspectRatio === "1:1"}
+                  onClick={() => setAspectRatio("1:1")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="4:5"
+                  description="Rect"
+                  icon={<RectangleVertical size={16} />}
+                  selected={aspectRatio === "4:5"}
+                  onClick={() => setAspectRatio("4:5")}
+                  disabled={generating}
+                />
+              </div>
             </div>
           </div>
 
@@ -541,34 +561,39 @@ function StudioContent() {
           ) : null}
 
           {/* ACTION BUTTONS */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
-            <button
-              type="button"
-              onClick={handleCopyPrompt}
-              className="flex-1 inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-bold tracking-tight text-white hover:bg-white/10 transition-all transform hover:scale-[1.02] backdrop-blur-md"
-            >
-              {copied ? "Copied" : "Copy Prompt Only"}
-            </button>
+          <div className="space-y-4 pt-4 border-t border-white/5">
 
-            <button
-              type="button"
-              onClick={() => { if (handleAuthGate()) setWizardOpen(true); }}
-              className="flex-1 inline-flex items-center justify-center rounded-2xl border border-lime-400/30 bg-lime-400/10 px-6 py-4 text-sm font-bold tracking-tight text-lime-200 hover:bg-lime-400/20 transition-all transform hover:scale-[1.02]"
-            >
-              Start Remix
-            </button>
-
+            {/* Primary Action */}
             <button
               type="button"
               onClick={handleGenerate}
               disabled={generating}
               className={[
-                "flex-[2] inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
-                generating ? "cursor-not-allowed bg-lime-400/60" : "bg-[#B7FF00] hover:bg-lime-300",
+                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
               ].join(" ")}
             >
               {generating ? "Generating..." : "Generate Artwork"}
             </button>
+
+            {/* Secondary Actions Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold tracking-tight text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              >
+                {copied ? "Copied" : "Copy Prompt Only"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { if (handleAuthGate()) setWizardOpen(true); }}
+                className="inline-flex items-center justify-center rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3 text-sm font-bold tracking-tight text-lime-200 hover:bg-lime-400/10 transition-all"
+              >
+                Remix Again
+              </button>
+            </div>
           </div>
         </div>
 

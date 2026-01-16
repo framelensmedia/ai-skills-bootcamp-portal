@@ -24,6 +24,7 @@ export type FeedItem = {
     remixPromptText: string;
     combinedPromptText: string;
     fullQualityUrl?: string | null;
+    promptId?: string | null;
 };
 
 type FeedClientProps = {
@@ -97,13 +98,14 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             // Although page requires auth generally.
 
             let q = supabase
-                .from("prompt_generations")
                 .select(`
                 id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, is_public,
-                user_id
+                user_id, prompt_id
             `)
                 .eq("is_public", true)
                 .range(page * 8, (page + 1) * 8 - 1);
+
+
 
             if (sort === "newest") {
                 q = q.order("created_at", { ascending: false });
@@ -163,6 +165,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                     remixPromptText: remix,
                     combinedPromptText: combined,
                     fullQualityUrl: settings.full_quality_url || null,
+                    promptId: d.prompt_id || null,
                 };
             });
 
@@ -264,8 +267,13 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     const handleRemix = (payload: any) => {
-        const href = `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
+        let href = `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
             `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
+
+        if (payload.promptId) {
+            href += `&promptId=${encodeURIComponent(payload.promptId)}`;
+        }
+
         router.push(href);
     };
 
@@ -352,7 +360,8 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                         imgUrl: item.imageUrl,
                                         remixPromptText: item.remixPromptText,
                                         originalPromptText: item.originalPromptText,
-                                        combinedPromptText: item.combinedPromptText
+                                        combinedPromptText: item.combinedPromptText,
+                                        promptId: item.promptId
                                     })
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 bg-[#B7FF00] text-black rounded-lg text-sm font-bold hover:bg-[#a3e600] transition"

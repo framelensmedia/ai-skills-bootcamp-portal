@@ -63,7 +63,8 @@ export default async function HomePage() {
       originalPromptText: r.original_prompt_text,
       remixPromptText: r.remix_prompt_text,
       combinedPromptText: r.combined_prompt_text,
-      createdAt: r.created_at
+      createdAt: r.created_at,
+      promptId: r.prompt_id || null
     };
   });
 

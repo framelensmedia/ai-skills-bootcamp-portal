@@ -13,7 +13,7 @@ export type TemplateConfig = {
     force_minimal_flow?: boolean;
 };
 
-const DEFAULT_CONFIG: TemplateConfig = {
+export const DEFAULT_CONFIG: TemplateConfig = {
     subject_mode: "non_human",
     editable_fields: [
         { id: "headline", label: "Headline", default: "" },

@@ -40,7 +40,7 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
         }
 
         // Default behavior: Go to Studio with params
-        let href = `/studio/creator?img=${encodeURIComponent(item.imageUrl)}` +
+        let href = `/studio?img=${encodeURIComponent(item.imageUrl)}` +
             `&remix=${encodeURIComponent(item.remixPromptText || item.combinedPromptText || "")}`;
 
         if (item.promptId) {

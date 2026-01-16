@@ -11,6 +11,7 @@ export type RemixDetail = {
     image_url: string;
     created_at: string;
     prompt_slug: string | null;
+    prompt_id?: string | null;
     combined_prompt_text?: string | null;
     user_id: string;
     settings?: any;
@@ -20,10 +21,21 @@ export type RemixDetail = {
         created_at: string;
     };
 };
+// ... (start line 249 original)
+const handleRemixThis = () => {
+    if (remix.prompt_slug) {
+        router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
+    } else {
+        const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
+        router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
+    }
+};
 
 type Props = {
     initialRemix?: RemixDetail | null;
 };
+
+import { cleanPrompt } from "@/lib/stringUtils";
 
 export default function RemixClient({ initialRemix }: Props) {
     const params = useParams();
@@ -101,11 +113,10 @@ export default function RemixClient({ initialRemix }: Props) {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data: fav } = await supabase
-                    .from("favorites")
+                    .from("prompt_favorites")
                     .select("id")
                     .eq("user_id", user.id)
-                    .eq("record_id", id)
-                    .eq("type", "generation")
+                    .eq("generation_id", id)
                     .maybeSingle();
                 setIsFavorited(!!fav);
             }
@@ -162,19 +173,17 @@ export default function RemixClient({ initialRemix }: Props) {
         try {
             if (isFavorited) {
                 await supabase
-                    .from("favorites")
+                    .from("prompt_favorites")
                     .delete()
                     .eq("user_id", user.id)
-                    .eq("record_id", remix.id)
-                    .eq("type", "generation");
+                    .eq("generation_id", remix.id);
                 setIsFavorited(false);
             } else {
                 await supabase
-                    .from("favorites")
+                    .from("prompt_favorites")
                     .insert({
                         user_id: user.id,
-                        record_id: remix.id,
-                        type: "generation"
+                        generation_id: remix.id
                     });
                 setIsFavorited(true);
             }
@@ -239,7 +248,7 @@ export default function RemixClient({ initialRemix }: Props) {
         if (remix.prompt_slug) {
             router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
         } else {
-            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}`);
+            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
         }
     };
 
@@ -370,7 +379,7 @@ export default function RemixClient({ initialRemix }: Props) {
                             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
                                 <div className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Prompt Used</div>
                                 <p className="font-mono text-sm leading-relaxed text-white/80 line-clamp-6">
-                                    {remix.combined_prompt_text}
+                                    {cleanPrompt(remix.combined_prompt_text)}
                                 </p>
                             </div>
                         )}

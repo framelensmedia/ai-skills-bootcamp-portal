@@ -25,21 +25,11 @@ const SYSTEM_CORE = `
 
 const SYSTEM_HUMAN_RULES = `
 [HUMAN SUBJECT IDENTITY LOCK (MANDATORY)]
-- Completely replace the template's human subject with the uploaded subject.
-
-[TEMPLATE SUBJECT NULLIFICATION]
-- If a user uploads a subject photo, ignore the template’s human anatomy entirely.
-- Do NOT transfer body, pose, limbs, clothing, or silhouette from the template subject.
-- The template subject exists only as a spatial/layout guide.
-- The uploaded subject must never be extended, completed, or re-rendered to match the template subject.
-
-[COMPOSITE-FIRST RENDERING]
-- Treat the uploaded subject as a 2D photographic cutout.
-- Do not generate new pixels of the subject outside the uploaded image bounds.
-- Allowed operations: crop, scale, rotate slightly, edge feather, shadow, lighting match.
-- Forbidden operations: body generation, limb completion, uniform synthesis, face recreation.
-- The uploaded subject must remain a 2D photographic cutout, not a 3D rendered person.
-- COMPOSITING STRATEGY: You MUST hide missing body areas by cropping tighter, scaling the subject up, or placing them behind foreground elements (badges, text bars, gradients).
+- PRIMARY GOAL: Preserve the facial identity and key physical characteristics of the uploaded subject.
+- INTEGRATION: You MUST blend the subject naturally into the scene. Match lighting, shadows, and color tone to the template.
+- OUTFIT & BODY: If the user requests an outfit change, GENERATE the new outfit while keeping the subject's face/head. If no outfit change is requested, you may adapt the existing outfit's lighting/style to fit the scene.
+- ADAPTATION: You are allowed to adjust the subject's pose slightly or complete missing parts of the anatomy if needed for the composition, BUT the face must remain recognizable as the uploaded person.
+- AVOID: Do not create a cartoon or caricature unless the style dictates it. Maintain photorealism for the face.
 `;
 
 const SYSTEM_NON_HUMAN_RULES = `
@@ -125,6 +115,7 @@ export async function POST(req: Request) {
         let subjectLock = false;
         let industryIntent: string | null = null;
         let intentQueue: any[] = [];
+        let subjectMode: string = "non_human"; // Default
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -166,6 +157,13 @@ export async function POST(req: Request) {
 
             industryIntent = String(form.get("industry_intent") ?? "").trim() || null;
 
+            // Allow override from client
+            const clientSubjectMode = String(form.get("subjectMode") ?? "").trim();
+            if (clientSubjectMode === "human" || clientSubjectMode === "non_human") {
+                // We'll use this partially to override later
+                subjectMode = clientSubjectMode;
+            }
+
             try {
                 const q = String(form.get("intent_queue") ?? "");
                 if (q) intentQueue = JSON.parse(q);
@@ -190,6 +188,7 @@ export async function POST(req: Request) {
             combined_prompt_text = rawPrompt;
             // We don't get original_prompt_text explicitly in the current JSON payload from prompt page,
             subjectLock = String(body.subjectLock ?? "false").trim() === "true";
+            if (body.subjectMode) subjectMode = String(body.subjectMode).trim();
             industryIntent = String(body.industry_intent ?? "").trim() || null;
             intentQueue = body.intent_queue || [];
         }
@@ -300,8 +299,8 @@ export async function POST(req: Request) {
             }
 
             // 2. User Subject Image (if provided)
-            if (userSubjectFile) {
-                const f: any = userSubjectFile; // safe cast to avoid TS 'never' issue
+            // Fix: We iterate over imageFiles. We implicitly treat the first one as the main subject if multiple.
+            for (const f of imageFiles) {
                 const data = await fileToBase64(f);
                 imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data } });
             }
@@ -322,7 +321,19 @@ export async function POST(req: Request) {
 
         // Fetch internal secret sauce
         let internalRules = "";
-        let subjectMode = "non_human";
+        // subjectMode is already initialized from form/body if present, or "non_human" by default?
+        // Wait, I defined 'subjectMode' variable inside step 1 block in my head but I need to check where it is defined in the file.
+        // It wasn't defined in the top scope in original file.
+        // Let's check line 325: 'let subjectMode = "non_human";'
+
+        // I should have defined it at top level.
+        // Since I only added it to the 'if multipart' block in the previous tool call, it might be scoped (if I used 'let' inside block).
+        // Actually I didn't verify if I used 'let' or assigned to outer.
+        // In the previous step I added: 'subjectMode = clientSubjectMode;' implies assignment.
+        // But 'subjectMode' wasn't defined in top scope in original file! It was defined at line 325.
+        // So my previous edit might have caused a reference error if I tried to assign it before declaration.
+
+        // Let's fix it by properly initializing it at line 125, and using it here.
 
         if (promptId) {
             const { data: dbTemplate } = await admin
@@ -333,12 +344,17 @@ export async function POST(req: Request) {
 
             if (dbTemplate) {
                 internalRules = dbTemplate.system_rules || "";
-                subjectMode = dbTemplate.subject_mode || "non_human";
+                // Only override if not set by client? Or always prefer DB if strict?
+                // Usually DB template rules are strict. But if "Remix" allows changing mode...
+                // If client specifically sent it (from Wizard), we should probably respect it OR fallback.
+                if (!subjectMode || subjectMode === "non_human") {
+                    subjectMode = dbTemplate.subject_mode || "non_human";
+                }
             }
         }
 
         const subjectRules = imageFiles.length > 0
-            ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
+            ? ((subjectMode === "human" || subjectLock) ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
 
         const bgSwapInstruction = industryIntent ? `

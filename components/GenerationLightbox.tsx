@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { cleanPrompt } from "@/lib/stringUtils";
 
 type Props = {
   open: boolean;
@@ -374,7 +375,7 @@ export default function GenerationLightbox({
                 <div
                   className={`whitespace-pre-wrap text-sm leading-relaxed text-white/90 font-mono opacity-80 overflow-hidden transition-all duration-300 ${isExpanded ? '' : 'max-h-[150px] mask-linear-fade-bottom'}`}
                 >
-                  {(c || o) || <span className="text-white/30 italic">Waiting for generation...</span>}
+                  {cleanPrompt(c || o) || <span className="text-white/30 italic">Waiting for generation...</span>}
                 </div>
 
                 {/* Accordion Toggle */}

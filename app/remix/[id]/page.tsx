@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import RemixClient, { RemixDetail } from "./RemixClient";
 
 type Props = {
-    params: { id: string };
+    params: Promise<{ id: string }>;
 };
 
 // 1. Generate Metadata
@@ -11,7 +11,7 @@ export async function generateMetadata(
     { params }: Props,
     parent: ResolvingMetadata
 ): Promise<Metadata> {
-    const id = params.id;
+    const { id } = await params;
     const supabase = await createSupabaseServerClient();
 
     const { data: remix } = await supabase
@@ -48,7 +48,7 @@ export async function generateMetadata(
 
 // 2. Server Component Page
 export default async function RemixPage({ params }: Props) {
-    const id = params.id;
+    const { id } = await params;
     const supabase = await createSupabaseServerClient();
 
     // Fetch Full Data
