@@ -11,6 +11,8 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
+import LoadingHourglass from "@/components/LoadingHourglass";
+import LoadingOrb from "@/components/LoadingOrb";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -871,6 +873,12 @@ function PromptContent() {
                   className="object-contain"
                   priority
                 />
+                {/* Generating Overlay */}
+                {generating && (
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
+                    <LoadingOrb />
+                  </div>
+                )}
 
                 {/* Expand Icon Overlay - Subtle */}
                 <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white">
@@ -1127,13 +1135,16 @@ function PromptContent() {
                 onClick={handleGenerate}
                 disabled={isLocked || generating}
               >
-                {generating
-                  ? "Generating..."
-                  : lockReason === "login"
-                    ? "Log in to Generate"
-                    : isLocked
-                      ? "Upgrade to Pro"
-                      : "Generate Artwork"}
+                {generating ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingHourglass className="w-5 h-5 text-black" />
+                    <span>Generating...</span>
+                  </span>
+                ) : lockReason === "login"
+                  ? "Log in to Generate"
+                  : isLocked
+                    ? "Upgrade to Pro"
+                    : "Generate Artwork"}
               </button>
             </div>
 

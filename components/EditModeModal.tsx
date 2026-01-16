@@ -2,6 +2,8 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { Sparkles, Send, X, Paperclip, Trash2 } from "lucide-react";
+import LoadingHourglass from "./LoadingHourglass";
+import LoadingOrb from "./LoadingOrb";
 
 export type QueueItem = any;
 
@@ -70,6 +72,12 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                             className="object-contain"
                             unoptimized
                         />
+                        {/* Loading Overlay */}
+                        {isGenerating && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-500">
+                                <LoadingOrb />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -152,7 +160,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                                     disabled={!input.trim() || isGenerating}
                                     className="p-2 rounded-lg text-[#B7FF00] hover:bg-[#B7FF00]/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                                 >
-                                    {isGenerating ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : <Send size={18} />}
+                                    {isGenerating ? <div className="h-4 w-4"><LoadingHourglass className="h-4 w-4 text-[#B7FF00]" /></div> : <Send size={18} />}
                                 </button>
                             </div>
                             <input
