@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -13,7 +13,34 @@ import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "luc
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
 function TypeWriter({ text }: { text: string }) {
-    return <div className="text-xl font-bold text-white">{text}</div>;
+    const [visible, setVisible] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisible(true);
+                observer.disconnect();
+            }
+        });
+        if (ref.current) observer.observe(ref.current);
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={ref} className="text-xl font-bold text-white tracking-tight mb-4 min-h-[28px]">
+            {text.split("").map((char, i) => (
+                <span
+                    key={i}
+                    className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ transitionDelay: `${i * 50}ms` }}
+                >
+                    {char === " " ? "\u00A0" : char}
+                </span>
+            ))}
+            <span className={`inline-block ml-0.5 animate-pulse text-lime-400 ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
+        </div>
+    );
 }
 
 function CreatorContent() {
