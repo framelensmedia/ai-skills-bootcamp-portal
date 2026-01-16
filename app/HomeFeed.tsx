@@ -346,10 +346,10 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 </Link>
 
                                 <Link
-                                    href="/studio"
+                                    href="/studio/creator"
                                     className="inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-6 py-4 text-sm font-semibold text-white hover:bg-white/10"
                                 >
-                                    Open Prompt Studio →
+                                    Open Creator Studio →
                                 </Link>
                             </div>
                         </div>
@@ -522,10 +522,10 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             Browse Prompts
                         </Link>
                         <Link
-                            href="/studio"
+                            href="/studio/creator"
                             className="inline-flex w-full justify-center rounded-md border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 sm:w-auto"
                         >
-                            Open Prompt Studio
+                            Open Creator Studio
                         </Link>
                         <Link
                             href="/pricing"
