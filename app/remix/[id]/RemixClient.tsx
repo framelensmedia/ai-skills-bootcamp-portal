@@ -21,15 +21,7 @@ export type RemixDetail = {
         created_at: string;
     };
 };
-// ... (start line 249 original)
-const handleRemixThis = () => {
-    if (remix.prompt_slug) {
-        router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
-    } else {
-        const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
-        router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
-    }
-};
+
 
 type Props = {
     initialRemix?: RemixDetail | null;
@@ -245,10 +237,12 @@ export default function RemixClient({ initialRemix }: Props) {
     };
 
     const handleRemixThis = () => {
+        if (!remix) return;
         if (remix.prompt_slug) {
             router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
         } else {
-            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
+            const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
+            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
         }
     };
 
