@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -45,6 +45,31 @@ export default function RemixClient({ initialRemix }: Props) {
 
     // Pagination state
     const [visibleCount, setVisibleCount] = useState(8);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const isFetchingRef = useRef(false); // Ref to track fetching state synchronously
+    // const sentinelRef = useRef<HTMLDivElement>(null); // REMOVED
+    const observerRef = useRef<IntersectionObserver | null>(null);
+
+    const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+        if (loading) return;
+
+        if (observerRef.current) observerRef.current.disconnect();
+
+        if (node) {
+            observerRef.current = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && !isFetchingRef.current && hasMore) {
+                    setPage((prev) => prev + 1);
+                }
+            }, {
+                root: null,
+                rootMargin: "500px",
+                threshold: 0.1
+            });
+            observerRef.current.observe(node);
+        }
+    }, [loading, hasMore]);
 
     useEffect(() => {
         if (!id) return;
@@ -127,25 +152,60 @@ export default function RemixClient({ initialRemix }: Props) {
                 setUserRemixes(otherRemixes as any);
             }
 
-            // Load Random Community Remixes
-            const { data: randomData } = await supabase
-                .from("prompt_generations")
-                .select("id, image_url, created_at")
-                .eq("is_public", true)
-                .neq("user_id", currentRemix.user_id)
-                .order("created_at", { ascending: false })
-                .limit(50);
-
-            if (randomData) {
-                const shuffled = randomData.sort(() => 0.5 - Math.random());
-                setCommunityRemixes(shuffled.slice(0, 8) as any);
-            }
-
             setLoading(false);
         }
 
         load();
-    }, [id]); // Only re-run if ID changes. 'remix' state change should not trigger re-fetch. 
+    }, [id]);
+
+    useEffect(() => {
+        const fetchCommunity = async () => {
+            if (!hasMore || isFetchingRef.current) return;
+
+            setIsFetchingMore(true);
+            isFetchingRef.current = true;
+
+            try {
+                const supabase = createSupabaseBrowserClient();
+                const from = page * 12;
+                const to = from + 11;
+
+                // Artificial delay to prevent rapid-fire requests if needed, but not strictly necessary
+                // await new Promise(r => setTimeout(r, 500));
+
+                const { data, error } = await supabase
+                    .from("prompt_generations")
+                    .select("id, image_url, created_at")
+                    .eq("is_public", true)
+                    .neq("id", id || "") // Exclude current remix, but allow same user
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false }) // Secondary sort for stable pagination
+                    .range(from, to);
+
+                if (data) {
+                    if (data.length < 12) {
+                        setHasMore(false);
+                    }
+
+                    setCommunityRemixes((prev) => {
+                        if (page === 0 && prev.length === 0) return data as any;
+                        const existing = new Set(prev.map(p => p.id));
+                        const newItems = data.filter((p: any) => !existing.has(p.id));
+                        return [...prev, ...newItems] as any;
+                    });
+                } else {
+                    setHasMore(false);
+                }
+            } finally {
+                setIsFetchingMore(false);
+                isFetchingRef.current = false;
+            }
+        };
+
+        if (remix) {
+            fetchCommunity();
+        }
+    }, [page, remix?.user_id]);
     // Handled by defining 'currentRemix' var. 
     // Better: Only trigger if ID changes or on mount.
     // Actually, if we have initialRemix, we skip step 1.
@@ -270,7 +330,7 @@ export default function RemixClient({ initialRemix }: Props) {
 
                 <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
                     {/* Image Column */}
-                    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square">
+                    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last">
                         <Image
                             src={remix.image_url}
                             alt="User Remix"
@@ -408,7 +468,7 @@ export default function RemixClient({ initialRemix }: Props) {
                         {visibleCount < userRemixes.length && (
                             <div className="mt-8 flex justify-center">
                                 <button
-                                    onClick={() => setVisibleCount(prev => prev + 12)}
+                                    onClick={() => setVisibleCount((prev: number) => prev + 12)}
                                     className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:border-white/20 active:scale-95"
                                 >
                                     Show More
@@ -424,7 +484,7 @@ export default function RemixClient({ initialRemix }: Props) {
 
                 {/* Community Remixes */}
                 {communityRemixes.length > 0 && (
-                    <div>
+                    <div className="pb-10">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold text-white">More Community Remixes</h2>
                             <button
@@ -435,7 +495,7 @@ export default function RemixClient({ initialRemix }: Props) {
                             </button>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {communityRemixes.map((r) => (
+                            {communityRemixes.map((r, i) => (
                                 <button
                                     key={r.id}
                                     onClick={() => router.push(`/remix/${r.id}`)}
@@ -445,11 +505,20 @@ export default function RemixClient({ initialRemix }: Props) {
                                         src={r.image_url}
                                         alt="Community Remix"
                                         fill
+                                        loading="lazy"
+                                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                                         className="object-cover group-hover:opacity-90 transition-opacity"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </button>
                             ))}
+                        </div>
+
+                        {/* Sentinel for Intersection Observer */}
+                        <div ref={sentinelRef} className="mt-8 flex h-10 w-full items-center justify-center">
+                            {isFetchingMore && (
+                                <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#B7FF00]"></span>
+                            )}
                         </div>
                     </div>
                 )}
