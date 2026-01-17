@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Check, Play, Clock, BookOpen, ArrowRight, Loader2 } from "lucide-react";
@@ -29,6 +30,7 @@ type Props = {
 
 export default function BasicTrainingCards({ className = "" }: Props) {
     const { user } = useAuth();
+    const router = useRouter();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const [bootcamps, setBootcamps] = useState<Bootcamp[]>([]);
@@ -174,6 +176,12 @@ export default function BasicTrainingCards({ className = "" }: Props) {
                     <Link
                         key={bootcamp.id}
                         href={`/learn/${bootcamp.slug}`}
+                        onClick={(e) => {
+                            if (!user) {
+                                e.preventDefault();
+                                router.push("/login");
+                            }
+                        }}
                         className={`
               group relative flex flex-col overflow-hidden rounded-2xl border transition-all duration-300
               ${isCompleted
@@ -264,10 +272,10 @@ export default function BasicTrainingCards({ className = "" }: Props) {
                                 )}
 
                                 <div className={`flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-300 ${isCompleted
-                                        ? "border-green-500/30 bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-black group-hover:border-green-500"
-                                        : isStarted
-                                            ? "border-[#B7FF00]/30 bg-[#B7FF00]/10 text-[#B7FF00] group-hover:bg-[#B7FF00] group-hover:text-black group-hover:border-[#B7FF00]"
-                                            : "border-white/10 bg-white/5 text-white/40 group-hover:border-[#B7FF00] group-hover:bg-[#B7FF00] group-hover:text-black"
+                                    ? "border-green-500/30 bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-black group-hover:border-green-500"
+                                    : isStarted
+                                        ? "border-[#B7FF00]/30 bg-[#B7FF00]/10 text-[#B7FF00] group-hover:bg-[#B7FF00] group-hover:text-black group-hover:border-[#B7FF00]"
+                                        : "border-white/10 bg-white/5 text-white/40 group-hover:border-[#B7FF00] group-hover:bg-[#B7FF00] group-hover:text-black"
                                     }`}>
                                     <ArrowRight size={14} className="-ml-0.5 group-hover:translate-x-0.5 transition-transform" />
                                 </div>

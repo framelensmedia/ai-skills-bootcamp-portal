@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Rocket, ArrowRight, Play, CheckCircle } from "lucide-react";
@@ -29,6 +30,7 @@ type Props = {
 
 export default function BasicTrainingSection({ className = "" }: Props) {
     const { user } = useAuth();
+    const router = useRouter();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const [bootcamps, setBootcamps] = useState<Bootcamp[]>([]);
@@ -141,7 +143,16 @@ export default function BasicTrainingSection({ className = "" }: Props) {
 
                 {/* LEFT: Featured Image */}
                 <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-2xl">
-                    <Link href={nextMissionUrl} className="block h-full w-full">
+                    <Link
+                        href={nextMissionUrl}
+                        onClick={(e) => {
+                            if (!user) {
+                                e.preventDefault();
+                                router.push("/login");
+                            }
+                        }}
+                        className="block h-full w-full"
+                    >
                         {activeBootcamp.thumbnail_url ? (
                             <Image
                                 src={activeBootcamp.thumbnail_url}
@@ -202,6 +213,12 @@ export default function BasicTrainingSection({ className = "" }: Props) {
                     <div>
                         <Link
                             href={nextMissionUrl}
+                            onClick={(e) => {
+                                if (!user) {
+                                    e.preventDefault();
+                                    router.push("/login");
+                                }
+                            }}
                             className="inline-flex items-center gap-3 bg-[#B7FF00] text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#a3e600] active:scale-95 transition-all shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)] hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.5)]"
                         >
                             {isComplete ? "Review Mission" : isStarted ? "Resume Mission" : "Start Basic Training"}

@@ -409,6 +409,8 @@ function StudioContent() {
         businessName={businessName}
         onBusinessNameChange={setBusinessName}
         templateConfig={templateConfig}
+        isGuest={!user}
+        onGuestInteraction={() => handleAuthGate()}
       />
       <EditModeModal
         isOpen={editModalOpen}
@@ -466,7 +468,7 @@ function StudioContent() {
 
               <div className="mt-4">
                 <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
-                <ImageUploader files={uploads} onChange={setUploads} />
+                <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
               </div>
             </div>
           </div>

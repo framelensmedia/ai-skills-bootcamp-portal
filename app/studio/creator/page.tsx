@@ -11,6 +11,10 @@ import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import PromptCard from "@/components/PromptCard";
+import RemixCard from "@/components/RemixCard";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -73,6 +77,65 @@ function CreatorContent() {
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [previewImage, setPreviewImage] = useState<string>("/orb-neon.gif"); // Default placeholder
+
+    // Community Feed Data
+    const [communityPrompts, setCommunityPrompts] = useState<any[]>([]);
+    const [communityRemixes, setCommunityRemixes] = useState<any[]>([]);
+
+    // Fetch Community Content
+    useEffect(() => {
+        const fetchCommunityContent = async () => {
+            // Fetch Prompts
+            const { data: promptsData } = await supabase
+                .from("prompts_public")
+                .select("id, title, slug, summary, category, access_level, image_url, featured_image_url, media_url")
+                .order("created_at", { ascending: false })
+                .limit(4);
+
+            if (promptsData) setCommunityPrompts(promptsData);
+
+            // Fetch Remixes
+            const { data: remixesData } = await supabase
+                .from("prompt_generations")
+                .select(`
+                     id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
+                     user_id, prompt_id
+                  `)
+                .eq("is_public", true)
+                .order("created_at", { ascending: false })
+                .limit(4);
+
+            if (remixesData) {
+                // Fetch profiles for remixes
+                const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id)));
+                let profileMap = new Map();
+                if (userIds.length > 0) {
+                    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
+                    profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
+                }
+
+                const processedRemixes = remixesData.map((r: any) => {
+                    const profile = profileMap.get(r.user_id) || {};
+                    const settings = r.settings || {};
+                    return {
+                        id: r.id,
+                        imageUrl: r.image_url,
+                        title: settings.headline || "Untitled Remix",
+                        username: profile.full_name || "Anonymous Creator",
+                        userAvatar: profile.profile_image || null,
+                        upvotesCount: r.upvotes_count || 0,
+                        originalPromptText: r.original_prompt_text,
+                        remixPromptText: r.remix_prompt_text,
+                        combinedPromptText: r.combined_prompt_text,
+                        createdAt: r.created_at,
+                        promptId: r.prompt_id || null
+                    };
+                });
+                setCommunityRemixes(processedRemixes);
+            }
+        };
+        fetchCommunityContent();
+    }, [supabase]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -279,6 +342,8 @@ function CreatorContent() {
                             businessName={businessName}
                             onBusinessNameChange={setBusinessName}
                             templateConfig={templateConfig}
+                            isGuest={!user}
+                            onGuestInteraction={() => handleAuthGate()}
                         />
 
                         {/* AUTO MODE */}
@@ -301,11 +366,13 @@ function CreatorContent() {
                                     rows={8}
                                     placeholder="Describe your image..."
                                     value={manualPrompt}
+                                    onClick={handleAuthGate}
+                                    onFocus={handleAuthGate}
                                 />
 
                                 <div className="mt-4">
                                     <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
-                                    <ImageUploader files={uploads} onChange={setUploads} />
+                                    <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
                                 </div>
                             </div>
                         )}
@@ -392,6 +459,51 @@ function CreatorContent() {
                             </span>
                         ) : "Generate Artwork"}
                     </button>
+
+                    {/* View Community Feed Button */}
+                    <Link
+                        href="/feed"
+                        className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white transition hover:bg-white/10 hover:border-white/20"
+                    >
+                        View Community Feed
+                        <ArrowRight size={16} />
+                    </Link>
+
+                    {/* Trending Prompts */}
+                    {communityPrompts.length > 0 && (
+                        <div className="pt-6 border-t border-white/10">
+                            <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider opacity-60">Trending Prompts</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {communityPrompts.map((p) => (
+                                    <div key={p.id} className="scale-[0.85] origin-top-left -mr-[15%] -mb-[15%]">
+                                        <PromptCard
+                                            id={p.id}
+                                            title={p.title}
+                                            summary={p.summary || ""}
+                                            slug={p.slug}
+                                            featuredImageUrl={p.featured_image_url || p.image_url || p.media_url}
+                                            category={p.category}
+                                            accessLevel={p.access_level}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Community Remixes */}
+                    {communityRemixes.length > 0 && (
+                        <div className="pt-6 border-t border-white/10">
+                            <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider opacity-60">Community Remixes</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {communityRemixes.map((r) => (
+                                    <div key={r.id}>
+                                        <RemixCard item={r} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT COLUMN: Preview / Results */}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
+import { Menu } from "lucide-react";
 
 export default function Nav() {
   const router = useRouter();
@@ -152,23 +153,31 @@ export default function Nav() {
             </div>
           </div>
         ) : (
-          <Link
-            href="/login"
-            className="hidden rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 sm:inline-flex"
-          >
-            Log in
-          </Link>
+          <div className="hidden sm:flex items-center gap-3">
+            <Link
+              href="/login"
+              className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-black hover:bg-lime-300"
+            >
+              Sign Up
+            </Link>
+          </div>
         )}
 
         {/* Mobile toggle */}
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10 sm:hidden"
+          className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 h-9 w-9 text-white hover:bg-white/10 sm:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
           aria-expanded={mobileOpen ? "true" : "false"}
         >
-          Menu
+          <Menu size={20} />
         </button>
       </nav>
 

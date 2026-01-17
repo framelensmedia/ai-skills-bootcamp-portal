@@ -36,6 +36,8 @@ type Props = {
     businessName: string;
     onBusinessNameChange: (name: string) => void;
     templateConfig?: TemplateConfig;
+    isGuest?: boolean;
+    onGuestInteraction?: () => void;
 };
 
 type Message = {
@@ -80,7 +82,9 @@ export default function RemixChatWizard({
     logo,
     onLogoChange,
     businessName,
-    onBusinessNameChange
+    onBusinessNameChange,
+    isGuest,
+    onGuestInteraction
 }: Props) {
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
@@ -343,7 +347,15 @@ export default function RemixChatWizard({
                     {/* Input Area */}
                     <div className="border-t border-white/10 bg-black/80 backdrop-blur-xl p-4 shrink-0 z-10 pb-8 md:pb-6">
                         {activeStep?.type === "intro" ? (
-                            <button onClick={() => advanceStep()} className="w-full rounded-xl bg-lime-400 py-4 text-sm font-bold text-black hover:bg-lime-300 md:py-3">
+                            <button
+                                onClick={() => {
+                                    if (isGuest && onGuestInteraction) {
+                                        onGuestInteraction();
+                                        return;
+                                    }
+                                    advanceStep();
+                                }}
+                                className="w-full rounded-xl bg-lime-400 py-4 text-sm font-bold text-black hover:bg-lime-300 md:py-3">
                                 {uploads.length > 0 ? "Use these images" : "Skip Upload"}
                             </button>
                         ) : activeStep?.type === "logo" ? (
@@ -363,7 +375,16 @@ export default function RemixChatWizard({
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">
                                     <input
-                                        autoFocus
+                                        autoFocus={!isGuest}
+                                        onClick={() => {
+                                            if (isGuest && onGuestInteraction) onGuestInteraction();
+                                        }}
+                                        onFocus={(e) => {
+                                            if (isGuest && onGuestInteraction) {
+                                                onGuestInteraction();
+                                                e.target.blur();
+                                            }
+                                        }}
                                         className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
                                         placeholder={activeStep?.type === "group" ? "Enter numbered answers..." : "Enter new value..."}
                                         value={inputVal}
@@ -375,12 +396,28 @@ export default function RemixChatWizard({
                                             }
                                         }}
                                     />
-                                    <button onClick={() => advanceStep()} className="rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black hover:bg-lime-300 whitespace-nowrap">
+                                    <button
+                                        onClick={() => {
+                                            if (isGuest && onGuestInteraction) {
+                                                onGuestInteraction();
+                                                return;
+                                            }
+                                            advanceStep();
+                                        }}
+                                        className="rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black hover:bg-lime-300 whitespace-nowrap">
                                         Next
                                     </button>
                                 </div>
                                 <div className="flex gap-2 justify-end">
-                                    <button onClick={() => advanceStep(true)} className="px-3 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
+                                    <button
+                                        onClick={() => {
+                                            if (isGuest && onGuestInteraction) {
+                                                onGuestInteraction();
+                                                return;
+                                            }
+                                            advanceStep(true);
+                                        }}
+                                        className="px-3 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
                                         Skip / Keep Original
                                     </button>
                                     {showRemove && (

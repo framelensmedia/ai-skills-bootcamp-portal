@@ -8,9 +8,10 @@ type Props = {
     onChange: (files: File[]) => void;
     maxFiles?: number;
     disabled?: boolean;
+    onUploadStart?: (e: React.MouseEvent) => void;
 };
 
-export default function ImageUploader({ files, onChange, maxFiles = 10, disabled }: Props) {
+export default function ImageUploader({ files, onChange, maxFiles = 10, disabled, onUploadStart }: Props) {
     const [previews, setPreviews] = useState<string[]>([]);
 
     useEffect(() => {
@@ -66,6 +67,11 @@ export default function ImageUploader({ files, onChange, maxFiles = 10, disabled
 
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <label
+                    onClick={(e) => {
+                        if (onUploadStart) {
+                            onUploadStart(e);
+                        }
+                    }}
                     className={[
                         "inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 transition hover:bg-black/60",
                         disabled ? "cursor-not-allowed opacity-50" : "",

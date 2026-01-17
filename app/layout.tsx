@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import Header from "@/components/Header";
 import AIAssistant from "@/components/AIAssistant";
 import BackToTop from "@/components/BackToTop";
 import { ToastContextProvider } from "@/context/ToastContext";
@@ -54,35 +55,10 @@ export default function RootLayout({
         <AuthProvider>
           <ToastContextProvider>
             {/* Header */}
-            <header className="bg-black border-b border-white/10">
-              <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-                {/* Logo / Brand */}
-                <Link href="/" className="flex min-w-0 items-center gap-3">
-                  <Image
-                    src="/logo-symbol.png"
-                    alt="AI Skills Studio"
-                    width={36}
-                    height={36}
-                    priority
-                    className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
-                  />
-
-                  {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
-                  <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
-                    <span className="text-lime-400">AI Skills</span>{" "}
-                    <span className="text-white">Studio</span>
-                  </span>
-                </Link>
-
-                {/* Navigation */}
-                <div className="shrink-0">
-                  <Nav />
-                </div>
-              </div >
-            </header >
+            <Header />
 
             {/* Main Content */}
-            <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+            <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-24">{children}</main>
 
             {/* AI Assistant Chat Bubble */}
             <AIAssistant />

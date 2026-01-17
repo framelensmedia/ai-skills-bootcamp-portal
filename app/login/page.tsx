@@ -33,14 +33,14 @@ function LoginContent() {
       return;
     }
 
-    // ✅ Redirect back to the prompt (or wherever), fallback to dashboard
-    router.push(redirectTo || "/dashboard");
+    // ✅ Redirect back to the prompt (or wherever), fallback to feed
+    router.push(redirectTo || "/feed");
     router.refresh();
   }
 
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-10 text-white">
-      <div className="rounded-3xl border border-white/10 bg-black/40 p-6">
+    <div className="flex min-h-[calc(100vh-12rem)] w-full flex-col items-center justify-center py-10 text-white">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-black/40 p-6">
         <h1 className="text-2xl font-semibold">Log in</h1>
         <p className="mt-2 text-sm text-white/70">
           {redirectTo
@@ -98,7 +98,7 @@ function LoginContent() {
           </button>
         </form>
       </div>
-    </main>
+    </div>
   );
 }
 
