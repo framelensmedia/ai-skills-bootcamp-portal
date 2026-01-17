@@ -39,7 +39,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-12rem)] w-full flex-col items-center justify-center py-10 text-white">
+    <div className="flex min-h-[calc(100vh-10rem)] w-full flex-col items-center justify-center py-10 text-white">
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-black/40 p-6">
         <h1 className="text-2xl font-semibold">Log in</h1>
         <p className="mt-2 text-sm text-white/70">
