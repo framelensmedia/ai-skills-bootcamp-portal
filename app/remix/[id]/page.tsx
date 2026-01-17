@@ -35,13 +35,11 @@ export async function generateMetadata(
         openGraph: {
             title: title,
             description: description,
-            images: [remix.image_url], // Use the generated image as OG Image
         },
         twitter: {
             card: "summary_large_image",
             title: title,
             description: description,
-            images: [remix.image_url],
         },
     };
 }
