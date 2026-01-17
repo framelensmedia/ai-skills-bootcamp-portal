@@ -303,7 +303,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 </div>
             </div>
 
-            <div className="mx-auto max-w-md md:max-w-5xl space-y-12 md:space-y-0 md:grid md:grid-cols-2 md:gap-8">
+            <div className="mx-auto max-w-md md:max-w-6xl space-y-12 md:space-y-0 md:grid md:grid-cols-3 md:gap-6">
                 {items.map((item, index) => (
                     <article ref={index === items.length - 1 ? lastElementRef : null} key={`${item.id}-${index}`} className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden">
                         <div className="p-4 flex items-center gap-3">
@@ -328,7 +328,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                     alt={item.promptTitle}
                                     fill
                                     className="object-contain"
-                                    sizes="(max-width: 768px) 100vw, 50vw"
+                                    sizes="(max-width: 768px) 100vw, 33vw"
                                     loading={index < 2 ? "eager" : "lazy"} // Eager load first 2
                                 />
                             ) : (

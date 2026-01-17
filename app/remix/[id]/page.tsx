@@ -35,11 +35,13 @@ export async function generateMetadata(
         openGraph: {
             title: title,
             description: description,
+            images: [`/remix/${id}/opengraph-image`], // Explicitly override layout default
         },
         twitter: {
             card: "summary_large_image",
             title: title,
             description: description,
+            images: [`/remix/${id}/opengraph-image`],
         },
     };
 }
