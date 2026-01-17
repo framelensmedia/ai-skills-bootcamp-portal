@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -15,6 +15,7 @@ import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -81,11 +82,25 @@ function CreatorContent() {
     // Community Feed Data
     const [communityPrompts, setCommunityPrompts] = useState<any[]>([]);
     const [communityRemixes, setCommunityRemixes] = useState<any[]>([]);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingRemixes, setLoadingRemixes] = useState(false);
+    const observer = useRef<IntersectionObserver | null>(null);
 
-    // Fetch Community Content
+    const lastRemixRef = useCallback((node: HTMLDivElement | null) => {
+        if (loadingRemixes) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && hasMore) {
+                setPage((prev) => prev + 1);
+            }
+        });
+        if (node) observer.current.observe(node);
+    }, [loadingRemixes, hasMore]);
+
+    // Fetch Prompts (Once)
     useEffect(() => {
-        const fetchCommunityContent = async () => {
-            // Fetch Prompts
+        const fetchPrompts = async () => {
             const { data: promptsData } = await supabase
                 .from("prompts_public")
                 .select("id, title, slug, summary, category, access_level, image_url, featured_image_url, media_url")
@@ -93,8 +108,20 @@ function CreatorContent() {
                 .limit(4);
 
             if (promptsData) setCommunityPrompts(promptsData);
+        };
+        fetchPrompts();
+    }, [supabase]);
 
-            // Fetch Remixes
+    // Fetch Remixes (Paginated)
+    useEffect(() => {
+        const fetchRemixes = async () => {
+            if (!hasMore) return;
+            setLoadingRemixes(true);
+
+            const LIMIT = 6;
+            const from = page * LIMIT;
+            const to = from + LIMIT - 1;
+
             const { data: remixesData } = await supabase
                 .from("prompt_generations")
                 .select(`
@@ -103,9 +130,13 @@ function CreatorContent() {
                   `)
                 .eq("is_public", true)
                 .order("created_at", { ascending: false })
-                .limit(4);
+                .range(from, to);
 
             if (remixesData) {
+                if (remixesData.length < LIMIT) {
+                    setHasMore(false);
+                }
+
                 // Fetch profiles for remixes
                 const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id)));
                 let profileMap = new Map();
@@ -131,11 +162,20 @@ function CreatorContent() {
                         promptId: r.prompt_id || null
                     };
                 });
-                setCommunityRemixes(processedRemixes);
+
+                setCommunityRemixes((prev) => {
+                    // Avoid duplicates just in case
+                    const newIds = new Set(processedRemixes.map((r: any) => r.id));
+                    const filteredPrev = prev.filter(p => !newIds.has(p.id));
+                    return [...filteredPrev, ...processedRemixes];
+                });
+            } else {
+                setHasMore(false);
             }
+            setLoadingRemixes(false);
         };
-        fetchCommunityContent();
-    }, [supabase]);
+        fetchRemixes();
+    }, [page, supabase]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -489,23 +529,24 @@ function CreatorContent() {
                         <div className="pt-6 border-t border-white/10">
                             <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider opacity-60">Community Remixes</h3>
                             <div className="grid grid-cols-2 gap-4">
-                                {communityRemixes.map((r) => (
-                                    <div key={r.id}>
+                                {communityRemixes.map((r, index) => (
+                                    <div key={r.id} ref={index === communityRemixes.length - 1 ? lastRemixRef : null}>
                                         <RemixCard item={r} />
                                     </div>
                                 ))}
                             </div>
+                            {loadingRemixes && (
+                                <div className="py-4 flex justify-center w-full">
+                                    <LoadingOrb />
+                                </div>
+                            )}
+
+                            {/* Sticky Back To Top for Feed */}
+                            <div className="sticky bottom-8 flex justify-center pointer-events-none z-50 mt-8">
+                                <GalleryBackToTop />
+                            </div>
                         </div>
                     )}
-
-                    {/* View Community Feed Button */}
-                    <Link
-                        href="/feed"
-                        className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-4 text-sm font-bold text-white transition hover:bg-white/10 hover:border-white/20"
-                    >
-                        View Community Feed
-                        <ArrowRight size={16} />
-                    </Link>
                 </div>
 
                 {/* RIGHT COLUMN: Preview / Results */}
@@ -539,6 +580,8 @@ function CreatorContent() {
         </main>
     );
 }
+
+
 
 function SelectPill({
     label,

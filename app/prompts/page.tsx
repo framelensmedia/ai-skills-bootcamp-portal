@@ -4,6 +4,7 @@ import PackCarousel from "@/components/PackCarousel";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { Wand2, Layers, Palette, RefreshCw } from "lucide-react";
+import PromptsFooter from "./PromptsFooter";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,16 +37,7 @@ export default async function PromptsPage({
     .order("created_at", { ascending: false })
     .limit(12);
 
-  // Fetch Community Remixes (recent 8)
-  const { data: remixesData } = await supabase
-    .from("prompt_generations")
-    .select(`
-         id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
-         user_id, prompt_id
-      `)
-    .eq("is_public", true)
-    .order("created_at", { ascending: false })
-    .limit(8);
+
 
   // Get template counts for each pack
   const packs = await Promise.all(
@@ -64,33 +56,7 @@ export default async function PromptsPage({
       })
   );
 
-  // Process Remixes
-  const rawRemixes = remixesData || [];
-  const remixUserIds = Array.from(new Set(rawRemixes.map((r: any) => r.user_id)));
 
-  let profileMap = new Map();
-  if (remixUserIds.length > 0) {
-    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", remixUserIds);
-    profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
-  }
-
-  const recentRemixes: RemixItem[] = rawRemixes.map((r: any) => {
-    const profile = profileMap.get(r.user_id) || {};
-    const settings = r.settings || {};
-    return {
-      id: r.id,
-      imageUrl: r.image_url,
-      title: settings.headline || "Untitled Remix",
-      username: profile.full_name || "Anonymous Creator",
-      userAvatar: profile.profile_image || null,
-      upvotesCount: r.upvotes_count || 0,
-      originalPromptText: r.original_prompt_text,
-      remixPromptText: r.remix_prompt_text,
-      combinedPromptText: r.combined_prompt_text,
-      createdAt: r.created_at,
-      promptId: r.prompt_id || null
-    };
-  });
 
   // Build query from SAFE VIEW
   // Added pack_name and pack_slug to select
@@ -228,29 +194,8 @@ export default async function PromptsPage({
         </div>
       </div>
 
-      {/* Community Remixes Section */}
-      {recentRemixes.length > 0 && (
-        <div className="mt-20 pt-10 border-t border-white/10">
-          <div className="mb-8 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-              <RefreshCw size={24} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-1">Community Remixes</h2>
-              <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm transition hover:bg-white/5 cursor-default">
-                <span className="text-blue-400">●</span>
-                <span className="text-xs font-medium text-white">Fresh inspiration made by creators like you</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {recentRemixes.map((remix) => (
-              <RemixCard key={remix.id} item={remix} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Client-Side Footer: Trending Prompts & Infinite Infinite Remixes */}
+      <PromptsFooter />
     </div>
 
   );

@@ -54,7 +54,7 @@ function BackToTopContent() {
             onClick={scrollToTop}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`fixed bottom-8 left-8 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-black border border-white/20 text-white shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all duration-500 hover:bg-white/10 hover:border-white/40 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
+            className={`fixed bottom-8 left-8 md:left-1/2 md:-translate-x-1/2 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-black border border-white/20 text-white shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all duration-500 hover:bg-white/10 hover:border-white/40 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
                 } animate-border-pulse`}
             aria-label="Back to top"
         >

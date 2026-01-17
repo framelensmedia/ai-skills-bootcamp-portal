@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Loading from "@/components/Loading";
 
-import { useEffect, useMemo, useState, useRef, Suspense } from "react";
+import { useEffect, useMemo, useState, useRef, Suspense, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
@@ -13,6 +13,9 @@ import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import GalleryBackToTop from "@/components/GalleryBackToTop";
+import PromptCard from "@/components/PromptCard";
+import RemixCard from "@/components/RemixCard";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -190,10 +193,32 @@ function PromptContent() {
   // Track what prompt was used for the last generation
   const [lastFinalPrompt, setLastFinalPrompt] = useState<string>("");
 
-  // Remixes (per prompt) from prompt_generations
-  const [remixes, setRemixes] = useState<RemixRow[]>([]);
-  const [remixesLoading, setRemixesLoading] = useState(false);
-  const [remixesError, setRemixesError] = useState<string | null>(null);
+  // 1. Specific Remixes (for this prompt, finite)
+  // We use 'any[]' to accommodate RemixItem shape
+  const [specificRemixes, setSpecificRemixes] = useState<any[]>([]);
+  const [specificLoading, setSpecificLoading] = useState(false);
+
+  // 2. Trending Prompts (Grid)
+  const [trendingPrompts, setTrendingPrompts] = useState<any[]>([]);
+
+  // 3. Global Community Remixes (Infinite)
+  // We use 'any[]' to accommodate the RemixItem shape required by RemixCard
+  const [communityRemixes, setCommunityRemixes] = useState<any[]>([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityPage, setCommunityPage] = useState(0);
+  const [hasMoreCommunity, setHasMoreCommunity] = useState(true);
+  const communityObserver = useRef<IntersectionObserver | null>(null);
+
+  const lastCommunityRef = useCallback((node: HTMLDivElement | null) => {
+    if (communityLoading) return;
+    if (communityObserver.current) communityObserver.current.disconnect();
+    communityObserver.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMoreCommunity) {
+        setCommunityPage((prev) => prev + 1);
+      }
+    });
+    if (node) communityObserver.current.observe(node);
+  }, [communityLoading, hasMoreCommunity]);
 
   // Fullscreen viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -221,7 +246,6 @@ function PromptContent() {
 
     if (prefill.length) {
       setEditSummary(prefill);
-      // setRemixIsFullPrompt(true); // Concept deprecated? simple usage
     } else if (remix.length) {
       setEditSummary(remix);
     }
@@ -283,7 +307,6 @@ function PromptContent() {
       if (meta.author_id) {
         const { data: profile } = await supabase
           .from("profiles")
-          // Fix: Limit to known columns
           .select("full_name, profile_image")
           .eq("user_id", meta.author_id)
           .maybeSingle();
@@ -362,65 +385,140 @@ function PromptContent() {
       cancelled = true;
     };
   }, [slug]);
-
-  // Load remixes for this prompt (Public / All Users)
   useEffect(() => {
-    let cancelled = false;
+    if (!metaRow?.id) return;
+    async function loadSpecific() {
+      setSpecificLoading(true);
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("prompt_generations")
+        .select("*")
+        .eq("prompt_id", metaRow!.id)
+        .order("created_at", { ascending: false })
+        .limit(8);
 
-    async function loadRemixes() {
-      // if (!userId) return; // Allow public viewing of remixes
-      if (!metaRow?.id) return;
+      if (data) {
+        // Fetch profiles for specific remixes
+        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+        let profileMap = new Map();
 
-      setRemixesLoading(true);
-      setRemixesError(null);
-
-      try {
-        const supabase = createSupabaseBrowserClient();
-
-        const { data, error } = await supabase
-          .from("prompt_generations")
-          .select("*")
-          // .eq("user_id", userId) // Removed to show ALL users' remixes
-          .eq("prompt_id", metaRow.id)
-          .order("created_at", { ascending: false })
-          .limit(50);
-
-        if (cancelled) return;
-
-        if (error) {
-          // If RLS blocks anonymous access, just show empty
-          setRemixes([]);
-          setRemixesLoading(false);
-          return;
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
+          profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
         }
 
-        const rows: RemixRow[] = (data ?? []).map((r: any) => ({
-          id: String(r.id),
-          image_url: String(r.image_url || ""),
-          created_at: String(r.created_at || ""),
-          aspect_ratio: r?.settings?.aspectRatio ?? null,
-          prompt_text: r?.prompt_text ?? r?.final_prompt ?? null,
-          remix: r?.remix ?? null,
-          prompt_slug: r?.prompt_slug ?? null,
-        }));
-
-        setRemixes(rows.filter((r) => r.image_url.trim().length > 0));
-      } catch (e: any) {
-        if (cancelled) return;
-        setRemixesError(e?.message || "Failed to load remixes");
-        setRemixes([]);
-      } finally {
-        if (cancelled) return;
-        setRemixesLoading(false);
+        const rows = data.map((r: any) => {
+          const profile = profileMap.get(r.user_id) || {};
+          const settings = r.settings || {};
+          return {
+            id: String(r.id),
+            imageUrl: String(r.image_url || ""),
+            title: settings.headline || "Untitled Remix",
+            username: profile.full_name || "Anonymous Creator",
+            userAvatar: profile.profile_image || null,
+            upvotesCount: r.upvotes_count || 0,
+            originalPromptText: r.prompt_text || r.original_prompt_text,
+            remixPromptText: r.remix || r.remix_prompt_text,
+            combinedPromptText: r.final_prompt || r.combined_prompt_text,
+            createdAt: r.created_at,
+            promptId: r.prompt_id || null,
+            prompt_slug: r.prompt_slug ?? null,
+          };
+        });
+        setSpecificRemixes(rows.filter((r) => r.imageUrl.trim().length > 0));
       }
+      setSpecificLoading(false);
     }
+    loadSpecific();
+  }, [metaRow?.id]);
 
-    loadRemixes();
+  // EFFECT: Load Global Community Remixes (Infinite)
+  useEffect(() => {
+    const fetchCommunity = async () => {
+      if (!hasMoreCommunity) return;
+      setCommunityLoading(true);
 
-    return () => {
-      cancelled = true;
+      const supabase = createSupabaseBrowserClient();
+      const LIMIT = 12;
+      const from = communityPage * LIMIT;
+      const to = from + LIMIT - 1;
+
+      const { data: remixesData } = await supabase
+        .from("prompt_generations")
+        .select("*")
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (remixesData) {
+        if (remixesData.length < LIMIT) {
+          setHasMoreCommunity(false);
+        }
+
+        // Fetch profiles for remixes similar to Creator Studio
+        const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id).filter(Boolean)));
+        let profileMap = new Map();
+
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
+          profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
+        }
+
+        const processedRemixes = remixesData.map((r: any) => {
+          const profile = profileMap.get(r.user_id) || {};
+          const settings = r.settings || {};
+          // Map to RemixItem shape
+          return {
+            id: String(r.id),
+            imageUrl: String(r.image_url || ""),
+            title: settings.headline || "Untitled Remix",
+            username: profile.full_name || "Anonymous Creator",
+            userAvatar: profile.profile_image || null,
+            upvotesCount: r.upvotes_count || 0,
+            originalPromptText: r.prompt_text || r.original_prompt_text,
+            remixPromptText: r.remix || r.remix_prompt_text,
+            combinedPromptText: r.final_prompt || r.combined_prompt_text,
+            createdAt: r.created_at,
+            promptId: r.prompt_id || null,
+            // Additional fields for compatibility if needed
+            prompt_slug: r.prompt_slug ?? null,
+          };
+        });
+
+        const validRows = processedRemixes.filter((r) => r.imageUrl.trim().length > 0);
+
+        setCommunityRemixes((prev) => {
+          if (communityPage === 0) return validRows;
+          const existing = new Set(prev.map((p) => p.id));
+          return [...prev, ...validRows.filter((p) => !existing.has(p.id))];
+        });
+      } else {
+        setHasMoreCommunity(false);
+      }
+      setCommunityLoading(false);
     };
-  }, [userId, metaRow?.id]);
+
+    fetchCommunity();
+  }, [communityPage, hasMoreCommunity]);
+
+  // EFFECT: Fetch Trending Prompts (Once)
+  useEffect(() => {
+    const fetchPrompts = async () => {
+      const supabase = createSupabaseBrowserClient();
+      const { data: promptsData } = await supabase
+        .from("prompts_public")
+        .select("id, title, slug, summary, category, access_level, image_url, featured_image_url, media_url")
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if (promptsData) setTrendingPrompts(promptsData);
+    };
+    fetchPrompts();
+  }, []);
+
+  const forceRefreshRemixes = () => {
+    window.location.reload();
+  };
 
   const fullPromptText = useMemo(() => {
     if (isLocked) return "";
@@ -597,30 +695,7 @@ function PromptContent() {
   }
 
   async function refreshRemixes() {
-    if (!userId || !metaRow?.id) return;
-    try {
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
-        .from("prompt_generations")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("prompt_id", metaRow.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      const rows: RemixRow[] = (data ?? []).map((r: any) => ({
-        id: String(r.id),
-        image_url: String(r.image_url || ""),
-        created_at: String(r.created_at || ""),
-        aspect_ratio: r?.settings?.aspectRatio ?? null,
-        prompt_text: r?.prompt_text ?? r?.final_prompt ?? null,
-        remix: r?.remix ?? null,
-        prompt_slug: r?.prompt_slug ?? null,
-      }));
-      setRemixes(rows.filter((r) => r.image_url.trim().length > 0));
-    } catch {
-      // no-op
-    }
+    forceRefreshRemixes();
   }
 
   async function handleGenerate() {
@@ -1148,31 +1223,24 @@ function PromptContent() {
               </button>
             </div>
 
-            {/* COMMUNITY REMIXES (Always Visible) */}
+            {/* 1. SPECIFIC REMIXES (Made with this Prompt) - Finite */}
             <div className="mt-8">
               <div className="flex items-center justify-between gap-3 mb-4 px-2">
-                <div className="text-sm font-bold text-white/60 uppercase tracking-widest">Community Remixes</div>
-                <div className="text-xs font-mono text-white/40">
-                  {remixesLoading ? "..." : remixes.length ? `${remixes.length}` : "0"}
+                <div className="text-sm font-bold text-white uppercase tracking-widest opacity-80">
+                  Made with this Prompt
                 </div>
               </div>
 
-              {remixesError ? (
-                <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200">
-                  {remixesError}
-                </div>
-              ) : null}
-
-              {remixesLoading ? (
-                <div className="px-2 text-sm text-white/40 animate-pulse">Loading community remixes...</div>
-              ) : remixes.length === 0 ? (
+              {specificLoading ? (
+                <div className="px-2 text-sm text-white/40 animate-pulse">Loading remixes...</div>
+              ) : specificRemixes.length === 0 ? (
                 <div className="rounded-3xl border border-white/5 bg-white/5 p-8 text-center">
                   <p className="text-sm text-white/40">No remixes yet.</p>
                   <p className="text-xs text-white/20 mt-1">Be the first to remix this prompt!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {remixes.slice(0, 50).map((r) => (
+                  {specificRemixes.map((r) => (
                     <div
                       key={r.id}
                       className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/5 hover:border-lime-400/30 transition-all hover:shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]"
@@ -1184,7 +1252,7 @@ function PromptContent() {
                         title="View Community Remix"
                       >
                         <div className="relative aspect-square w-full">
-                          <Image src={r.image_url} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
+                          <Image src={r.imageUrl} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
                         </div>
                       </button>
 
@@ -1213,15 +1281,64 @@ function PromptContent() {
                   ))}
                 </div>
               )}
-
-              <div className="mt-4">
-                {/* View Full Library button removed or changed? User wants "change it from remix history to user remixes". 
-                      Likely we don't need "View Full Library" here if this IS all logic. 
-                      Or remove it. The user didn't ask to keep "My Library" link. I'll remove it to focus on Community. */}
-              </div>
             </div>
+
+            {/* 2. TRENDING PROMPTS (Grid) */}
+            {trendingPrompts.length > 0 && (
+              <div className="mt-16 pt-8 border-t border-white/10">
+                <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider opacity-60 px-2">Trending Prompts</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {trendingPrompts.map((p) => (
+                    <div key={p.id} className="scale-[0.85] origin-top-left -mr-[15%] -mb-[15%]">
+                      <PromptCard
+                        id={p.id}
+                        title={p.title}
+                        summary={p.summary || ""}
+                        slug={p.slug}
+                        featuredImageUrl={p.featured_image_url || p.image_url || p.media_url}
+                        category={p.category}
+                        accessLevel={p.access_level}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+
+            {/* 3. GLOBAL COMMUNITY REMIXES (Infinite) */}
+            {communityRemixes.length > 0 && (
+              <div className="mt-16 pt-8 border-t border-white/10 relative">
+                <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider opacity-60 px-2">Community Remixes</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {communityRemixes.map((r, i) => (
+                    <div
+                      key={`${r.id}-${i}`}
+                      ref={i === communityRemixes.length - 1 ? lastCommunityRef : null}
+                    >
+                      <RemixCard item={r} />
+                    </div>
+                  ))}
+                </div>
+
+                {communityLoading && (
+                  <div className="py-8 flex justify-center w-full">
+                    <LoadingOrb />
+                  </div>
+                )}
+
+                {/* Sticky Back To Top */}
+                <div className="sticky bottom-8 flex justify-center pointer-events-none z-50 mt-8">
+                  <GalleryBackToTop />
+                </div>
+              </div>
+            )}
+
           </section>
         </div >
+
+
       </main>
     </>
   );

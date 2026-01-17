@@ -456,12 +456,12 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 <h3 className="text-xl font-bold text-white mb-1">Community Remixes</h3>
                                 <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm">
                                     <span className="text-blue-400">●</span>
-                                    <span>Fresh inspiration from the studio</span>
+                                    <span>Fresh inspiration made by creators like you</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             {recentRemixes.map((remix) => (
                                 <RemixCard key={remix.id} item={remix} />
                             ))}
