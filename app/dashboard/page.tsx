@@ -154,15 +154,15 @@ export default function DashboardPage() {
           {/* Primary Action Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Link
-              href="/studio"
+              href="/studio/creator"
               className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-zinc-900/50 p-6 transition-all hover:border-[#B7FF00]/50 hover:bg-zinc-900"
             >
               <div className="mb-4">
                 <div className="mb-4 inline-flex items-center justify-center rounded-lg bg-[#B7FF00]/10 p-3 text-[#B7FF00]">
                   <Zap size={24} />
                 </div>
-                <h3 className="text-xl font-bold text-white">Prompt Studio</h3>
-                <p className="mt-1 text-sm text-white/60">Create custom assets with advanced controls.</p>
+                <h3 className="text-xl font-bold text-white">Creator Studio</h3>
+                <p className="mt-1 text-sm text-white/60">Create, Remix, and Share your AI creations.</p>
               </div>
               <div className="flex items-center gap-2 text-xs font-medium text-[#B7FF00] opacity-0 transition group-hover:opacity-100">
                 Launch Tool <ArrowUpRight size={14} />

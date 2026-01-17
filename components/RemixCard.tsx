@@ -103,14 +103,14 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
                     </div>
                 </div>
 
-                <div className="mt-auto pt-3 flex items-center justify-between border-t border-white/5">
+                <div className="mt-auto pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-white/5">
                     <span className="text-xs text-white/40">
                         {new Date(item.createdAt).toLocaleDateString()}
                     </span>
 
                     <button
                         onClick={handleRemixClick}
-                        className="flex items-center gap-1.5 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1.5 text-xs font-bold text-[#B7FF00] transition hover:bg-[#B7FF00] hover:text-black"
+                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1.5 text-xs font-bold text-[#B7FF00] transition hover:bg-[#B7FF00] hover:text-black"
                     >
                         <RefreshCw size={12} />
                         Remix This
