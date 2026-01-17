@@ -57,10 +57,10 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
 
     return (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 md:p-4" role="dialog">
-            <div className="flex h-[100dvh] w-full max-w-5xl overflow-hidden bg-black shadow-2xl flex-col md:flex-row md:h-[80vh] md:rounded-2xl md:border md:border-white/10">
+            <div className="flex h-[100dvh] w-full max-w-5xl overflow-hidden bg-black shadow-2xl flex-col md:flex-row-reverse md:h-[80vh] md:rounded-2xl md:border md:border-white/10">
 
                 {/* Left: Preview (Locked) */}
-                <div className="relative h-[45vh] w-full bg-neutral-900/50 flex items-center justify-center border-b border-white/10 p-6 md:h-auto md:flex-1 md:border-b-0 md:border-r">
+                <div className="relative h-[45vh] w-full bg-neutral-900/50 flex items-center justify-center border-b border-white/10 p-6 md:h-auto md:flex-1 md:border-b-0 md:border-l">
                     <div className="absolute top-4 left-4 z-10 rounded-lg bg-black/60 px-3 py-1 text-xs font-mono text-white/50 border border-white/5 backdrop-blur-md">
                         SOURCE IMAGE
                     </div>
