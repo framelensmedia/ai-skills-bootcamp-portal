@@ -56,11 +56,11 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
     };
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4" role="dialog">
-            <div className="flex h-[80vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl flex-col md:flex-row">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 md:p-4" role="dialog">
+            <div className="flex h-[100dvh] w-full max-w-5xl overflow-hidden bg-black shadow-2xl flex-col md:flex-row md:h-[80vh] md:rounded-2xl md:border md:border-white/10">
 
                 {/* Left: Preview (Locked) */}
-                <div className="relative flex-1 bg-neutral-900/50 min-h-[300px] flex items-center justify-center border-b md:border-b-0 md:border-r border-white/10 p-6">
+                <div className="relative h-[45vh] w-full bg-neutral-900/50 flex items-center justify-center border-b border-white/10 p-6 md:h-auto md:flex-1 md:border-b-0 md:border-r">
                     <div className="absolute top-4 left-4 z-10 rounded-lg bg-black/60 px-3 py-1 text-xs font-mono text-white/50 border border-white/5 backdrop-blur-md">
                         SOURCE IMAGE
                     </div>
@@ -82,7 +82,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                 </div>
 
                 {/* Right: Chat/Controls */}
-                <div className="flex w-full md:w-[400px] flex-col bg-neutral-900 border-l border-white/5">
+                <div className="flex flex-1 w-full flex-col bg-neutral-900 md:flex-none md:w-[400px]">
 
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-white/10 p-4 bg-black/20">
