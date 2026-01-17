@@ -59,6 +59,8 @@ export type LibraryItem = {
     folder_id: string | null;
     is_public: boolean;
     fullQualityUrl?: string | null;
+    favoriteType?: "prompt" | "generation";
+    favoriteTargetId?: string;
 };
 
 export type FolderType = {
@@ -623,6 +625,48 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
         return () => { cancelled = true; };
     }, [activeTab, sortMode, promptSlugFilter]);
 
+    // Favorites Logic
+    async function handleRemoveFavorite(id: string, e: React.MouseEvent) {
+        e.stopPropagation();
+        if (!confirm("Remove from favorites?")) return;
+
+        // Optimistic update
+        setFavoriteItems(prev => prev.filter(f => f.recordId !== id));
+
+        try {
+            const res = await fetch("/api/library/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: [id], table: "favorites" })
+            });
+            if (!res.ok) throw new Error("Failed");
+            showToast("Removed from favorites");
+        } catch (e) {
+            console.error(e);
+            showToast("Failed to remove", "error");
+        }
+    }
+
+    function handleItemClick(item: LibraryItem) {
+        if (isSelectionMode) {
+            toggleSelection(item.id);
+            return;
+        }
+
+        if (activeTab === "favorites") {
+            if (item.favoriteType === "prompt" && item.promptSlug) {
+                router.push(`/prompts/${item.promptSlug}`);
+                return;
+            } else if (item.favoriteType === "generation" && item.favoriteTargetId) {
+                router.push(`/remix/${item.favoriteTargetId}`);
+                return;
+            }
+        }
+
+        // Default: Open Lightbox
+        openLightbox(item);
+    }
+
     // Display Logic
     const displayedItems = useMemo(() => {
         let items: LibraryItem[] = [];
@@ -647,7 +691,9 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                         remixPromptText: "",
                         combinedPromptText: "",
                         folder: null,
-                        is_public: true
+                        is_public: true,
+                        favoriteType: "prompt",
+                        favoriteTargetId: p.id
                     } as LibraryItem;
                 } else if (f.type === "generation") {
                     const l = f.data as LibraryItem;
@@ -655,6 +701,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                         ...l,
                         id: f.recordId,
                         folder_id: f.folder_id,
+                        favoriteType: "generation",
+                        favoriteTargetId: l.id
                     };
                 }
                 return null;
@@ -842,7 +890,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                         viewMode === "grid" ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {displayedItems.map(it => (
-                                    <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => openLightbox(it)}>
+                                    <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => handleItemClick(it)}>
                                         {/* Guard image */}
                                         {it.imageUrl ? (
                                             <Image
@@ -867,11 +915,27 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                                             </div>
                                         )}
 
-                                        {isSelectionMode && (
+                                        {activeTab === "favorites" && (
+                                            <div
+                                                onClick={(e) => handleRemoveFavorite(it.id, e)}
+                                                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-pink-500 hover:bg-black hover:text-red-500 transition opacity-0 group-hover:opacity-100"
+                                                title="Remove from favorites"
+                                            >
+                                                <Heart size={14} fill="currentColor" />
+                                            </div>
+                                        )}
+
+                                        {isSelectionMode && activeTab === "remixes" && (
                                             <div className="absolute top-2 right-2">
                                                 {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
                                             </div>
                                         )}
+                                        {isSelectionMode && activeTab === "favorites" && (
+                                            <div className="absolute top-2 left-2">
+                                                {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
+                                            </div>
+                                        )}
+
                                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
                                             <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
@@ -882,7 +946,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                         ) : (
                             <div className="space-y-2">
                                 {displayedItems.map(it => (
-                                    <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => openLightbox(it)}>
+                                    <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => handleItemClick(it)}>
                                         <div className="relative w-12 h-12 bg-black shrink-0 rounded overflow-hidden">
                                             {it.imageUrl ? (
                                                 <Image src={it.imageUrl} alt="" fill className="object-cover" />
@@ -898,6 +962,12 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                                                     <button onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }} className={`flex items-center gap-1 hover:text-white ${it.is_public ? "text-green-400" : ""}`}>
                                                         {it.is_public ? <Globe size={10} /> : <Lock size={10} />}
                                                         <span>{it.is_public ? "Public" : "Private"}</span>
+                                                    </button>
+                                                )}
+                                                {activeTab === "favorites" && (
+                                                    <button onClick={(e) => handleRemoveFavorite(it.id, e)} className="flex items-center gap-1 text-pink-500 hover:text-red-500">
+                                                        <Heart size={10} fill="currentColor" />
+                                                        <span>Remove</span>
                                                     </button>
                                                 )}
                                             </div>

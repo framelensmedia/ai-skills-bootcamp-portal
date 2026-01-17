@@ -10,7 +10,8 @@ import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/Remi
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
@@ -73,6 +74,7 @@ type PromptMetaRow = {
   template_config_json?: any;
   subject_mode?: "human" | "non_human";
   author_id?: string;
+  aspect_ratios?: string[];
 };
 
 type PromptBodyRow = {
@@ -278,7 +280,7 @@ function PromptContent() {
       const { data: meta, error: metaError } = await supabase
         .from("prompts")
         .select(
-          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at, template_config_json, subject_mode, author_id"
+          "id, title, slug, summary, access_level, image_url, featured_image_url, media_url, category, created_at, template_config_json, subject_mode, author_id, aspect_ratios"
         )
         .eq("slug", slug)
         .maybeSingle();
@@ -302,6 +304,13 @@ function PromptContent() {
       }
 
       setMetaRow(meta as PromptMetaRow);
+
+      if (meta.aspect_ratios && Array.isArray(meta.aspect_ratios) && meta.aspect_ratios.length > 0) {
+        const valid = ["9:16", "16:9", "1:1", "4:5"];
+        if (valid.includes(meta.aspect_ratios[0])) {
+          setAspectRatio(meta.aspect_ratios[0] as AspectRatio);
+        }
+      }
 
       // Fetch Prompt Creator Profile
       if (meta.author_id) {
@@ -929,91 +938,93 @@ function PromptContent() {
         <div className="grid gap-5 lg:grid-cols-2">
           {/* PREVIEW PANEL */}
           <section className="order-1 lg:order-2">
-            <button
-              type="button"
-              className="group relative block w-full text-left"
-              onClick={() => openLightbox(imageSrc)}
-              title="Open full screen"
-            >
-              <div
-                className={[
-                  "relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 group-hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]",
-                  previewAspectClass,
-                ].join(" ")}
+            <div className="lg:sticky lg:top-8">
+              <button
+                type="button"
+                className="group relative block w-full text-left"
+                onClick={() => openLightbox(imageSrc)}
+                title="Open full screen"
               >
-                <Image
-                  src={imageSrc}
-                  alt={metaRow.title}
-                  fill
-                  className="object-contain"
-                  priority
-                />
-                {/* Generating Overlay */}
-                {generating && (
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                    <LoadingOrb />
+                <div
+                  className={[
+                    "relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 group-hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]",
+                    previewAspectClass,
+                  ].join(" ")}
+                >
+                  <Image
+                    src={imageSrc}
+                    alt={metaRow.title}
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                  {/* Generating Overlay */}
+                  {generating && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
+                      <LoadingOrb />
+                    </div>
+                  )}
+
+                  {/* Expand Icon Overlay - Subtle */}
+                  <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                    </svg>
                   </div>
+                </div>
+              </button>
+
+              {/* Floating Tags / Info */}
+              <div className="mt-4 flex flex-wrap items-center gap-2 justify-center">
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
+                  {(metaRow.category ?? "general").toString().toUpperCase()}
+                </span>
+
+                {showProBadge && (
+                  <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-4 py-1.5 text-xs font-bold tracking-wide text-lime-200 backdrop-blur-md">
+                    PRO
+                  </span>
                 )}
 
-                {/* Expand Icon Overlay - Subtle */}
-                <div className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                  </svg>
-                </div>
+                {generatedImageUrl && (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
+                    GENERATED
+                  </span>
+                )}
               </div>
-            </button>
 
-            {/* Floating Tags / Info */}
-            <div className="mt-4 flex flex-wrap items-center gap-2 justify-center">
-              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
-                {(metaRow.category ?? "general").toString().toUpperCase()}
-              </span>
+              {generateError ? (
+                <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
+                  {generateError}
+                </div>
+              ) : null}
 
-              {showProBadge && (
-                <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-4 py-1.5 text-xs font-bold tracking-wide text-lime-200 backdrop-blur-md">
-                  PRO
-                </span>
-              )}
-
-              {generatedImageUrl && (
-                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md">
-                  GENERATED
-                </span>
+              {/* Minimal Actions for Generated Result */}
+              {hasGeneratedForActions && (
+                <div className="mt-6 flex justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleDownloadGenerated}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
+                    title="Download"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 12.75l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearGenerated}
+                    className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
+                    title="Clear"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
-
-            {generateError ? (
-              <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
-                {generateError}
-              </div>
-            ) : null}
-
-            {/* Minimal Actions for Generated Result */}
-            {hasGeneratedForActions && (
-              <div className="mt-6 flex justify-center gap-4">
-                <button
-                  type="button"
-                  onClick={handleDownloadGenerated}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
-                  title="Download"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M12 12.75l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={clearGenerated}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-all hover:scale-110"
-                  title="Clear"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
           </section>
 
           {/* TOOL PANEL */}
@@ -1301,6 +1312,15 @@ function PromptContent() {
                       />
                     </div>
                   ))}
+                </div>
+                <div className="mt-8 flex justify-center">
+                  <Link
+                    href="/prompts"
+                    className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:scale-105 hover:border-lime-400/50"
+                  >
+                    <span>View More Templates</span>
+                    <ArrowRight size={16} className="text-lime-400 transition-transform group-hover:translate-x-1" />
+                  </Link>
                 </div>
               </div>
             )}

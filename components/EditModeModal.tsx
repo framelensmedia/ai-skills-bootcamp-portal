@@ -138,12 +138,19 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
 
                         {/* Input */}
                         <form onSubmit={handleSubmit} className="relative">
-                            <input
-                                className="w-full rounded-xl bg-black border border-white/10 p-4 pr-20 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all"
+                            <textarea
+                                className="w-full rounded-xl bg-black border border-white/10 p-4 pr-20 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all resize-none min-h-[60px] max-h-[120px]"
                                 placeholder={isGenerating ? "Processing..." : "Type instruction..."}
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 disabled={isGenerating}
+                                rows={2}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSubmit();
+                                    }
+                                }}
                             />
 
                             <div className="absolute right-2 top-2 flex items-center gap-1">

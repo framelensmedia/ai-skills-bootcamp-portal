@@ -88,11 +88,24 @@ export default function TemplateImportPage() {
             const fileNames = new Set(relatedFiles.map(f => f.name));
             const baseNames = new Set(relatedFiles.map(f => f.name.replace(/\.[^/.]+$/, "")));
 
-            const exists = (name: string) => {
-                if (!name) return true;
-                if (fileNames.has(name)) return true;
-                const base = name.replace(/\.[^/.]+$/, "");
-                return baseNames.has(base);
+            const exists = (jsonPath: string) => {
+                if (!jsonPath) return true;
+
+                // Normalize JSON path: strip folder, lowercase
+                const jsonBase = jsonPath.split(/[/\\]/).pop()?.toLowerCase() || "";
+
+                // Check against uploaded files (names are already basenames in browser File object)
+                return relatedFiles.some(f => {
+                    const fileBase = f.name.toLowerCase();
+
+                    // Exact match (ignoring case/path)
+                    if (fileBase === jsonBase) return true;
+
+                    // Match without extension (legacy support)
+                    const fileBaseNoExt = fileBase.replace(/\.[^/.]+$/, "");
+                    const jsonBaseNoExt = jsonBase.replace(/\.[^/.]+$/, "");
+                    return fileBaseNoExt === jsonBaseNoExt;
+                });
             };
 
             // Check Thumbnail
@@ -176,6 +189,27 @@ export default function TemplateImportPage() {
         }
     }, [mode]);
 
+    // Helper to calculate aspect ratio
+    const getImageAspectRatio = (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new window.Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                const ratio = img.width / img.height;
+                URL.revokeObjectURL(url);
+                // Match to standards (with 15% tolerance)
+                if (Math.abs(ratio - 9 / 16) < 0.15) resolve("9:16");
+                else if (Math.abs(ratio - 4 / 5) < 0.15) resolve("4:5");
+                else if (Math.abs(ratio - 3 / 4) < 0.15) resolve("3:4");
+                else if (Math.abs(ratio - 1) < 0.15) resolve("1:1");
+                else if (Math.abs(ratio - 16 / 9) < 0.15) resolve("16:9");
+                else resolve("9:16"); // Default
+            };
+            img.onerror = () => resolve("9:16");
+            img.src = url;
+        });
+    };
+
     // Submit Logic
     async function handleImport() {
         if (mode === "existing") {
@@ -193,7 +227,60 @@ export default function TemplateImportPage() {
 
         try {
             const formData = new FormData();
-            formData.append("json", await jsonFile.text());
+            let jsonString = await jsonFile.text();
+
+            // --- Auto-Detect Aspect Ratios ---
+            try {
+                const jsonData = JSON.parse(jsonString);
+
+                if (mode === "pack" && jsonData.templates && Array.isArray(jsonData.templates)) {
+                    // Create lookup map for pack files
+                    const fileMap = new Map<string, File>();
+                    packFiles.forEach(f => {
+                        fileMap.set(f.name, f);
+                        fileMap.set(f.name.toLowerCase(), f);
+                        // Also map basename without extension
+                        const base = f.name.replace(/\.[^/.]+$/, "");
+                        fileMap.set(base, f);
+                        fileMap.set(base.toLowerCase(), f);
+                    });
+
+                    for (const tpl of jsonData.templates) {
+                        const imgName = tpl.featured_image || tpl.featured_image_filename;
+                        // Only auto-detect if not explicitly set in JSON
+                        if (imgName && (!tpl.aspect_ratios || tpl.aspect_ratios.length === 0)) {
+                            // Find file
+                            let f = fileMap.get(imgName);
+                            if (!f && imgName.includes(".")) {
+                                // Try without extension
+                                f = fileMap.get(imgName.replace(/\.[^/.]+$/, ""));
+                            }
+                            // Try lowercase
+                            if (!f) f = fileMap.get(imgName.toLowerCase());
+
+                            if (f) {
+                                const ratio = await getImageAspectRatio(f);
+                                tpl.aspect_ratios = [ratio];
+                                console.log(`Auto-detected ratio for ${imgName}: ${ratio}`);
+                            }
+                        }
+                    }
+                    jsonString = JSON.stringify(jsonData);
+                }
+                else if (mode === "single" && jsonData.type === "single_template" && imageFile) {
+                    if (!jsonData.template.aspect_ratios || jsonData.template.aspect_ratios.length === 0) {
+                        const ratio = await getImageAspectRatio(imageFile);
+                        jsonData.template.aspect_ratios = [ratio];
+                        jsonString = JSON.stringify(jsonData);
+                        console.log(`Auto-detected ratio for single template: ${ratio}`);
+                    }
+                }
+            } catch (preError) {
+                console.warn("Aspect ratio detection skipped due to parse error:", preError);
+            }
+            // ---------------------------------
+
+            formData.append("json", jsonString);
             formData.append("filename_id", jsonFile.name.replace(/\.json$/i, ""));
 
             if (mode === "single" && imageFile) {

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown } from "lucide-react";
+import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp } from "lucide-react";
 
 export type RemixDetail = {
     id: string;
@@ -20,6 +20,7 @@ export type RemixDetail = {
         avatar_url: string | null;
         created_at: string;
     };
+    upvotes_count?: number;
 };
 
 
@@ -42,6 +43,11 @@ export default function RemixClient({ initialRemix }: Props) {
     const [copied, setCopied] = useState(false);
     const [isFavorited, setIsFavorited] = useState(false);
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+
+    // Upvote State
+    const [likesCount, setLikesCount] = useState(0);
+    const [hasLiked, setHasLiked] = useState(false);
+    const [isTogglingLike, setIsTogglingLike] = useState(false);
 
     // Pagination state
     const [visibleCount, setVisibleCount] = useState(8);
@@ -127,8 +133,10 @@ export default function RemixClient({ initialRemix }: Props) {
             // 2. Load Recommendations & Favorites (Always fetch these on client to keep page cacheable/light or just standard flow)
 
             // Check favorite status
+            // Check favorite status
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                // Check favorite
                 const { data: fav } = await supabase
                     .from("prompt_favorites")
                     .select("id")
@@ -136,7 +144,19 @@ export default function RemixClient({ initialRemix }: Props) {
                     .eq("generation_id", id)
                     .maybeSingle();
                 setIsFavorited(!!fav);
+
+                // Check like
+                const { data: like } = await supabase
+                    .from("remix_upvotes")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .eq("generation_id", id)
+                    .maybeSingle();
+                setHasLiked(!!like);
             }
+
+            // Set initial likes count
+            setLikesCount(currentRemix.upvotes_count || 0);
 
             // Load other remixes by this user
             const { data: otherRemixes } = await supabase
@@ -229,20 +249,60 @@ export default function RemixClient({ initialRemix }: Props) {
                     .delete()
                     .eq("user_id", user.id)
                     .eq("generation_id", remix.id);
-                setIsFavorited(false);
-            } else {
-                await supabase
-                    .from("prompt_favorites")
-                    .insert({
-                        user_id: user.id,
-                        generation_id: remix.id
-                    });
                 setIsFavorited(true);
             }
-        } catch (e) {
-            console.error("Failed to toggle favorite:", e);
+        } catch (err) {
+            console.error("Failed to toggle favorite:", err);
+            setIsFavorited(!isFavorited);
         } finally {
             setIsTogglingFavorite(false);
+        }
+    };
+
+    const handleUpvote = async () => {
+        if (isTogglingLike) return;
+        const supabase = createSupabaseBrowserClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            router.push(`/login?redirectTo=/remix/${id}`);
+            return;
+        }
+
+        setIsTogglingLike(true);
+        // Optimistic update
+        const newHasLiked = !hasLiked;
+        setHasLiked(newHasLiked);
+        setLikesCount((prev) => (newHasLiked ? prev + 1 : Math.max(0, prev - 1)));
+
+        try {
+            if (newHasLiked) {
+                await supabase.from("remix_upvotes").insert({
+                    user_id: user.id,
+                    generation_id: id
+                });
+            } else {
+                await supabase.from("remix_upvotes").delete()
+                    .eq("user_id", user.id)
+                    .eq("generation_id", id);
+            }
+        } catch (err) {
+            console.error("Failed to toggle like:", err);
+            // Revert on error
+            setHasLiked(!newHasLiked);
+            setLikesCount((prev) => (!newHasLiked ? prev + 1 : Math.max(0, prev - 1)));
+        } finally {
+            setIsTogglingLike(false);
+        }
+    };
+
+    const handleRemix = () => {
+        if (!remix) return;
+        if (remix.prompt_slug) {
+            router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
+        } else {
+            const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
+            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
         }
     };
 
@@ -293,16 +353,6 @@ export default function RemixClient({ initialRemix }: Props) {
             URL.revokeObjectURL(obj);
         } catch {
             window.open(remix.image_url, "_blank", "noopener,noreferrer");
-        }
-    };
-
-    const handleRemixThis = () => {
-        if (!remix) return;
-        if (remix.prompt_slug) {
-            router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
-        } else {
-            const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
-            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
         }
     };
 
@@ -393,18 +443,31 @@ export default function RemixClient({ initialRemix }: Props) {
                         {/* Actions */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
-                                onClick={handleRemixThis}
-                                className="flex items-center justify-center gap-2 rounded-xl bg-[#B7FF00] px-6 py-4 text-sm font-bold text-black transition-transform hover:scale-[1.02] hover:bg-[#a3e600] shadow-[0_0_20px_-5px_#B7FF00] sm:col-span-2"
+                                onClick={handleRemix}
+                                className="flex items-center justify-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-sm font-bold text-black transition-transform hover:scale-[1.02] hover:bg-lime-300 shadow-[0_0_20px_-5px_#B7FF00] sm:col-span-2"
                             >
                                 <Sparkles size={18} />
                                 Remix This
+                            </button>
+
+                            {/* Upvote Button */}
+                            <button
+                                onClick={handleUpvote}
+                                disabled={isTogglingLike}
+                                className={`flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-sm font-bold transition-colors whitespace-nowrap ${hasLiked
+                                    ? "border-orange-500/50 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20"
+                                    : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                                    }`}
+                            >
+                                <ArrowBigUp size={24} className={hasLiked ? "fill-current" : ""} />
+                                <span>{likesCount}</span>
                             </button>
 
                             <button
                                 onClick={handleToggleFavorite}
                                 disabled={isTogglingFavorite}
                                 className={`flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-sm font-bold transition-colors whitespace-nowrap ${isFavorited
-                                    ? "border-red-400/50 bg-red-400/10 text-red-400 hover:bg-red-400/20"
+                                    ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20"
                                     : "border-white/15 bg-white/5 text-white hover:bg-white/10"
                                     }`}
                             >
@@ -414,7 +477,7 @@ export default function RemixClient({ initialRemix }: Props) {
 
                             <button
                                 onClick={handleDownload}
-                                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-white/10 whitespace-nowrap"
+                                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-white/10 whitespace-nowrap sm:col-span-2"
                             >
                                 <Download size={18} />
                                 Download
@@ -440,88 +503,91 @@ export default function RemixClient({ initialRemix }: Props) {
                     </div>
                 </div>
 
-                {/* More from this Creator */}
-                {userRemixes.length > 0 && (
-                    <div className="mt-16">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-white">More from this Creator</h2>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {userRemixes.slice(0, visibleCount).map((r) => (
-                                <button
-                                    key={r.id}
-                                    onClick={() => router.push(`/remix/${r.id}`)}
-                                    className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
-                                >
-                                    <Image
-                                        src={r.image_url}
-                                        alt="Creator Remix"
-                                        fill
-                                        className="object-cover group-hover:opacity-90 transition-opacity"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Show More Button */}
-                        {visibleCount < userRemixes.length && (
-                            <div className="mt-8 flex justify-center">
-                                <button
-                                    onClick={() => setVisibleCount((prev: number) => prev + 12)}
-                                    className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:border-white/20 active:scale-95"
-                                >
-                                    Show More
-                                    <ChevronDown size={16} />
-                                </button>
+                {
+                    userRemixes.length > 0 && (
+                        <div className="mt-16">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold text-white">More from this Creator</h2>
                             </div>
-                        )}
-                    </div>
-                )}
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {userRemixes.slice(0, visibleCount).map((r) => (
+                                    <button
+                                        key={r.id}
+                                        onClick={() => router.push(`/remix/${r.id}`)}
+                                        className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
+                                    >
+                                        <Image
+                                            src={r.image_url}
+                                            alt="Creator Remix"
+                                            fill
+                                            className="object-cover group-hover:opacity-90 transition-opacity"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Show More Button */}
+                            {visibleCount < userRemixes.length && (
+                                <div className="mt-8 flex justify-center">
+                                    <button
+                                        onClick={() => setVisibleCount((prev: number) => prev + 12)}
+                                        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:border-white/20 active:scale-95"
+                                    >
+                                        Show More
+                                        <ChevronDown size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )
+                }
 
                 {/* Divider */}
                 <div className="my-16 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
                 {/* Community Remixes */}
-                {communityRemixes.length > 0 && (
-                    <div className="pb-10">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-white">More Community Remixes</h2>
-                            <button
-                                onClick={() => router.push("/feed")}
-                                className="text-sm font-bold text-[#B7FF00] hover:text-white transition-colors"
-                            >
-                                View All
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {communityRemixes.map((r, i) => (
+                {
+                    communityRemixes.length > 0 && (
+                        <div className="pb-10">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold text-white">More Community Remixes</h2>
                                 <button
-                                    key={r.id}
-                                    onClick={() => router.push(`/remix/${r.id}`)}
-                                    className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
+                                    onClick={() => router.push("/feed")}
+                                    className="text-sm font-bold text-[#B7FF00] hover:text-white transition-colors"
                                 >
-                                    <Image
-                                        src={r.image_url}
-                                        alt="Community Remix"
-                                        fill
-                                        loading="lazy"
-                                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                                        className="object-cover group-hover:opacity-90 transition-opacity"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    View All
                                 </button>
-                            ))}
-                        </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {communityRemixes.map((r, i) => (
+                                    <button
+                                        key={r.id}
+                                        onClick={() => router.push(`/remix/${r.id}`)}
+                                        className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
+                                    >
+                                        <Image
+                                            src={r.image_url}
+                                            alt="Community Remix"
+                                            fill
+                                            loading="lazy"
+                                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                                            className="object-cover group-hover:opacity-90 transition-opacity"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                ))}
+                            </div>
 
-                        {/* Sentinel for Intersection Observer */}
-                        <div ref={sentinelRef} className="mt-8 flex h-10 w-full items-center justify-center">
-                            {isFetchingMore && (
-                                <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#B7FF00]"></span>
-                            )}
+                            {/* Sentinel for Intersection Observer */}
+                            <div ref={sentinelRef} className="mt-8 flex h-10 w-full items-center justify-center">
+                                {isFetchingMore && (
+                                    <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#B7FF00]"></span>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
             </div>
         </main>
     );

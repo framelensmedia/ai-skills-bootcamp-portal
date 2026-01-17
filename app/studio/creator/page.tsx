@@ -71,7 +71,7 @@ function CreatorContent() {
     // Manual mode state
     const [manualPrompt, setManualPrompt] = useState("");
     const [uploads, setUploads] = useState<File[]>([]);
-    const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
+    const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:5");
     const [mediaType, setMediaType] = useState<"image" | "video">("image");
 
     // Generation state
@@ -97,6 +97,13 @@ function CreatorContent() {
         });
         if (node) observer.current.observe(node);
     }, [loadingRemixes, hasMore]);
+
+    const previewAspectClass = useMemo(() => {
+        if (aspectRatio === "9:16") return "aspect-[9/16]";
+        if (aspectRatio === "16:9") return "aspect-[16/9]";
+        if (aspectRatio === "1:1") return "aspect-square";
+        return "aspect-[4/5]";
+    }, [aspectRatio]);
 
     // Fetch Prompts (Once)
     useEffect(() => {
@@ -521,6 +528,15 @@ function CreatorContent() {
                                     </div>
                                 ))}
                             </div>
+                            <div className="mt-8 flex justify-center">
+                                <Link
+                                    href="/prompts"
+                                    className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:scale-105 hover:border-lime-400/50"
+                                >
+                                    <span>View More Templates</span>
+                                    <ArrowRight size={16} className="text-lime-400 transition-transform group-hover:translate-x-1" />
+                                </Link>
+                            </div>
                         </div>
                     )}
 
@@ -551,7 +567,7 @@ function CreatorContent() {
 
                 {/* RIGHT COLUMN: Preview / Results */}
                 <div className="lg:col-span-7 order-1 lg:order-2">
-                    <div className="sticky top-8 aspect-[4/5] w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl">
+                    <div className={`sticky top-8 w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
                         {/* Generating Overlay */}
                         {generating && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
