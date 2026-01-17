@@ -303,23 +303,9 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 </div>
             </div>
 
-            <div className="mx-auto max-w-md md:max-w-6xl space-y-12 md:space-y-0 md:grid md:grid-cols-3 md:gap-6">
+            <div className="mx-auto max-w-6xl grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-6">
                 {items.map((item, index) => (
                     <article ref={index === items.length - 1 ? lastElementRef : null} key={`${item.id}-${index}`} className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden">
-                        <div className="p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden relative">
-                                {item.userAvatar ? (
-                                    <Image src={item.userAvatar} fill className="object-cover" alt={item.username} />
-                                ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center text-white/20"><User size={20} /></div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-sm font-bold text-white">{item.username}</div>
-                                <div className="text-xs text-white/40">{new Date(item.createdAt).toLocaleDateString()} • {item.promptTitle}</div>
-                            </div>
-                        </div>
-
                         <div className="relative aspect-[9/16] w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
                             {/* Guard image rendering */}
                             {item.imageUrl ? (
@@ -328,30 +314,55 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                     alt={item.promptTitle}
                                     fill
                                     className="object-contain"
-                                    sizes="(max-width: 768px) 100vw, 33vw"
+                                    sizes="(max-width: 768px) 50vw, 33vw"
                                     loading={index < 2 ? "eager" : "lazy"} // Eager load first 2
                                 />
                             ) : (
                                 <div className="h-full w-full bg-zinc-900 flex items-center justify-center text-white/20">Processing...</div>
                             )}
+
+                            {/* Overlay Gradient */}
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
+
+                            {/* Top Left: User Info Overlay */}
+                            <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+                                <div className="relative h-8 w-8 overflow-hidden rounded-full border border-white/20 bg-zinc-800">
+                                    {item.userAvatar ? (
+                                        <Image src={item.userAvatar} fill className="object-cover" alt={item.username} />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-white/50">
+                                            <User size={14} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-white shadow-black drop-shadow-md leading-tight">
+                                        {item.username}
+                                    </span>
+                                    <span className="text-[10px] text-white/80 shadow-black drop-shadow-md leading-tight">
+                                        {new Date(item.createdAt).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            </div>
+
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                         </div>
 
-                        <div className="p-4 flex items-center justify-between bg-zinc-900">
-                            <div className="flex items-center gap-6">
+                        <div className="p-3 flex items-center justify-between bg-zinc-900 border-t border-white/5">
+                            <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => handleUpvote(item)}
-                                    className={`flex items-center gap-2 text-sm font-bold transition group ${item.isLiked ? "text-[#B7FF00]" : "text-white/60 hover:text-white"}`}
+                                    className={`flex items-center gap-1.5 text-xs font-bold transition group ${item.isLiked ? "text-[#B7FF00]" : "text-white/60 hover:text-white"}`}
                                 >
-                                    <ArrowBigUp size={24} fill={item.isLiked ? "currentColor" : "none"} className={`transition-transform group-active:scale-125 ${item.isLiked ? "scale-110" : ""}`} />
+                                    <ArrowBigUp size={20} fill={item.isLiked ? "currentColor" : "none"} className={`transition-transform group-active:scale-125 ${item.isLiked ? "scale-110" : ""}`} />
                                     <span>{item.upvotesCount}</span>
                                 </button>
 
                                 <button
                                     onClick={() => handleSave(item)}
-                                    className={`flex items-center gap-2 text-sm font-bold transition group ${item.isSaved ? "text-pink-500" : "text-white/60 hover:text-white"}`}
+                                    className={`flex items-center gap-1.5 text-xs font-bold transition group ${item.isSaved ? "text-pink-500" : "text-white/60 hover:text-white"}`}
                                 >
-                                    <Heart size={20} fill={item.isSaved ? "currentColor" : "none"} className="transition-transform group-active:scale-90" />
+                                    <Heart size={18} fill={item.isSaved ? "currentColor" : "none"} className="transition-transform group-active:scale-90" />
                                 </button>
                             </div>
 
@@ -365,10 +376,10 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                         promptId: item.promptId
                                     })
                                 }}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#B7FF00] text-black rounded-lg text-sm font-bold hover:bg-[#a3e600] transition"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#B7FF00] text-black hover:bg-[#a3e600] transition active:scale-95"
+                                title="Remix this"
                             >
-                                <RefreshCw size={16} />
-                                Remix This
+                                <RefreshCw size={18} />
                             </button>
                         </div>
                     </article>
