@@ -425,7 +425,7 @@ function PromptContent() {
             prompt_slug: r.prompt_slug ?? null,
           };
         });
-        setSpecificRemixes(rows.filter((r) => r.imageUrl.trim().length > 0));
+        setSpecificRemixes(rows.filter((r: any) => r.imageUrl.trim().length > 0));
       }
       setSpecificLoading(false);
     }
@@ -485,12 +485,12 @@ function PromptContent() {
           };
         });
 
-        const validRows = processedRemixes.filter((r) => r.imageUrl.trim().length > 0);
+        const validRows = processedRemixes.filter((r: any) => r.imageUrl.trim().length > 0);
 
         setCommunityRemixes((prev) => {
           if (communityPage === 0) return validRows;
           const existing = new Set(prev.map((p) => p.id));
-          return [...prev, ...validRows.filter((p) => !existing.has(p.id))];
+          return [...prev, ...validRows.filter((p: any) => !existing.has(p.id))];
         });
       } else {
         setHasMoreCommunity(false);
