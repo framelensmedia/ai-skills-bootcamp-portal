@@ -241,8 +241,13 @@ export default function RemixChatWizard({
         if (nextStep.type === "field") {
             const f = nextStep.data;
             // 1) Logic: User Answer -> Default -> Fallback
-            const currentVal = answers[f.id] || f.default || "(set in template)";
-            botText = `The current ${f.label} is '${currentVal}'. What would you like to change it to?`;
+            const currentVal = answers[f.id] || f.default;
+
+            if (!currentVal || currentVal === "(set in template)") {
+                botText = `What would you like the ${f.label} to be?`;
+            } else {
+                botText = `The current ${f.label} is '${currentVal}'. What would you like to change it to?`;
+            }
         } else if (nextStep.type === "group") {
             const g = nextStep.data as { label: string, fields: string[] };
             // Resolve field labels AND current values
