@@ -78,6 +78,8 @@ function CreatorContent() {
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [previewImage, setPreviewImage] = useState<string>("/orb-neon.gif"); // Default placeholder
+    const previewRef = useRef<HTMLDivElement>(null);
+    const shuffledRemixIds = useRef<string[]>([]);
 
     // Community Feed Data
     const [communityPrompts, setCommunityPrompts] = useState<any[]>([]);
@@ -126,8 +128,44 @@ function CreatorContent() {
             setLoadingRemixes(true);
 
             const LIMIT = 6;
-            const from = page * LIMIT;
-            const to = from + LIMIT - 1;
+
+            // Initial Fetch & Shuffle (Client-side)
+            if (page === 0 && shuffledRemixIds.current.length === 0) {
+                try {
+                    const { data: allIds } = await supabase
+                        .from("prompt_generations")
+                        .select("id")
+                        .eq("is_public", true)
+                        .order("created_at", { ascending: false })
+                        .limit(500); // Fetch recent 500
+
+                    if (allIds && allIds.length > 0) {
+                        const ids = allIds.map((x: any) => x.id);
+                        // Fisher-Yates Shuffle
+                        for (let i = ids.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [ids[i], ids[j]] = [ids[j], ids[i]];
+                        }
+                        shuffledRemixIds.current = ids;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch ids", e);
+                }
+            }
+
+            const start = page * LIMIT;
+            const end = start + LIMIT;
+            const pageIds = shuffledRemixIds.current.slice(start, end);
+
+            if (pageIds.length === 0) {
+                if (shuffledRemixIds.current.length > 0) {
+                    setHasMore(false);
+                } else {
+                    setHasMore(false);
+                }
+                setLoadingRemixes(false);
+                return;
+            }
 
             const { data: remixesData } = await supabase
                 .from("prompt_generations")
@@ -135,9 +173,7 @@ function CreatorContent() {
                      id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
                      user_id, prompt_id
                   `)
-                .eq("is_public", true)
-                .order("created_at", { ascending: false })
-                .range(from, to);
+                .in("id", pageIds);
 
             if (remixesData) {
                 if (remixesData.length < LIMIT) {
@@ -171,10 +207,13 @@ function CreatorContent() {
                 });
 
                 setCommunityRemixes((prev) => {
+                    // Sort processedRemixes to match pageIds (random order)
+                    const sortedNew = pageIds.map(pid => processedRemixes.find((r: any) => r.id === pid)).filter(Boolean);
+
                     // Avoid duplicates just in case
-                    const newIds = new Set(processedRemixes.map((r: any) => r.id));
+                    const newIds = new Set(sortedNew.map((r: any) => r.id));
                     const filteredPrev = prev.filter(p => !newIds.has(p.id));
-                    return [...filteredPrev, ...processedRemixes];
+                    return [...filteredPrev, ...sortedNew];
                 });
             } else {
                 setHasMore(false);
@@ -300,6 +339,11 @@ function CreatorContent() {
     const generateImage = async (prompt: string, imageUploads: File[]) => {
         setGenerating(true);
         setError(null);
+
+        // Scroll to preview on mobile
+        if (typeof window !== "undefined" && window.innerWidth < 1024 && previewRef.current) {
+            previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
 
         try {
             // 1. Upload images to Supabase first
@@ -590,7 +634,7 @@ function CreatorContent() {
                 </div>
 
                 {/* RIGHT COLUMN: Preview / Results */}
-                <div className="lg:col-span-7 order-1 lg:order-2">
+                <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
                     <div className={`sticky top-8 w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
                         {/* Generating Overlay */}
                         {generating && (

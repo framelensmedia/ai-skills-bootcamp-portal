@@ -26,15 +26,36 @@ export default async function HomePage() {
     user
       ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
       : Promise.resolve({ data: [] }),
-    supabase
-      .from("prompt_generations")
-      .select(`
-         id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
-         user_id, prompt_id
-      `)
-      .eq("is_public", true)
-      .order("created_at", { ascending: false })
-      .limit(8)
+    user
+      ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
+      : Promise.resolve({ data: [] }),
+    // Randomized Remix Fetch
+    (async () => {
+      const { data: allIds } = await supabase
+        .from("prompt_generations")
+        .select("id")
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (!allIds || allIds.length === 0) return { data: [] };
+
+      const ids = allIds.map((x: any) => x.id);
+      // Shuffle
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+      const selectedIds = ids.slice(0, 8);
+
+      return supabase
+        .from("prompt_generations")
+        .select(`
+             id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
+             user_id, prompt_id
+          `)
+        .in("id", selectedIds);
+    })()
   ]);
 
   const prompts = (promptsRes.data || []) as PublicPrompt[];

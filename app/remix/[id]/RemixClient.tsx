@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp } from "lucide-react";
+import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 export type RemixDetail = {
     id: string;
@@ -57,6 +58,7 @@ export default function RemixClient({ initialRemix }: Props) {
     const isFetchingRef = useRef(false); // Ref to track fetching state synchronously
     // const sentinelRef = useRef<HTMLDivElement>(null); // REMOVED
     const observerRef = useRef<IntersectionObserver | null>(null);
+    const shuffledRemixIds = useRef<string[]>([]);
 
     const sentinelRef = useCallback((node: HTMLDivElement | null) => {
         if (loading) return;
@@ -79,6 +81,12 @@ export default function RemixClient({ initialRemix }: Props) {
 
     useEffect(() => {
         if (!id) return;
+
+        // Reset state for new ID
+        setPage(0);
+        setCommunityRemixes([]);
+        setHasMore(true);
+        shuffledRemixIds.current = [];
 
         async function load() {
             const supabase = createSupabaseBrowserClient();
@@ -169,7 +177,9 @@ export default function RemixClient({ initialRemix }: Props) {
                 .limit(32);
 
             if (otherRemixes) {
-                setUserRemixes(otherRemixes as any);
+                // Shuffle "More from this Creator" as well for freshness
+                const shuffled = [...otherRemixes].sort(() => 0.5 - Math.random());
+                setUserRemixes(shuffled as any);
             }
 
             setLoading(false);
@@ -187,30 +197,66 @@ export default function RemixClient({ initialRemix }: Props) {
 
             try {
                 const supabase = createSupabaseBrowserClient();
-                const from = page * 12;
-                const to = from + 11;
+                const LIMIT = 12;
 
-                // Artificial delay to prevent rapid-fire requests if needed, but not strictly necessary
-                // await new Promise(r => setTimeout(r, 500));
+                // Initial Fetch & Shuffle (Client-side)
+                if (page === 0 && shuffledRemixIds.current.length === 0) {
+                    try {
+                        const { data: allIds } = await supabase
+                            .from("prompt_generations")
+                            .select("id")
+                            .eq("is_public", true)
+                            .neq("id", id || "")
+                            .order("created_at", { ascending: false })
+                            .limit(1000); // Fetch recent 1000 to shuffle
+
+                        if (allIds && allIds.length > 0) {
+                            const ids = allIds.map((x: any) => x.id);
+                            // Fisher-Yates Shuffle
+                            for (let i = ids.length - 1; i > 0; i--) {
+                                const j = Math.floor(Math.random() * (i + 1));
+                                [ids[i], ids[j]] = [ids[j], ids[i]];
+                            }
+                            shuffledRemixIds.current = ids;
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch ids", e);
+                    }
+                }
+
+                const start = page * LIMIT;
+                const end = start + LIMIT;
+                const pageIds = shuffledRemixIds.current.slice(start, end);
+
+                if (pageIds.length === 0) {
+                    // If pool is empty or we reached end
+                    if (shuffledRemixIds.current.length > 0) {
+                        setHasMore(false);
+                    } else {
+                        // Fallback to normal fetch if shuffle failed? 
+                        // Or just stop.
+                        setHasMore(false);
+                    }
+                    return;
+                }
 
                 const { data, error } = await supabase
                     .from("prompt_generations")
                     .select("id, image_url, created_at")
-                    .eq("is_public", true)
-                    .neq("id", id || "") // Exclude current remix, but allow same user
-                    .order("created_at", { ascending: false })
-                    .order("id", { ascending: false }) // Secondary sort for stable pagination
-                    .range(from, to);
+                    .in("id", pageIds);
 
                 if (data) {
-                    if (data.length < 12) {
+                    if (data.length < LIMIT) {
                         setHasMore(false);
                     }
 
+                    // Sort data to match pageIds order to preserve shuffling
+                    const sortedData = pageIds.map(pid => data.find((d: any) => d.id === pid)).filter(Boolean);
+
                     setCommunityRemixes((prev) => {
-                        if (page === 0 && prev.length === 0) return data as any;
+                        if (page === 0) return sortedData as any;
                         const existing = new Set(prev.map(p => p.id));
-                        const newItems = data.filter((p: any) => !existing.has(p.id));
+                        const newItems = sortedData.filter((p: any) => p && !existing.has(p.id));
                         return [...prev, ...newItems] as any;
                     });
                 } else {
@@ -465,7 +511,7 @@ export default function RemixClient({ initialRemix }: Props) {
                                 onClick={handleUpvote}
                                 disabled={isTogglingLike}
                                 className={`flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-sm font-bold transition-colors whitespace-nowrap ${hasLiked
-                                    ? "border-orange-500/50 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20"
+                                    ? "border-[#B7FF00]/50 bg-[#B7FF00]/10 text-[#B7FF00] hover:bg-[#B7FF00]/20"
                                     : "border-white/10 bg-white/5 text-white hover:bg-white/10"
                                     }`}
                             >
@@ -559,7 +605,7 @@ export default function RemixClient({ initialRemix }: Props) {
                 {/* Community Remixes */}
                 {
                     communityRemixes.length > 0 && (
-                        <div className="pb-10">
+                        <div className="pb-10 relative">
                             <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-2xl font-bold text-white">More Community Remixes</h2>
                                 <button
@@ -594,6 +640,11 @@ export default function RemixClient({ initialRemix }: Props) {
                                 {isFetchingMore && (
                                     <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-[#B7FF00]"></span>
                                 )}
+                            </div>
+
+                            {/* Sticky Back To Top */}
+                            <div className="sticky bottom-8 flex justify-center pointer-events-none z-50 mt-8">
+                                <GalleryBackToTop />
                             </div>
                         </div>
                     )

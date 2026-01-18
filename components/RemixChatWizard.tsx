@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG: TemplateConfig = {
 type Props = {
     isOpen: boolean;
     onClose: () => void;
-    onComplete: (summary: string, answers: RemixAnswers) => void;
+    onComplete: (summary: string, answers: RemixAnswers, shouldGenerate?: boolean) => void;
     templatePreviewUrl: string;
     initialValues?: RemixAnswers | null;
     uploads: File[];
@@ -101,7 +101,7 @@ export default function RemixChatWizard({
     const steps = useMemo(() => {
         if (!templateConfig) return [];
 
-        const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo", data?: any }[] = [];
+        const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo" | "review", data?: any }[] = [];
         const minimal = templateConfig.force_minimal_flow;
 
         // 1. Intro (Photo Upload)
@@ -156,6 +156,9 @@ export default function RemixChatWizard({
 
         // 8. Instructions
         list.push({ type: "instructions" });
+
+        // 9. Review / Generate
+        list.push({ type: "review" });
 
         return list;
     }, [templateConfig]);
@@ -226,7 +229,8 @@ export default function RemixChatWizard({
         // Move to Next
         const nextIdx = stepIndex + 1;
         if (nextIdx >= steps.length) {
-            completeWorkflow(newMsgs, { ...answers, ...(answerKey ? { [answerKey]: answerVal } : {}) });
+            // Should be covered by logic below but just in case
+            completeWorkflow(newMsgs, { ...answers, ...(answerKey ? { [answerKey]: answerVal } : {}) }, true);
             return;
         }
 
@@ -258,6 +262,8 @@ export default function RemixChatWizard({
             botText = "What is your Business Name?";
         } else if (nextStep.type === "logo") {
             botText = "Upload your logo/brand mark (optional). We will remove the background automatically.";
+        } else if (nextStep.type === "review") {
+            botText = "Everything looks good! Ready to generate your artwork?";
         }
 
         setMessages([
@@ -270,18 +276,18 @@ export default function RemixChatWizard({
         ]);
     }
 
-    function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers) {
+    function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers, shouldGenerate = false) {
         // Include subjectLock in answers
         finalAnswers.subjectLock = String(subjectLock);
 
         const sum = generateEditSummary(finalAnswers, uploads.length > 0);
         setMessages([
             ...currentMsgs,
-            { id: "final", role: "system", text: "Great! Updating your prompt..." }
+            { id: "final", role: "system", text: shouldGenerate ? "Starting generation..." : "Great! Updating your prompt..." }
         ]);
 
         setTimeout(() => {
-            onComplete(sum, finalAnswers);
+            onComplete(sum, finalAnswers, shouldGenerate);
             onClose();
         }, 800);
     }
@@ -371,6 +377,13 @@ export default function RemixChatWizard({
                                     </button>
                                 </div>
                             </div>
+                        ) : activeStep?.type === "review" ? (
+                            <button
+                                onClick={() => completeWorkflow(messages, answers, true)}
+                                className="w-full rounded-xl bg-lime-400 py-4 text-base font-bold text-black hover:bg-lime-300 md:py-4 shadow-lg shadow-lime-400/20 transform hover:scale-[1.02] transition-all"
+                            >
+                                ✨ Generate Artwork
+                            </button>
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">

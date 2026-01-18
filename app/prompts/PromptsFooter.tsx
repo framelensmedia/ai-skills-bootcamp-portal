@@ -25,6 +25,7 @@ export default function PromptsFooter() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loadingRemixes, setLoadingRemixes] = useState(false);
+    const shuffledRemixIds = useRef<string[]>([]);
 
     // Observer
     const observer = useRef<IntersectionObserver | null>(null);
@@ -86,8 +87,44 @@ export default function PromptsFooter() {
             setLoadingRemixes(true);
 
             const LIMIT = 8;
-            const from = page * LIMIT;
-            const to = from + LIMIT - 1;
+
+            // Initial Fetch & Shuffle (Client-side)
+            if (page === 0 && shuffledRemixIds.current.length === 0) {
+                try {
+                    const { data: allIds } = await supabase
+                        .from("prompt_generations")
+                        .select("id")
+                        .eq("is_public", true)
+                        .order("created_at", { ascending: false })
+                        .limit(500); // Fetch recent 500
+
+                    if (allIds && allIds.length > 0) {
+                        const ids = allIds.map((x: any) => x.id);
+                        // Fisher-Yates Shuffle
+                        for (let i = ids.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [ids[i], ids[j]] = [ids[j], ids[i]];
+                        }
+                        shuffledRemixIds.current = ids;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch ids", e);
+                }
+            }
+
+            const start = page * LIMIT;
+            const end = start + LIMIT;
+            const pageIds = shuffledRemixIds.current.slice(start, end);
+
+            if (pageIds.length === 0) {
+                if (shuffledRemixIds.current.length > 0) {
+                    setHasMore(false);
+                } else {
+                    setHasMore(false);
+                }
+                setLoadingRemixes(false);
+                return;
+            }
 
             const { data: remixesData } = await supabase
                 .from("prompt_generations")
@@ -95,9 +132,7 @@ export default function PromptsFooter() {
                      id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
                      user_id, prompt_id
                   `)
-                .eq("is_public", true)
-                .order("created_at", { ascending: false })
-                .range(from, to);
+                .in("id", pageIds);
 
             if (remixesData) {
                 if (remixesData.length < LIMIT) {
@@ -131,10 +166,13 @@ export default function PromptsFooter() {
                 });
 
                 setCommunityRemixes((prev) => {
+                    // Sort processedRemixes to match pageIds (random order)
+                    const sortedNew = pageIds.map(pid => processedRemixes.find((r: any) => r.id === pid)).filter(Boolean);
+
                     // Unique check
-                    const newIds = new Set(processedRemixes.map((r: any) => r.id));
+                    const newIds = new Set(sortedNew.map((r: any) => r.id));
                     const filteredPrev = prev.filter(p => !newIds.has(p.id));
-                    return [...filteredPrev, ...processedRemixes];
+                    return [...filteredPrev, ...sortedNew];
                 });
             } else {
                 setHasMore(false);

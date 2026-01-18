@@ -35,20 +35,22 @@ export function transformAutoModeToPrompt(data: AutoModeData): TransformedOutput
     const parts: string[] = [];
 
     // Asset type and project
-    parts.push(`Create a professional ${data.asset_type.toLowerCase()} for "${data.project_name}".`);
+    const type = data.asset_type || "Digital Artwork";
+    const projectPart = data.project_name ? ` for "${data.project_name}"` : "";
+    parts.push(`Create a professional ${type.toLowerCase()}${projectPart}.`);
 
     // Copy/text elements
     const copyParts: string[] = [];
-    if (data.copy_block.headline) {
+    if (data.copy_block?.headline) {
         copyParts.push(`Headline: "${data.copy_block.headline}"`);
     }
-    if (data.copy_block.subheadline) {
+    if (data.copy_block?.subheadline) {
         copyParts.push(`Subheadline: "${data.copy_block.subheadline}"`);
     }
-    if (data.copy_block.cta) {
+    if (data.copy_block?.cta) {
         copyParts.push(`Call-to-action: "${data.copy_block.cta}"`);
     }
-    if (data.copy_block.offer) {
+    if (data.copy_block?.offer) {
         copyParts.push(`Offer/tagline: "${data.copy_block.offer}"`);
     }
 
@@ -58,7 +60,8 @@ export function transformAutoModeToPrompt(data: AutoModeData): TransformedOutput
     }
 
     // Style & vibe
-    parts.push(`\nStyle: ${data.style_vibe}`);
+    const vibe = data.style_vibe || "Creative, Premium, High Quality";
+    parts.push(`\nStyle: ${vibe}`);
 
     // Colors
     if (data.color_preferences) {

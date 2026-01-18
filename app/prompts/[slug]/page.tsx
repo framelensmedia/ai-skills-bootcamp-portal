@@ -143,6 +143,8 @@ function PromptContent() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const shuffledRemixIds = useRef<string[]>([]);
 
   // Interaction State
   const [manualMode, setManualMode] = useState(false);
@@ -449,15 +451,53 @@ function PromptContent() {
 
       const supabase = createSupabaseBrowserClient();
       const LIMIT = 12;
-      const from = communityPage * LIMIT;
-      const to = from + LIMIT - 1;
+
+      // Initial Fetch & Shuffle (Client-side)
+      if (communityPage === 0 && shuffledRemixIds.current.length === 0) {
+        try {
+          const { data: allIds } = await supabase
+            .from("prompt_generations")
+            .select("id")
+            .eq("is_public", true)
+            .order("created_at", { ascending: false })
+            .limit(500); // Fetch recent 500 to shuffle
+
+          if (allIds && allIds.length > 0) {
+            const ids = allIds.map(x => x.id);
+            // Fisher-Yates Shuffle
+            for (let i = ids.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [ids[i], ids[j]] = [ids[j], ids[i]];
+            }
+            shuffledRemixIds.current = ids;
+          }
+        } catch (e) {
+          console.error("Failed to fetch ids", e);
+        }
+      }
+
+      const start = communityPage * LIMIT;
+      const end = start + LIMIT;
+      const pageIds = shuffledRemixIds.current.slice(start, end);
+
+      if (pageIds.length === 0 && shuffledRemixIds.current.length > 0) {
+        setHasMoreCommunity(false);
+        setCommunityLoading(false);
+        return;
+      }
+
+      // If pool is empty (no public remixes), stop
+      if (shuffledRemixIds.current.length === 0 && communityPage === 0) {
+        // Attempt to fetch normal if shuffle failed? No, just handle empty.
+        setHasMoreCommunity(false);
+        setCommunityLoading(false);
+        return;
+      }
 
       const { data: remixesData } = await supabase
         .from("prompt_generations")
         .select("*")
-        .eq("is_public", true)
-        .order("created_at", { ascending: false })
-        .range(from, to);
+        .in("id", pageIds);
 
       if (remixesData) {
         if (remixesData.length < LIMIT) {
@@ -496,13 +536,19 @@ function PromptContent() {
 
         const validRows = processedRemixes.filter((r: any) => r.imageUrl.trim().length > 0);
 
+        // Sort validRows to match pageIds order (to maintain randomization)
+        const sortedRows = pageIds.map(id => validRows.find((r: any) => r.id === String(id))).filter(Boolean);
+
         setCommunityRemixes((prev) => {
-          if (communityPage === 0) return validRows;
+          if (communityPage === 0) return sortedRows;
           const existing = new Set(prev.map((p) => p.id));
-          return [...prev, ...validRows.filter((p: any) => !existing.has(p.id))];
+          return [...prev, ...sortedRows.filter((p: any) => !existing.has(p.id))];
         });
       } else {
-        setHasMoreCommunity(false);
+        if (communityPage === 0) {
+          // If query returned null but we had IDs? weird.
+          // Just ignore.
+        }
       }
       setCommunityLoading(false);
     };
@@ -619,6 +665,11 @@ function PromptContent() {
     setGenerating(true);
     setGenerateError(null);
 
+    // Scroll to preview on mobile
+    if (typeof window !== "undefined" && window.innerWidth < 1024 && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     try {
       const refResponse = await fetch(generatedImageUrl);
       const refBlob = await refResponse.blob();
@@ -675,26 +726,18 @@ function PromptContent() {
     setWizardOpen(true);
   }
 
-  function handleWizardComplete(summary: string, ans: RemixAnswers, files?: File[]) {
+  function handleWizardComplete(summary: string, ans: RemixAnswers, shouldGenerate = false) {
     setEditSummary(summary);
     setRemixAnswers(ans);
-    if (files) {
-      // files is File[]
-      // We need to manage uploads state
-      // clearUploads? or just set?
-      // setUploads is available? Yes.
-      // But setUploads appends? No, we likely want to replace if wizard returns the full set.
-      // But RemixChatWizard might return NEW uploads or ALL?
-      // In RemixChatWizard, onComplete calls with `uploads` (state).
-      // So it is the full set currently in the wizard.
-      // BUT my PromptPage implementation uses `addUploads` / `removeUpload`.
-      // `setUploads` updates the array.
-      // So `setUploads(files)` is correct.
-      setUploads(files);
-    }
+    // uploads are updated via setUploads prop in wizard
     setWizardOpen(false);
     // When wizard completes (with valid output), switch to manual mode so user sees the result
     if (summary) setManualMode(true);
+
+    if (shouldGenerate) {
+      // Trigger generation with these fresh values
+      handleGenerate({ prompt: summary, answers: ans });
+    }
   }
 
   function handleRemixFromCard(row: RemixRow) {
@@ -730,7 +773,7 @@ function PromptContent() {
     forceRefreshRemixes();
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(overrides?: { prompt?: string; answers?: RemixAnswers; files?: File[] }) {
     if (isLocked) {
       if (lockReason === "login") {
         router.push(`/login?redirectTo=${encodeURIComponent(`/prompts/${slug}`)}`);
@@ -750,7 +793,11 @@ function PromptContent() {
       return;
     }
 
-    if (!editSummary) {
+    const promptToUse = overrides?.prompt ?? editSummary;
+    const answersToUse = overrides?.answers ?? remixAnswers;
+    const uploadsToUse = overrides?.files ?? uploads;
+
+    if (!promptToUse) {
       setGenerateError("Please use 'Remix' to create instructions first.");
       return;
     }
@@ -758,9 +805,14 @@ function PromptContent() {
     setGenerating(true);
     setGenerateError(null);
 
+    // Scroll to preview on mobile
+    if (typeof window !== "undefined" && window.innerWidth < 1024 && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     try {
       // Upload Images Client-Side
-      const uploadPromises = uploads.slice(0, MAX_UPLOADS).map(file => uploadFile(file));
+      const uploadPromises = uploadsToUse.slice(0, MAX_UPLOADS).map(file => uploadFile(file));
       const imageUrls = await Promise.all(uploadPromises);
 
       // Upload Logo if exists
@@ -770,44 +822,24 @@ function PromptContent() {
       }
 
       const payload = {
-        prompt: editSummary,
+        prompt: promptToUse,
         userId,
         aspectRatio,
         promptId: metaRow.id,
         promptSlug: metaRow.slug,
-        edit_instructions: editSummary,
-        combined_prompt_text: editSummary,
+        edit_instructions: promptToUse,
+        combined_prompt_text: promptToUse,
 
         subjectMode: templateConfig?.subject_mode || "non_human",
         template_reference_image: imageSrc, // Used as reference for Remix
 
         imageUrls, // Send URLs
-        logo_image: logoUrl, // If supported in API? Need to check if API supports logo_image as URL.
-        // API check: API checks `logoFile` from form. 
-        // Previous API update: I added `imageUrls` support.
-        // I DID NOT add `logoUrl` support in `route.ts`.
-        // I should add `logoUrl` support to `route.ts` if I want to support logo.
-        // For now, let's stick to `imageUrls` which solves the main user complaint.
-        // If logo is large, it will still fail if sent as URL? No, URL is small.
-        // But API must fetch it.
-        // Let's assume standard remix (without logo) is the priority. 
-        // But wait, if I don't send logo, it breaks logo replacement.
-        // I'll skip logo refactor for now to be safe, OR I should add it to payload.
-        // The API reads `logo_image` from form. It doesn't read it from JSON body currently?
-        // Line 151 in route.ts: `logoFile = form.get("logo_image") ...`
-        // It doesn't seem to read logo from JSON body in `route.ts`.
-        // So I can't support Logo via JSON yet unless I update route.ts.
-        // Risk: Users using Logo will fail if I switch to JSON.
-        // However, only "Remix" flow uses this. The Wizard sets logo?
-        // The page has `logo` state.
-        // If I skip logo, I might break that feature.
-        // But I must fix the 413 error.
-        // I'll send the rest as JSON.
+        logo_image: logoUrl,
 
         business_name: businessName,
-        headline: remixAnswers?.headline,
-        industry_intent: remixAnswers?.industry_intent,
-        subjectLock: remixAnswers?.subjectLock
+        headline: answersToUse?.headline,
+        industry_intent: answersToUse?.industry_intent,
+        subjectLock: answersToUse?.subjectLock
       };
 
       const res = await fetch("/api/generate", {
@@ -976,7 +1008,7 @@ function PromptContent() {
 
         <div className="grid gap-5 lg:grid-cols-2">
           {/* PREVIEW PANEL */}
-          <section className="order-1 lg:order-2">
+          <section className="order-1 lg:order-2" ref={previewRef}>
             <div className="lg:sticky lg:top-8">
               <button
                 type="button"
@@ -1257,7 +1289,7 @@ function PromptContent() {
                       ? "bg-lime-400/60"
                       : "bg-lime-400 hover:bg-lime-300",
                 ].join(" ")}
-                onClick={handleGenerate}
+                onClick={() => handleGenerate()}
                 disabled={isLocked || generating}
               >
                 {generating ? (

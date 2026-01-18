@@ -239,11 +239,11 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
             case 1:
                 return !!data.asset_type;
             case 2:
-                // Relaxed validation: allow empty project name if user wants? No, let's keep it required but maybe just whitespace check.
-                return !!data.project_name?.trim();
+                // Relaxed validation: allow empty project name
+                return true;
             case 3:
-                // Headline usually required
-                return !!data.copy_block?.headline?.trim();
+                // Relaxed validation: allow empty headline
+                return true;
             default:
                 return true; // Steps 4-7 are optional
         }
