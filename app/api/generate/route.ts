@@ -116,6 +116,7 @@ export async function POST(req: Request) {
         let industryIntent: string | null = null;
         let intentQueue: any[] = [];
         let subjectMode: string = "non_human"; // Default
+        let imageUrls: string[] = [];
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -191,6 +192,9 @@ export async function POST(req: Request) {
             if (body.subjectMode) subjectMode = String(body.subjectMode).trim();
             industryIntent = String(body.industry_intent ?? "").trim() || null;
             intentQueue = body.intent_queue || [];
+            if (Array.isArray(body.imageUrls)) {
+                imageUrls = body.imageUrls.map(String);
+            }
         }
 
         // 2. Validation
@@ -204,6 +208,9 @@ export async function POST(req: Request) {
         if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
         if (imageFiles.length > 10) {
+            return NextResponse.json({ error: "Too many images. Max is 10 per request." }, { status: 400 });
+        }
+        if (imageFiles.length + imageUrls.length > 10) {
             return NextResponse.json({ error: "Too many images. Max is 10 per request." }, { status: 400 });
         }
 
@@ -275,6 +282,15 @@ export async function POST(req: Request) {
                 const d = await fileToBase64(f);
                 imageParts.push({ inlineData: { mimeType: f.type, data: d } });
             }
+            for (const url of imageUrls) {
+                try {
+                    const { data, mimeType } = await urlToBase64(url);
+                    imageParts.push({ inlineData: { mimeType, data } });
+                } catch (e) {
+                    console.error("Failed to download input url:", url, e);
+                    // Continue or fail?
+                }
+            }
 
         } else {
             // --- REMIX MODE ---
@@ -303,6 +319,14 @@ export async function POST(req: Request) {
             for (const f of imageFiles) {
                 const data = await fileToBase64(f);
                 imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data } });
+            }
+            for (const url of imageUrls) {
+                try {
+                    const { data, mimeType } = await urlToBase64(url);
+                    imageParts.push({ inlineData: { mimeType, data } });
+                } catch (e) {
+                    console.error("Failed to download remix input url:", url, e);
+                }
             }
         }
 
@@ -519,7 +543,7 @@ Execute the user's instruction precisely.
                     aspectRatio: ar,
                     model,
                     provider: "vertex",
-                    input_images: imageFiles.length,
+                    input_images: imageFiles.length + imageUrls.length,
                     original_prompt_text,
                     remix_prompt_text,
                     combined_prompt_text: combined_prompt_text || rawPrompt,

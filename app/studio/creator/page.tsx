@@ -281,26 +281,50 @@ function CreatorContent() {
         await generateImage(manualPrompt, uploads);
     };
 
+    const uploadFile = async (file: File) => {
+        const ext = file.name.split(".").pop() || "png";
+        const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+        const { data, error } = await supabase.storage
+            .from("remix-images")
+            .upload(fileName, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from("remix-images")
+            .getPublicUrl(fileName);
+
+        return publicUrl;
+    };
+
     const generateImage = async (prompt: string, imageUploads: File[]) => {
         setGenerating(true);
         setError(null);
 
         try {
-            const form = new FormData();
-            form.append("userId", user.id);
-            form.append("prompt", prompt);
-            form.append("combined_prompt_text", prompt);
-            form.append("aspectRatio", aspectRatio);
+            // 1. Upload images to Supabase first
+            const uploadPromises = imageUploads.map(file => uploadFile(file));
+            const imageUrls = await Promise.all(uploadPromises);
 
-            // Add uploads
-            imageUploads.forEach((file) => {
-                form.append("images", file);
-            });
+            // 2. Upload Logo if exists (and not already in logic, checking if logic should include it)
+            // Current generateImage doesn't assume logo, staying strict to exist logic for now.
+
+            const payload = {
+                userId: user.id,
+                prompt: prompt,
+                combined_prompt_text: prompt,
+                aspectRatio,
+                imageUrls // Send URLs instead of files
+            };
 
             const res = await fetch("/api/generate", {
                 method: "POST",
-                body: form,
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload),
             });
+
 
             const json = await res.json();
 
