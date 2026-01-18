@@ -8,6 +8,7 @@ import { ArrowBigUp, Heart, RefreshCw, Clock, TrendingUp, User } from "lucide-re
 import Loading from "@/components/Loading";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { useToast } from "@/context/ToastContext";
+import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 export type FeedItem = {
     id: string; // generation id
@@ -396,6 +397,11 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                         No public remixes yet. Be the first to share one!
                     </div>
                 )}
+            </div>
+
+            {/* Sticky Back To Top */}
+            <div className="sticky bottom-8 flex justify-center pointer-events-none z-50 mt-8">
+                <GalleryBackToTop />
             </div>
 
             {selectedItem && (

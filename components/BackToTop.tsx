@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 
 export default function BackToTop() {
     const pathname = usePathname();
-    const isGallery = pathname === "/library" || pathname === "/feed" || pathname?.startsWith("/library/") || pathname?.startsWith("/feed/");
+    const isGallery = pathname === "/library" || pathname?.startsWith("/library/");
 
     if (!isGallery) return null;
 
