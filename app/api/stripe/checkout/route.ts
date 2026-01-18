@@ -51,7 +51,26 @@ export async function POST() {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "7-Day Trial Access",
+            description: "Instant access for 7 days",
+          },
+          unit_amount: 100, // $1.00
+        },
+      },
+    ],
+    subscription_data: {
+      trial_period_days: 7,
+    },
     success_url: `${siteUrl}/dashboard?paid=1`,
     cancel_url: `${siteUrl}/pricing?canceled=1`,
     allow_promotion_codes: true,

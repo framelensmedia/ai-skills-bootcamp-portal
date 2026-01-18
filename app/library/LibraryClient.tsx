@@ -91,9 +91,10 @@ function fallbackFromSettings(settings: any) {
 type LibraryClientProps = {
     initialFolders: FolderType[];
     initialRemixItems: LibraryItem[];
+    isPro: boolean;
 };
 
-export default function LibraryClient({ initialFolders, initialRemixItems }: LibraryClientProps) {
+export default function LibraryClient({ initialFolders, initialRemixItems, isPro }: LibraryClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { showToast } = useToast();
@@ -131,6 +132,49 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
     const [lbCombined, setLbCombined] = useState("");
     const [lbFullQualityUrl, setLbFullQualityUrl] = useState<string | null>(null);
     const [isOwnedByCurrentUser, setIsOwnedByCurrentUser] = useState(false);
+
+    // Global Private Toggle
+    const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+
+    // Derived state for the toggle
+    const areAllPrivate = remixItems.length > 0 && remixItems.every(i => !i.is_public);
+
+    async function handleToggleGlobalPrivacy() {
+        if (!isPro) {
+            router.push("/pricing");
+            return;
+        }
+
+        const targetStatePrivate = !areAllPrivate; // If currently all private, we target public (false).
+        const actionLabel = targetStatePrivate ? "Private" : "Public";
+        const newIsPublic = !targetStatePrivate;
+
+        if (!confirm(`Switch ALL remixes to ${actionLabel}?`)) {
+            return;
+        }
+
+        setIsUpdatingPrivacy(true);
+        const supabase = createSupabaseBrowserClient();
+
+        // 1. Update all in UI immediately
+        setRemixItems(prev => prev.map(p => ({ ...p, is_public: newIsPublic })));
+
+        // 2. Update DB
+        const { error } = await supabase
+            .from("prompt_generations")
+            .update({ is_public: newIsPublic })
+            .eq("user_id", (await supabase.auth.getUser()).data.user?.id!);
+
+        if (error) {
+            alert(`Failed to set all to ${actionLabel}.`);
+            // Revert UI?
+            setRemixItems(prev => prev.map(p => ({ ...p, is_public: !newIsPublic })));
+        } else {
+            showToast(`All remixes set to ${actionLabel}.`, "success");
+        }
+
+        setIsUpdatingPrivacy(false);
+    }
 
     // Edit Mode
     const [editModalOpen, setEditModalOpen] = useState(false);
@@ -427,6 +471,13 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
 
     async function handleToggleVisibility(item: LibraryItem) {
         const newStatus = !item.is_public;
+
+        // If trying to make Private (newStatus = false) and NOT Pro
+        if (!newStatus && !isPro) {
+            router.push("/pricing");
+            return;
+        }
+
         setRemixItems(prev => prev.map(i => i.id === item.id ? { ...i, is_public: newStatus } : i));
 
         const supabase = createSupabaseBrowserClient();
@@ -462,10 +513,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
             }
 
             // If switching to favorites for first time
+            // If switching to favorites for first time
             if (!isRemixes && !hasFetchedFavorites) {
-                setLoading(true);
-            } else if (isRemixes && remixItems.length === 0 && !loading) {
-                // We might be empty or loading.
                 setLoading(true);
             } else if (sortMode !== "newest") {
                 setLoading(true);
@@ -800,6 +849,21 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                         </>
                     )}
 
+                    {activeTab === "remixes" && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 border border-white/10">
+                            <span className="text-xs font-bold uppercase tracking-wider text-white/70">
+                                {areAllPrivate ? "Private Mode" : "Public Mode"} {isPro ? "" : "(Pro)"}
+                            </span>
+                            <button
+                                onClick={handleToggleGlobalPrivacy}
+                                disabled={isUpdatingPrivacy}
+                                className={`relative h-5 w-9 rounded-full transition-colors ${areAllPrivate ? "bg-[#B7FF00]" : "bg-white/10 hover:bg-white/20"} ${isUpdatingPrivacy ? "opacity-50 cursor-wait" : ""}`}
+                            >
+                                <span className={`absolute top-1 left-1 h-3 w-3 rounded-full bg-white transition-transform ${areAllPrivate ? "translate-x-4 bg-black" : "translate-x-0"}`} />
+                            </button>
+                        </div>
+                    )}
+
                     <button
                         onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
@@ -886,7 +950,24 @@ export default function LibraryClient({ initialFolders, initialRemixItems }: Lib
                 </aside>
 
                 <section className="flex-1 min-h-[50vh]">
-                    {loading ? <Loading /> : (
+                    {loading ? <Loading /> : displayedItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 px-4 border border-dashed border-white/10 rounded-2xl bg-zinc-900/50 text-center">
+                            <div className="mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-zinc-800 text-white/30">
+                                <Library size={32} />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-2">Library is empty</h3>
+                            <p className="text-sm text-white/50 max-w-sm mx-auto">
+                                {activeTab === "remixes"
+                                    ? "You haven't generated any remixes yet. Go to the Studio to start creating!"
+                                    : "You haven't added any favorites yet."}
+                            </p>
+                            {activeTab === "remixes" && (
+                                <button onClick={() => router.push('/studio/creator')} className="mt-6 px-5 py-2.5 rounded-lg bg-[#B7FF00] text-black text-sm font-bold hover:bg-[#B7FF00]/90 transition">
+                                    Open Creator Studio
+                                </button>
+                            )}
+                        </div>
+                    ) : (
                         viewMode === "grid" ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {displayedItems.map(it => (

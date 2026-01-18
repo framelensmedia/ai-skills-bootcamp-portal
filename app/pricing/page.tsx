@@ -120,8 +120,9 @@ function PricingContent() {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-3xl font-semibold whitespace-nowrap">$29</div>
+              <div className="text-3xl font-semibold whitespace-nowrap">$39.99</div>
               <div className="text-sm text-white/60 whitespace-nowrap">per month</div>
+              <div className="text-xs text-[#B7FF00] mt-1 font-medium whitespace-nowrap">7-day trial for $1</div>
             </div>
           </div>
 
@@ -137,7 +138,7 @@ function PricingContent() {
             disabled={loading}
             className="mt-8 w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
           >
-            {loading ? "Redirecting..." : "Start Premium"}
+            {loading ? "Redirecting..." : "Start Trial for $1"}
           </button>
 
           <p className="mt-3 text-xs text-white/60">

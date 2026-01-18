@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
 import { Wand2, ArrowRight, Flame, RefreshCw } from "lucide-react";
@@ -278,6 +279,34 @@ type HomeFeedProps = {
 export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteIds, recentRemixes = [] }: HomeFeedProps) {
     const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
 
+    // Auth Logic for CTA
+    const [user, setUser] = useState<any>(null);
+    const [isPro, setIsPro] = useState(false);
+    const [loadingAuth, setLoadingAuth] = useState(true);
+
+    useEffect(() => {
+        const supabase = createSupabaseBrowserClient();
+        async function checkAuth() {
+            setLoadingAuth(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("plan, role, staff_pro").eq("user_id", user.id).single();
+                if (profile) {
+                    const plan = String(profile.plan || "free").toLowerCase();
+                    const role = String(profile.role || "user").toLowerCase();
+                    const staffPro = Boolean(profile.staff_pro);
+                    const isStaffPlus = ["staff", "instructor", "editor", "admin", "super_admin"].includes(role);
+                    const pro = plan === "premium" || staffPro || isStaffPlus;
+                    setIsPro(pro);
+                }
+            }
+            setLoadingAuth(false);
+        }
+        checkAuth();
+    }, []);
+
     const sliderPrompts = useMemo(() => {
         const markedBootcamps = instructorBootcamps.map(b => ({ ...b, type: "instructor_bootcamp" } as InstructorBootcamp));
         // ONLY show instructor bootcamps in the slider as requested
@@ -288,6 +317,17 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
     // We are now Server Component based for initial data, so no loading state needed for initial content!
     // BUT we render client side so hydration happens.
+
+    const themePrimary = "bg-[#B7FF00] text-black hover:opacity-90";
+    const themeSecondary = "border border-white/15 bg-white/5 text-white hover:bg-white/10";
+
+    // Default (Loading or Pro): Browse is Primary
+    let browseStyle = themePrimary;
+
+    // If we have a dynamic Primary action (Sign Up or Upgrade), demote Browse
+    if (!loadingAuth && (!user || (user && !isPro))) {
+        browseStyle = themeSecondary;
+    }
 
     return (
         <>
@@ -517,7 +557,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
                         <Link
                             href="/prompts"
-                            className="inline-flex w-full justify-center rounded-md bg-[#B7FF00] px-5 py-3 text-sm font-semibold text-black hover:opacity-90 sm:w-auto"
+                            className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${browseStyle}`}
                         >
                             Browse Prompts
                         </Link>
@@ -527,12 +567,22 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         >
                             Open Creator Studio
                         </Link>
-                        <Link
-                            href="/pricing"
-                            className="inline-flex w-full justify-center rounded-md border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 sm:w-auto"
-                        >
-                            Upgrade to Pro
-                        </Link>
+
+                        {!loadingAuth && !user ? (
+                            <Link
+                                href="/signup"
+                                className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${themePrimary}`}
+                            >
+                                Sign Up
+                            </Link>
+                        ) : !loadingAuth && user && !isPro ? (
+                            <Link
+                                href="/pricing"
+                                className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${themePrimary}`}
+                            >
+                                Upgrade to Pro
+                            </Link>
+                        ) : null}
                     </div>
                     <p className="mt-4 text-xs text-white/50">Free tier available. Upgrade anytime.</p>
                 </div>

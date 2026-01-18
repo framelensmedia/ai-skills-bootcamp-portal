@@ -26,9 +26,7 @@ export default async function HomePage() {
     user
       ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
       : Promise.resolve({ data: [] }),
-    user
-      ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
-      : Promise.resolve({ data: [] }),
+
     // Randomized Remix Fetch
     (async () => {
       const { data: allIds } = await supabase

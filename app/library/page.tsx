@@ -25,7 +25,7 @@ export default async function LibraryPage() {
   }
 
   // Parallel Fetch: Folders & Remixes
-  const [foldersRes, remixesRes] = await Promise.all([
+  const [foldersRes, remixesRes, profileRes] = await Promise.all([
     supabase
       .from("folders")
       .select("*")
@@ -38,11 +38,26 @@ export default async function LibraryPage() {
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }) // Newest first default
-      .limit(200)
+      .limit(200),
+    supabase
+      .from("profiles")
+      .select("plan, role, staff_pro")
+      .eq("user_id", user.id)
+      .single()
   ]);
 
   const initialFolders = (foldersRes.data || []) as FolderType[];
   const genRows = (remixesRes.data || []) as GenRow[];
+  const profile = profileRes.data;
+
+  const isPro = (() => {
+    if (!profile) return false;
+    const plan = String(profile.plan || "free").toLowerCase();
+    const role = String(profile.role || "user").toLowerCase();
+    const staffPro = Boolean(profile.staff_pro);
+    const isStaffPlus = ["staff", "instructor", "editor", "admin", "super_admin"].includes(role);
+    return plan === "premium" || staffPro || isStaffPlus;
+  })();
 
   // Hydrate prompts for Remixes
   const promptIds = Array.from(new Set(genRows.map((g) => g.prompt_id).filter(Boolean))) as string[];
@@ -91,6 +106,7 @@ export default async function LibraryPage() {
     <LibraryClient
       initialFolders={initialFolders}
       initialRemixItems={initialRemixItems}
+      isPro={isPro}
     />
   );
 }
