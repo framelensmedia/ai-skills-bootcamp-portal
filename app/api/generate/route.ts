@@ -116,7 +116,9 @@ export async function POST(req: Request) {
         let industryIntent: string | null = null;
         let intentQueue: any[] = [];
         let subjectMode: string = "non_human"; // Default
+
         let imageUrls: string[] = [];
+        let logoUrl: string | null = null;
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -195,6 +197,7 @@ export async function POST(req: Request) {
             if (Array.isArray(body.imageUrls)) {
                 imageUrls = body.imageUrls.map(String);
             }
+            logoUrl = body.logo_image ? String(body.logo_image).trim() : null;
         }
 
         // 2. Validation
@@ -338,6 +341,14 @@ export async function POST(req: Request) {
                 const data = await fileToBase64(logoFile);
                 imageParts.push({ inlineData: { mimeType, data } });
                 logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
+            }
+        } else if (logoUrl) {
+            try {
+                const { data, mimeType } = await urlToBase64(logoUrl);
+                imageParts.push({ inlineData: { mimeType, data } });
+                logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
+            } catch (e) {
+                console.error("Failed to download logo url:", logoUrl, e);
             }
         } else if (businessName) {
             logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
