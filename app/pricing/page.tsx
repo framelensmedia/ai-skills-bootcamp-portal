@@ -62,7 +62,7 @@ function PricingContent() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10 text-white">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 pb-40 text-white">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Membership</h1>
         <p className="text-white/70">
