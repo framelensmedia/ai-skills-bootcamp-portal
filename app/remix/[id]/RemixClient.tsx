@@ -243,13 +243,23 @@ export default function RemixClient({ initialRemix }: Props) {
         }
 
         try {
+            // Optimistic update
+            const newIsFavorited = !isFavorited;
+            setIsFavorited(newIsFavorited);
+
             if (isFavorited) {
                 await supabase
                     .from("prompt_favorites")
                     .delete()
                     .eq("user_id", user.id)
                     .eq("generation_id", remix.id);
-                setIsFavorited(true);
+            } else {
+                await supabase
+                    .from("prompt_favorites")
+                    .insert({
+                        user_id: user.id,
+                        generation_id: remix.id
+                    });
             }
         } catch (err) {
             console.error("Failed to toggle favorite:", err);
