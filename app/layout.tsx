@@ -51,7 +51,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-black text-white" suppressHydrationWarning={true}>
+      <body className="min-h-[100dvh] bg-black text-white overflow-x-hidden" suppressHydrationWarning={true}>
         <AuthProvider>
           <ToastContextProvider>
             {/* Header */}
