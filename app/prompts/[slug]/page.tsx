@@ -884,8 +884,7 @@ function PromptContent() {
       : "Upgrade to Pro to unlock the full prompt text and generator tools.";
 
   const hasGeneratedForActions = Boolean(
-    (generatedImageUrl && generatedImageUrl.trim().length > 0) ||
-    (overridePreviewUrl && overridePreviewUrl.trim().length > 0)
+    generatedImageUrl && generatedImageUrl.trim().length > 0
   );
 
   return (

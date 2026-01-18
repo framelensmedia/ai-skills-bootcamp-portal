@@ -129,14 +129,14 @@ export default function AIAssistant() {
                         <div className="relative h-8 w-8 sm:h-9 sm:w-9 shrink-0">
                             <Image
                                 src="/logo-symbol.png"
-                                alt="AI Skills Bootcamp"
+                                alt="AI Skills Studio"
                                 fill
                                 className="object-contain"
                             />
                         </div>
                         <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
                             <span className="text-[#B7FF00]">AI Skills</span>{" "}
-                            <span className="text-white">Bootcamp</span>
+                            <span className="text-white">Studio</span>
                         </span>
                     </div>
 
