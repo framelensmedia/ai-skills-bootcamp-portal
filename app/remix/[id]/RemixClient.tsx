@@ -385,7 +385,20 @@ export default function RemixClient({ initialRemix }: Props) {
         );
     }
 
-    const handleCopyLink = async () => {
+    const handleShare = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Check out this remix on AI Skills Studio',
+                    text: 'I found this amazing remix on AI Skills Studio. Check it out!',
+                    url: window.location.href,
+                });
+                return;
+            } catch {
+                // If user cancels or share fails, duplicate fall-through to copy
+            }
+        }
+
         try {
             await navigator.clipboard.writeText(window.location.href);
             setCopied(true);
@@ -540,10 +553,10 @@ export default function RemixClient({ initialRemix }: Props) {
                             </button>
 
                             <button
-                                onClick={handleCopyLink}
+                                onClick={handleShare}
                                 className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-white/10 whitespace-nowrap sm:col-span-2"
                             >
-                                {copied ? <span className="text-lime-400">Copied!</span> : <><Share2 size={18} /> Share</>}
+                                {copied ? <span className="text-lime-400">Copied Link!</span> : <><Share2 size={18} /> Share</>}
                             </button>
                         </div>
 
