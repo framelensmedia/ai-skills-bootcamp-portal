@@ -523,7 +523,7 @@ export default function RemixClient({ initialRemix }: Props) {
                                 onClick={handleToggleFavorite}
                                 disabled={isTogglingFavorite}
                                 className={`flex items-center justify-center gap-2 rounded-xl border px-6 py-4 text-sm font-bold transition-colors whitespace-nowrap ${isFavorited
-                                    ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20"
+                                    ? "border-[#B7FF00]/50 bg-[#B7FF00]/10 text-[#B7FF00] hover:bg-[#B7FF00]/20"
                                     : "border-white/15 bg-white/5 text-white hover:bg-white/10"
                                     }`}
                             >

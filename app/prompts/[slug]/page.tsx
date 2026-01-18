@@ -463,7 +463,7 @@ function PromptContent() {
             .limit(500); // Fetch recent 500 to shuffle
 
           if (allIds && allIds.length > 0) {
-            const ids = allIds.map(x => x.id);
+            const ids = allIds.map((x: any) => x.id);
             // Fisher-Yates Shuffle
             for (let i = ids.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
