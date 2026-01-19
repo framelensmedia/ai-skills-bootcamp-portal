@@ -12,6 +12,7 @@ import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 
 type MediaType = "image" | "video";
 
