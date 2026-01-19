@@ -346,7 +346,7 @@ export default function GenerationLightbox({
                 className="relative h-full w-full cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]"
                 onClick={() => setIsFullScreen(true)}
               >
-                <Image src={safeUrl} alt="Preview" fill className="object-contain drop-shadow-2xl" priority />
+                <Image src={safeUrl} alt="Preview" fill className="object-contain drop-shadow-2xl" priority unoptimized />
               </div>
             </div>
           </div>
