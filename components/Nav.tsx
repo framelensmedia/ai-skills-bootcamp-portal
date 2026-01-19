@@ -250,12 +250,20 @@ export default function Nav() {
                       </button>
                     </div>
                   ) : (
-                    <Link
-                      href="/login"
-                      className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
-                    >
-                      Log in
-                    </Link>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Link
+                        href="/login"
+                        className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        Log in
+                      </Link>
+                      <Link
+                        href="/signup"
+                        className="inline-flex w-full items-center justify-center rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-black hover:bg-lime-300"
+                      >
+                        Sign Up
+                      </Link>
+                    </div>
                   )}
                 </div>
               </div>
