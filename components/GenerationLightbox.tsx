@@ -55,7 +55,11 @@ async function downloadImageToDevice(url: string) {
   const filename = safeFilenameFromUrl(url);
 
   // Try Web Share API Level 2 (Mobile "Save to Photos" support)
-  if (typeof navigator !== "undefined" && navigator.canShare) {
+  // We explicitly check for mobile UA because some desktop browsers support share
+  // but we want to force direct download for desktop users.
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (isMobile && typeof navigator !== "undefined" && navigator.canShare) {
     const file = new File([blob], filename, { type: blob.type });
     if (navigator.canShare({ files: [file] })) {
       try {
