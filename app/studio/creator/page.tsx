@@ -612,7 +612,7 @@ function CreatorContent() {
                     <GenerationFailureNotification
                         error={error}
                         onClose={() => setError(null)}
-                        onRetry={() => generateImage(manualPrompt || editSummary || "", uploads)}
+                        onRetry={() => generateImage(manualPrompt || "", uploads)}
                     />
 
                     {/* Community Remixes */}
