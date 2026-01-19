@@ -26,6 +26,7 @@ const SYSTEM_CORE = `
 const SYSTEM_HUMAN_RULES = `
 [HUMAN SUBJECT IDENTITY LOCK (MANDATORY)]
 - PRIMARY GOAL: Preserve the facial identity and key physical characteristics of the uploaded subject.
+- MICRO-DETAILS: You MUST preserve specific details like moles, scars, asymmetry, and exact eye shape. Do not "correct" or "beautify" these features.
 - INTEGRATION: You MUST blend the subject naturally into the scene. Match lighting, shadows, and color tone to the template.
 - OUTFIT & BODY: If the user requests an outfit change, GENERATE the new outfit while keeping the subject's face/head. If no outfit change is requested, you may adapt the existing outfit's lighting/style to fit the scene.
 - ADAPTATION: You are allowed to adjust the subject's pose slightly or complete missing parts of the anatomy if needed for the composition, BUT the face must remain recognizable as the uploaded person.
@@ -42,6 +43,7 @@ const SYSTEM_NON_HUMAN_RULES = `
 const SUBJECT_LOCK_INSTRUCTIONS = `
 [SUBJECT LOCK: ACTIVE]
 - STRICTLY PRESERVE the Uploaded Subject's identity, clothing, body type, and pose.
+- OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Cyberpunk", "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
 - Treated as a Photoshop cutout: Only crop, scale, color-match, and shadow-match are allowed.
 - NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
 - UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
@@ -448,6 +450,7 @@ Execute the user's instruction precisely.
             "---",
             aspectHint(ar),
             "No text overlays.",
+            "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face."
         ]
             .filter(Boolean)
             .join("\n\n");
