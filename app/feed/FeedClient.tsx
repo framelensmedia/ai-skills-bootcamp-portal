@@ -317,6 +317,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                     className="object-contain"
                                     sizes="(max-width: 768px) 50vw, 33vw"
                                     loading={index < 2 ? "eager" : "lazy"} // Eager load first 2
+                                    unoptimized
                                 />
                             ) : (
                                 <div className="h-full w-full bg-zinc-900 flex items-center justify-center text-white/20">Processing...</div>
