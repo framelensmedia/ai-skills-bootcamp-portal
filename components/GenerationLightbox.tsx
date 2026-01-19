@@ -52,9 +52,28 @@ async function downloadImageToDevice(url: string) {
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
 
   const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-
   const filename = safeFilenameFromUrl(url);
+
+  // Try Web Share API Level 2 (Mobile "Save to Photos" support)
+  if (typeof navigator !== "undefined" && navigator.canShare) {
+    const file = new File([blob], filename, { type: blob.type });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: filename,
+        });
+        return;
+      } catch (err: any) {
+        // If user aborted, just return. If real error, fall through to anchor download.
+        if (err.name === 'AbortError') return;
+        console.warn("Share API failed, falling back to download:", err);
+      }
+    }
+  }
+
+  // Fallback: Anchor tag download
+  const objectUrl = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.href = objectUrl;
