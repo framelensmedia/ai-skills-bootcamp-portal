@@ -412,10 +412,34 @@ export default function RemixClient({ initialRemix }: Props) {
         try {
             const res = await fetch(remix.image_url, { mode: "cors" });
             const blob = await res.blob();
+            const filename = `remix-${remix.id}.png`;
+
+            // Try Web Share API Level 2 (Mobile "Save to Photos" support)
+            // We explicitly check for mobile UA because some desktop browsers support share
+            // but we want to force direct download for desktop users.
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+            if (isMobile && typeof navigator !== "undefined" && navigator.canShare) {
+                const file = new File([blob], filename, { type: blob.type });
+                if (navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: filename,
+                        });
+                        return;
+                    } catch (err: any) {
+                        if (err.name === 'AbortError') return;
+                        console.warn("Share API failed, falling back to download:", err);
+                    }
+                }
+            }
+
+            // Fallback: Anchor tag download
             const obj = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = obj;
-            a.download = `remix-${remix.id}.png`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             a.remove();
