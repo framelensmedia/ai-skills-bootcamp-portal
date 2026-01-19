@@ -204,14 +204,18 @@ function StudioContent() {
     setTimeout(() => setCopied(false), 1200);
   }
 
-  function handleWizardComplete(summary: string, ans: RemixAnswers) {
+  function handleWizardComplete(summary: string, ans: RemixAnswers, shouldGenerate = false) {
     setEditSummary(summary);
     setRemixAnswers(ans);
     setWizardOpen(false);
     if (summary) setManualMode(true);
+
+    if (shouldGenerate) {
+      handleGenerate({ prompt: summary, answers: ans });
+    }
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(overrides?: { prompt?: string; answers?: RemixAnswers }) {
     if (!handleAuthGate()) return;
 
     setGenError(null);
@@ -221,7 +225,12 @@ function StudioContent() {
       return;
     }
 
-    if (!editSummary) {
+    if (generating) return;
+
+    const promptToUse = overrides?.prompt ?? editSummary;
+    const answersToUse = overrides?.answers ?? remixAnswers;
+
+    if (!promptToUse) {
       setGenError("Please use Remix to create your edit instructions first.");
       return;
     }
@@ -238,13 +247,13 @@ function StudioContent() {
 
       const form = new FormData();
 
-      form.append("prompt", normalize(editSummary));
+      form.append("prompt", normalize(promptToUse));
       form.append("userId", normalize(user.id));
       form.append("aspectRatio", normalize(aspectRatio));
 
       // ✅ Standardized prompt columns
-      form.append("combined_prompt_text", normalize(editSummary));
-      form.append("edit_instructions", normalize(editSummary));
+      form.append("combined_prompt_text", normalize(promptToUse));
+      form.append("edit_instructions", normalize(promptToUse));
       form.append("template_reference_image", normalize(previewImageUrl));
 
       // ✅ Upload up to 10 images
@@ -252,23 +261,24 @@ function StudioContent() {
         form.append("images", file, file.name || "upload");
       });
 
+
       if (prePromptId) form.append("promptId", normalize(prePromptId));
       if (prePromptSlug) form.append("promptSlug", normalize(prePromptSlug));
 
-      if (remixAnswers?.headline) {
-        form.append("headline", remixAnswers.headline);
+      if (answersToUse?.headline) {
+        form.append("headline", answersToUse.headline);
       }
-      if (remixAnswers?.subjectLock) {
-        form.append("subjectLock", remixAnswers.subjectLock);
+      if (answersToUse?.subjectLock) {
+        form.append("subjectLock", answersToUse.subjectLock);
       }
-      if (remixAnswers?.industry_intent) {
-        form.append("industry_intent", remixAnswers.industry_intent);
+      if (answersToUse?.industry_intent) {
+        form.append("industry_intent", answersToUse.industry_intent);
       }
-      if (remixAnswers?.business_name) {
-        form.append("business_name", remixAnswers.business_name);
+      if (answersToUse?.business_name) {
+        form.append("business_name", answersToUse.business_name);
       }
-      if (remixAnswers?.subject_mode) {
-        form.append("subjectMode", remixAnswers.subject_mode);
+      if (answersToUse?.subject_mode) {
+        form.append("subjectMode", answersToUse.subject_mode);
       }
 
       // Also append logo if present (override previous logic?)
@@ -570,7 +580,7 @@ function StudioContent() {
             {/* Primary Action */}
             <button
               type="button"
-              onClick={handleGenerate}
+              onClick={() => handleGenerate()}
               disabled={generating}
               className={[
                 "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",

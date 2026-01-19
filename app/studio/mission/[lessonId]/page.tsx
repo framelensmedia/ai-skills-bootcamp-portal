@@ -140,13 +140,17 @@ export default function MissionStudioPage({ params }: Props) {
         loadMission();
     }, [lessonId, router, supabase]);
 
-    function handleWizardComplete(summary: string, ans: RemixAnswers) {
+    function handleWizardComplete(summary: string, ans: RemixAnswers, shouldGenerate = false) {
         setEditSummary(summary);
         setWizardAnswers(ans);
         setWizardOpen(false);
+
+        if (shouldGenerate) {
+            handleGenerate(summary);
+        }
     }
 
-    async function handleGenerate() {
+    async function handleGenerate(overridePrompt?: string) {
         setGenError(null);
 
         if (mediaType === "video") {
@@ -154,7 +158,11 @@ export default function MissionStudioPage({ params }: Props) {
             return;
         }
 
-        if (!editSummary) {
+        if (generating) return;
+
+        const promptToUse = overridePrompt || editSummary;
+
+        if (!promptToUse) {
             setGenError("Please complete the remix wizard first.");
             return;
         }
@@ -170,11 +178,11 @@ export default function MissionStudioPage({ params }: Props) {
             }
 
             const form = new FormData();
-            form.append("prompt", editSummary);
+            form.append("prompt", promptToUse);
             form.append("userId", user.id);
             form.append("aspectRatio", aspectRatio);
-            form.append("combined_prompt_text", editSummary);
-            form.append("edit_instructions", editSummary);
+            form.append("combined_prompt_text", promptToUse);
+            form.append("edit_instructions", promptToUse);
             form.append("template_reference_image", previewImageUrl);
 
             // Include uploads
@@ -411,7 +419,7 @@ export default function MissionStudioPage({ params }: Props) {
 
                         {/* Generate Button */}
                         <button
-                            onClick={handleGenerate}
+                            onClick={() => handleGenerate()}
                             disabled={generating || !editSummary || completing}
                             className="w-full flex items-center justify-center gap-3 rounded-xl bg-[#B7FF00] px-6 py-4 text-lg font-bold text-black hover:bg-[#a3e600] disabled:opacity-50 transition"
                         >

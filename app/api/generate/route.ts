@@ -478,7 +478,16 @@ Execute the user's instruction precisely.
         const json: any = await res.json();
 
         if (!res.ok) {
+            if (res.status === 429) {
+                console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
+                return NextResponse.json(
+                    { error: "System is busy (High Traffic). Please wait a minute and try again." },
+                    { status: 429 }
+                );
+            }
+
             console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
+
             return NextResponse.json(
                 { error: "vertex_error", status: res.status, details: json },
                 { status: res.status }
