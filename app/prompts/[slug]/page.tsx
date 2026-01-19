@@ -960,6 +960,7 @@ function PromptContent() {
                         alt={creatorProfile.full_name || "Creator"}
                         fill
                         className="object-cover"
+                        unoptimized
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-white/40">
@@ -1029,6 +1030,7 @@ function PromptContent() {
                     fill
                     className="object-contain"
                     priority
+                    unoptimized
                   />
                   {/* Generating Overlay */}
                   {generating && (
@@ -1335,7 +1337,7 @@ function PromptContent() {
                         title="View Community Remix"
                       >
                         <div className="relative aspect-square w-full">
-                          <Image src={r.imageUrl} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" />
+                          <Image src={r.imageUrl} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" unoptimized />
                         </div>
                       </button>
 

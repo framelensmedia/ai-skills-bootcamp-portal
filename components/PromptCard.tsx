@@ -164,6 +164,7 @@ export default function PromptCard({
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
               onError={() => setImgFailed(true)}
               onLoadingComplete={() => setImgFailed(false)}
+              unoptimized
             />
           ) : (
             /* Skeleton / Placeholder if no URL */
