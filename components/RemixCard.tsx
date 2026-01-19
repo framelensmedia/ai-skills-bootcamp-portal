@@ -62,6 +62,7 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
                         className="object-cover transition duration-500 group-hover:scale-105"
                         sizes="(max-width: 640px) 100vw, 320px"
                         onError={() => setImgFailed(true)}
+                        unoptimized
                     />
                 ) : (
                     <div className="h-full w-full bg-white/5 flex items-center justify-center text-white/20">
@@ -76,7 +77,7 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
                 <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
                     <div className="relative h-6 w-6 overflow-hidden rounded-full border border-white/20 bg-zinc-800">
                         {item.userAvatar ? (
-                            <Image src={item.userAvatar} fill className="object-cover" alt={item.username} />
+                            <Image src={item.userAvatar} fill className="object-cover" alt={item.username} unoptimized />
                         ) : (
                             <div className="flex h-full w-full items-center justify-center text-white/50">
                                 <User size={12} />
