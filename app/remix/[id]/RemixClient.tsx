@@ -480,6 +480,7 @@ export default function RemixClient({ initialRemix }: Props) {
                             fill
                             className="object-contain"
                             priority
+                            unoptimized
                         />
                     </div>
 
@@ -614,6 +615,7 @@ export default function RemixClient({ initialRemix }: Props) {
                                             alt="Creator Remix"
                                             fill
                                             className="object-cover group-hover:opacity-90 transition-opacity"
+                                            unoptimized
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
@@ -666,6 +668,7 @@ export default function RemixClient({ initialRemix }: Props) {
                                             loading="lazy"
                                             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                                             className="object-cover group-hover:opacity-90 transition-opacity"
+                                            unoptimized
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
