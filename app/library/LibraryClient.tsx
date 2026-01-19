@@ -980,6 +980,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                                 fill
                                                 className="object-cover transition group-hover:scale-105"
                                                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+                                                unoptimized
                                             />
                                         ) : (
                                             <div className="absolute inset-0 bg-white/5 animate-pulse" />
@@ -1030,7 +1031,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                     <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => handleItemClick(it)}>
                                         <div className="relative w-12 h-12 bg-black shrink-0 rounded overflow-hidden">
                                             {it.imageUrl ? (
-                                                <Image src={it.imageUrl} alt="" fill className="object-cover" />
+                                                <Image src={it.imageUrl} alt="" fill className="object-cover" unoptimized />
                                             ) : <div className="bg-white/5 w-full h-full" />}
 
                                             {isSelectionMode && selectedIds.has(it.id) && <div className="absolute inset-0 bg-[#B7FF00]/20 flex items-center justify-center"><Check size={16} className="text-[#B7FF00]" /></div>}

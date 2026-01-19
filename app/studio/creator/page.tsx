@@ -648,6 +648,7 @@ function CreatorContent() {
                             alt="Preview"
                             fill
                             className="object-cover opacity-80"
+                            unoptimized
                         />
 
                         <div className="absolute inset-0 bg-black/35 pointer-events-none" />
