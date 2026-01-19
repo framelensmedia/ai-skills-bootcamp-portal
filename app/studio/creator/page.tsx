@@ -11,6 +11,7 @@ import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import Link from "next/link";
@@ -340,8 +341,8 @@ function CreatorContent() {
         setGenerating(true);
         setError(null);
 
-        // Scroll to preview on mobile
-        if (typeof window !== "undefined" && window.innerWidth < 1024 && previewRef.current) {
+        // Scroll to preview
+        if (typeof window !== "undefined" && previewRef.current) {
             previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
         }
 
@@ -608,6 +609,12 @@ function CreatorContent() {
                         </div>
                     )}
 
+                    <GenerationFailureNotification
+                        error={error}
+                        onClose={() => setError(null)}
+                        onRetry={() => generateImage(manualPrompt || editSummary || "", uploads)}
+                    />
+
                     {/* Community Remixes */}
                     {communityRemixes.length > 0 && (
                         <div className="pt-6 border-t border-white/10">
@@ -661,8 +668,8 @@ function CreatorContent() {
                         </div>
                     </div>
                 </div>
-            </div>
-        </main>
+            </div >
+        </main >
     );
 }
 

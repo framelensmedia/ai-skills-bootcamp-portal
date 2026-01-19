@@ -14,6 +14,7 @@ import Link from "next/link";
 import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
@@ -1064,11 +1065,11 @@ function PromptContent() {
                 )}
               </div>
 
-              {generateError ? (
-                <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-sm text-red-200">
-                  {generateError}
-                </div>
-              ) : null}
+              <GenerationFailureNotification
+                error={generateError}
+                onClose={() => setGenerateError(null)}
+                onRetry={() => handleGenerate()}
+              />
 
               {/* Minimal Actions for Generated Result */}
               {hasGeneratedForActions && (

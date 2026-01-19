@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, use } from "react";
+import { useEffect, useMemo, useState, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
@@ -59,6 +60,7 @@ export default function MissionStudioPage({ params }: Props) {
     const [lastImageUrl, setLastImageUrl] = useState("");
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [previewImageUrl, setPreviewImageUrl] = useState("");
+    const previewRef = useRef<HTMLDivElement>(null);
 
     // Completion state
     const [completing, setCompleting] = useState(false);
@@ -168,6 +170,11 @@ export default function MissionStudioPage({ params }: Props) {
         }
 
         setGenerating(true);
+
+        // Scroll to preview explicitly
+        if (typeof window !== "undefined" && previewRef.current) {
+            previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -344,7 +351,7 @@ export default function MissionStudioPage({ params }: Props) {
                     <div className="space-y-6">
                         {/* Template Preview */}
                         {previewImageUrl && (
-                            <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
+                            <div ref={previewRef} className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4">
                                 <h3 className="text-sm font-semibold text-white/70 mb-3">Template Reference</h3>
                                 <div className="relative aspect-square max-h-[300px] w-full overflow-hidden rounded-xl bg-black">
                                     <Image

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
@@ -47,6 +47,7 @@ function StudioContent() {
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
+  const previewRef = useRef<HTMLElement>(null);
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("/orb-neon.gif");
 
@@ -236,6 +237,11 @@ function StudioContent() {
     }
 
     setGenerating(true);
+
+    // Scroll to preview explicitly (ensure loading state is seen)
+    if (typeof window !== "undefined" && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 
     try {
       // User is guaranteed by handleAuthGate
@@ -449,9 +455,14 @@ function StudioContent() {
         <p className="mt-2 text-sm text-white/70 sm:text-base">
           Remix an existing prompt or build from scratch. Generate, save, and reuse winners.
         </p>
+        <GenerationFailureNotification
+          error={genError}
+          onClose={() => setGenError(null)}
+          onRetry={() => handleGenerate()}
+        />
       </div>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2" ref={previewRef}>
         {/* LEFT: Prompt Tool */}
         <div className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
           <div className="flex items-center justify-between px-2">
