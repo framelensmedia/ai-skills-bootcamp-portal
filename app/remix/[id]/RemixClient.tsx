@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp } from "lucide-react";
+import GenerationLightbox from "@/components/GenerationLightbox";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 export type RemixDetail = {
@@ -44,6 +45,7 @@ export default function RemixClient({ initialRemix }: Props) {
     const [copied, setCopied] = useState(false);
     const [isFavorited, setIsFavorited] = useState(false);
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
     // Upvote State
     const [likesCount, setLikesCount] = useState(0);
@@ -473,7 +475,10 @@ export default function RemixClient({ initialRemix }: Props) {
 
                 <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
                     {/* Image Column */}
-                    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last">
+                    <div
+                        onClick={() => setIsLightboxOpen(true)}
+                        className="relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                    >
                         <Image
                             src={remix.image_url}
                             alt="User Remix"
@@ -689,6 +694,19 @@ export default function RemixClient({ initialRemix }: Props) {
                         </div>
                     )
                 }
+
+                {remix && (
+                    <GenerationLightbox
+                        open={isLightboxOpen}
+                        url={remix.image_url}
+                        fullQualityUrl={remix.settings?.full_quality_url}
+                        onClose={() => setIsLightboxOpen(false)}
+                        combinedPromptText={remix.combined_prompt_text}
+                        onShare={() => handleShare()}
+                        onRemix={() => handleRemix()}
+                        title={remix.settings?.headline || "Remix"}
+                    />
+                )}
             </div>
         </main>
     );

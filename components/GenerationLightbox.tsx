@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { cleanPrompt } from "@/lib/stringUtils";
 
@@ -128,7 +128,9 @@ export default function GenerationLightbox({
   const [tempTitle, setTempTitle] = useState(title);
 
   // Update tempTitle when prop changes
-  useMemo(() => setTempTitle(title), [title]);
+  useEffect(() => {
+    setTempTitle(title);
+  }, [title]);
 
   const safeUrl = useMemo(() => normalize(url), [url]);
   const canShow = open && safeUrl.length > 0;
