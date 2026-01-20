@@ -176,6 +176,11 @@ function StudioContent() {
   }, [uploads]);
 
   function closeLightbox() {
+    // When closing, we ensure the preview shows the Last Generated Image
+    // This gives the user context of "where their generation went"
+    if (lastImageUrl) {
+      setPreviewImageUrl(lastImageUrl);
+    }
     setLightboxOpen(false);
   }
 

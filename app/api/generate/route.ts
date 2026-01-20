@@ -28,6 +28,7 @@ const SYSTEM_HUMAN_RULES = `
 - PRIMARY GOAL: Preserve the facial identity and key physical characteristics of the uploaded subject.
 - MICRO-DETAILS: You MUST preserve specific details like moles, scars, asymmetry, and exact eye shape. Do not "correct" or "beautify" these features.
 - INTEGRATION: You MUST blend the subject naturally into the scene. Match lighting, shadows, and color tone to the template.
+- LIGHTING: Apply subtle studio lighting to the subject to ensure they look premium and well-integrated. This helps with blending and removing the 'cutout' look, but must NOT alter facial features.
 - OUTFIT & BODY: If the user requests an outfit change, GENERATE the new outfit while keeping the subject's face/head. If no outfit change is requested, you may adapt the existing outfit's lighting/style to fit the scene.
 - ADAPTATION: You are allowed to adjust the subject's pose slightly or complete missing parts of the anatomy if needed for the composition, BUT the face must remain recognizable as the uploaded person.
 - AVOID: Do not create a cartoon or caricature unless the style dictates it. Maintain photorealism for the face.
@@ -48,6 +49,14 @@ const SUBJECT_LOCK_INSTRUCTIONS = `
 - NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
 - UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
 - SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements. Never generate fake limbs.
+`;
+
+const CREATIVE_FREEDOM_INSTRUCTIONS = `
+[CREATIVE FREEDOM: ACTIVE]
+- GOAL: Create an AMAZING, pleasantly surprising result. You have freedom to adapt the subject's outfit, pose, and lighting to perfectly match the style of the template.
+- IDENTITY LOCK (CRITICAL): You must still maintain 100% FACIAL LIKENESS. The user must clearly recognize themselves.
+- STUDIO LIGHTING (MANDATORY): Always apply subtle, high-quality studio lighting to the subject. Fix any poor lighting from the original photo to make it look professional and premium.
+- BLENDING: Ensure the subject is not a "cutout". Blend them seamlessly into the environment with matching shadows and color grading.
 `;
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
@@ -441,6 +450,7 @@ Execute the user's instruction precisely.
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
             subjectRules,
             (subjectLock && imageFiles.length > 0) ? SUBJECT_LOCK_INSTRUCTIONS : "",
+            (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,
             logoInstruction,
@@ -465,14 +475,11 @@ Execute the user's instruction precisely.
             generationConfig: { temperature: 0.7 },
         };
 
-        // DEBUG: Output full payload
-        console.log(JSON.stringify(payload, null, 2));
-
         // 6. Call Vertex
         const res = await fetch(url, {
             method: "POST",
             headers: {
-                Authorization: `Bearer ${token.token} `,
+                Authorization: `Bearer ${token.token}`, // Fixed trailing space
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(payload),

@@ -486,7 +486,7 @@ function UploadStepWrapper({
                     />
                     <label htmlFor="subject-lock" className="flex-1 cursor-pointer select-none text-sm text-white">
                         <span className="block font-semibold">Keep exact outfit and body</span>
-                        <span className="block text-xs text-white/50">Prevents the AI from changing clothes or pose.</span>
+                        <span className="block text-xs text-white/50">Uncheck to let the AI be creative with the design while preserving likeness. This offers more freedom for pleasantly surprising results.</span>
                     </label>
                 </div>
             )}
