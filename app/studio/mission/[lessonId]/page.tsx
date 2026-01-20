@@ -9,7 +9,8 @@ import RemixChatWizard, { RemixAnswers } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 import Loading from "@/components/Loading";
-import { ArrowLeft, Sparkles, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, AlertCircle, CheckCircle, Loader2, Play } from "lucide-react";
+import LoadingOrb from "@/components/LoadingOrb";
 import Link from "next/link";
 
 type MediaType = "image" | "video";
@@ -450,6 +451,11 @@ export default function MissionStudioPage({ params }: Props) {
                             <h3 className="text-sm font-semibold text-white/70 mb-3">Your Creation</h3>
                             {lastImageUrl ? (
                                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black">
+                                    {generating && (
+                                        <div className="absolute inset-0 z-20">
+                                            <LoadingOrb />
+                                        </div>
+                                    )}
                                     <Image
                                         src={lastImageUrl}
                                         alt="Generated"

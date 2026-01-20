@@ -1,6 +1,18 @@
 import Image from "next/image";
+import { useState, useEffect } from "react";
 
 export default function LoadingOrb() {
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+        const start = Date.now();
+        const interval = setInterval(() => {
+            setSeconds((Date.now() - start) / 1000);
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <div className="relative w-full h-full overflow-hidden animate-fadeIn">
             {/* Full Screen Portal Orb */}
@@ -23,6 +35,9 @@ export default function LoadingOrb() {
                 </h3>
                 <div className="h-1.5 w-48 bg-black/50 backdrop-blur-sm rounded-full overflow-hidden border border-white/10">
                     <div className="h-full bg-[#B7FF00] animate-[loading_2s_ease-in-out_infinite] w-1/3 shadow-[0_0_10px_#B7FF00]" />
+                </div>
+                <div className="text-xs font-mono text-white tracking-widest drop-shadow-md">
+                    {seconds.toFixed(1)}s
                 </div>
             </div>
 
