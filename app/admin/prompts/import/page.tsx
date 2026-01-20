@@ -144,13 +144,35 @@ export default function TemplateImportPage() {
     };
 
     // Handle Folder Select (Pack)
+    // Handle Folder Select (Pack)
     const handleFolderSelect = (files: FileList) => {
         const fileArray = Array.from(files);
-        const jsonFiles = fileArray.filter(f => f.name.toLowerCase().endsWith(".json"));
+        console.log("handleFolderSelect received files:", fileArray.map(f => f.name));
+        // Sanitize check: trim whitespace from names to handle accidentally renamed files
+        const jsonFiles = fileArray.filter(f => f.name.trim().toLowerCase().endsWith(".json"));
         const images = fileArray.filter(f => f.type.startsWith("image/"));
 
         if (jsonFiles.length === 0) {
-            setResult({ success: false, message: "Missing pack JSON file." });
+            console.error("No JSON files found in selection");
+
+            // Check for common issues
+            const zipFile = fileArray.find(f => f.name.toLowerCase().endsWith(".zip"));
+            if (zipFile) {
+                setResult({
+                    success: false,
+                    message: `Found ZIP file (${zipFile.name}) but no JSON. Please unzip the pack first and drop the folder.`
+                });
+                return;
+            }
+
+            const fileListStr = fileArray.length > 0
+                ? `Found ${fileArray.length} files: ${fileArray.map(f => f.name).slice(0, 5).join(", ")}${fileArray.length > 5 ? "..." : ""}`
+                : "No files detected.";
+
+            setResult({
+                success: false,
+                message: `Missing pack JSON file. ${fileListStr}`
+            });
             return;
         }
         if (jsonFiles.length > 1) {
@@ -169,12 +191,92 @@ export default function TemplateImportPage() {
         else if (e.type === "dragleave") setDragActive(false);
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
+    // Recursive scan for dropped items
+    const scanFiles = async (item: DataTransferItem): Promise<File[]> => {
+        // @ts-ignore
+        if (item.webkitGetAsEntry) {
+            // @ts-ignore
+            const entry = item.webkitGetAsEntry();
+            console.log("Entry found:", entry);
+            if (entry) {
+                return scanEntry(entry);
+            }
+        }
+        console.log("No entry found, trying getAsFile");
+        return item.getAsFile() ? [item.getAsFile()!] : [];
+    };
+
+    const scanEntry = async (entry: any): Promise<File[]> => {
+        if (entry.isFile) {
+            return new Promise((resolve) => {
+                entry.file((file: File) => {
+                    console.log("File found in scan:", file.name);
+                    resolve([file]);
+                });
+            });
+        }
+        else if (entry.isDirectory) {
+            console.log("Directory found:", entry.name);
+            const dirReader = entry.createReader();
+            const allEntries: any[] = [];
+
+            const readBatch = async (): Promise<void> => {
+                // readEntries might return empty array when finished, or error
+                try {
+                    const batch = await new Promise<any[]>((resolve, reject) => {
+                        dirReader.readEntries(resolve, reject);
+                    });
+
+                    if (batch.length > 0) {
+                        allEntries.push(...batch);
+                        await readBatch();
+                    }
+                } catch (e) {
+                    console.error("Error reading dir batch:", e);
+                }
+            };
+
+            await readBatch();
+
+            // Map entries to files
+            const files = await Promise.all(allEntries.map(scanEntry));
+            return files.flat();
+        }
+        return [];
+    };
+
+    const handleDrop = useCallback(async (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
 
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        console.log("Drop event:", e.dataTransfer);
+        if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+            const items = Array.from(e.dataTransfer.items);
+            console.log("Items to scan:", items);
+
+            // If pack mode, scan recursively
+            if (mode === "pack") {
+                const results = await Promise.all(items.map(item => scanFiles(item)));
+                const allFiles = results.flat().filter((f): f is File => f !== null);
+                console.log("All scanned files:", allFiles.map(f => f.name));
+
+                // Construct a DataTransfer to reuse handleFolderSelect logic which expects FileList
+                const dt = new DataTransfer();
+                allFiles.forEach(f => dt.items.add(f));
+                handleFolderSelect(dt.files);
+            }
+            else if (mode === "single") {
+                // Legacy simple handling for single files
+                const files = Array.from(e.dataTransfer.files);
+                const img = files.find(f => f.type.startsWith("image/"));
+                const json = files.find(f => f.name.endsWith(".json"));
+                if (img) handleImageSelect(img);
+                if (json) handleJsonSelect(json);
+            }
+        }
+        else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            console.log("Handling as simple files list (fallback)");
             const files = e.dataTransfer.files;
             if (mode === "single") {
                 const img = Array.from(files).find(f => f.type.startsWith("image/"));
@@ -182,8 +284,6 @@ export default function TemplateImportPage() {
                 if (img) handleImageSelect(img);
                 if (json) handleJsonSelect(json);
             } else if (mode === "pack") {
-                // If dropping a folder, strict browser support varies. 
-                // We'll scan all dropped files.
                 handleFolderSelect(files);
             }
         }
