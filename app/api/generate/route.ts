@@ -56,6 +56,7 @@ const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
 - STRICTLY PRESERVE the Uploaded Object's appearance, shape, texture, packing, and branding.
 - Do not warp or distort the product/object.
 - Blend it naturally into the scene with matching lighting and shadows.
+- LAYOUT PRESERVATION: If the template is a flyer or promo, you MUST preserve its composition and text placement. Do not change it into a plain product mockup.
 `;
 
 const CREATIVE_FREEDOM_INSTRUCTIONS = `
@@ -468,7 +469,8 @@ Execute the user's instruction precisely.
             rawPrompt,
             "---",
             aspectHint(ar),
-            "No text overlays.",
+
+            "PRESERVE TEMPLATE TEXT/LAYOUT: If the template has text (Headline, CTA), you must regenerate it or place the new text in the same positions.",
             (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
         ]
             .filter(Boolean)
