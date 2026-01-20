@@ -41,7 +41,7 @@ const SYSTEM_NON_HUMAN_RULES = `
 3. If the user asks for style transfer, apply the visual style of the Uploaded Image to the Template composition.
 `;
 
-const SUBJECT_LOCK_INSTRUCTIONS = `
+const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 [SUBJECT LOCK: ACTIVE]
 - STRICTLY PRESERVE the Uploaded Subject's identity, clothing, body type, and pose.
 - OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Cyberpunk", "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
@@ -49,6 +49,13 @@ const SUBJECT_LOCK_INSTRUCTIONS = `
 - NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
 - UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
 - SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements. Never generate fake limbs.
+`;
+
+const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
+[OBJECT LOCK: ACTIVE]
+- STRICTLY PRESERVE the Uploaded Object's appearance, shape, texture, packing, and branding.
+- Do not warp or distort the product/object.
+- Blend it naturally into the scene with matching lighting and shadows.
 `;
 
 const CREATIVE_FREEDOM_INSTRUCTIONS = `
@@ -400,7 +407,7 @@ export async function POST(req: Request) {
         }
 
         const subjectRules = imageFiles.length > 0
-            ? ((subjectMode === "human" || subjectLock) ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
+            ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
 
         const bgSwapInstruction = industryIntent ? `
@@ -449,7 +456,9 @@ Execute the user's instruction precisely.
             SYSTEM_CORE,
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
             subjectRules,
-            (subjectLock && imageFiles.length > 0) ? SUBJECT_LOCK_INSTRUCTIONS : "",
+            (subjectLock && imageFiles.length > 0)
+                ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
+                : "",
             (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,
@@ -460,7 +469,7 @@ Execute the user's instruction precisely.
             "---",
             aspectHint(ar),
             "No text overlays.",
-            "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face."
+            (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
         ]
             .filter(Boolean)
             .join("\n\n");

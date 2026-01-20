@@ -137,6 +137,7 @@ function PromptContent() {
   }, [aspectRatio]);
 
   const [isLocked, setIsLocked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // Admin State
   const [lockReason, setLockReason] = useState<"login" | "upgrade" | null>(null);
 
   // Generation state
@@ -361,9 +362,14 @@ function PromptContent() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan")
+        .select("plan, role")
         .eq("user_id", user!.id)
         .maybeSingle();
+
+      const role = String(profile?.role || "user").toLowerCase();
+      if (role === "admin" || role === "super_admin") {
+        setIsAdmin(true);
+      }
 
       const proUser = String(profile?.plan || "free").toLowerCase() === "premium";
 
@@ -831,7 +837,7 @@ function PromptContent() {
         edit_instructions: promptToUse,
         combined_prompt_text: promptToUse,
 
-        subjectMode: templateConfig?.subject_mode || "non_human",
+        subjectMode: answersToUse?.subjectMode || templateConfig?.subject_mode || "non_human",
         template_reference_image: imageSrc, // Used as reference for Remix
 
         imageUrls, // Send URLs

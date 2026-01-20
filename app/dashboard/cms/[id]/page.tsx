@@ -35,6 +35,7 @@ type PromptRow = {
   remix_placeholder: string | null;
   template_pack_id: string | null;
   pack_order_index: number | null;
+  subject_mode: string | null;
 };
 
 type PackSimple = { id: string; pack_name: string; };
@@ -125,6 +126,7 @@ export default function CmsPromptEditorPage() {
   const [isEditorsChoice, setIsEditorsChoice] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [remixPlaceholder, setRemixPlaceholder] = useState("");
+  const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("non_human");
 
   // Pack
   const [packInfo, setPackInfo] = useState<{ id: string | null; name: string; index: number | null }>({ id: null, name: "", index: null });
@@ -179,6 +181,7 @@ export default function CmsPromptEditorPage() {
       setIsEditorsChoice(r.is_editors_choice);
       setIsFeatured(r.is_featured);
       setRemixPlaceholder(r.remix_placeholder || "");
+      setSubjectMode((r.subject_mode as "human" | "non_human") || "non_human");
 
       if (r.template_pack_id) {
         setPackInfo({
@@ -215,7 +218,8 @@ export default function CmsPromptEditorPage() {
         is_editors_choice: isEditorsChoice,
         is_featured: isFeatured,
         remix_placeholder: remixPlaceholder,
-        template_pack_id: packInfo.id
+        template_pack_id: packInfo.id,
+        subject_mode: subjectMode
       };
 
       if (nextStatus === "submitted") payload.submitted_at = new Date().toISOString();
@@ -438,6 +442,30 @@ export default function CmsPromptEditorPage() {
                 </select>
               </div>
             </div>
+          </Card>
+
+          {/* Subject Mode Defaults */}
+          <Card className="p-5">
+            <Label icon={Sparkles}>Subject Mode Default</Label>
+            <div className="mt-3 flex rounded-xl border border-white/10 bg-black/40 p-1">
+              <button
+                onClick={() => setSubjectMode("human")}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-all ${subjectMode === "human" ? "bg-[#B7FF00] text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+              >
+                Human
+              </button>
+              <button
+                onClick={() => setSubjectMode("non_human")}
+                className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-all ${subjectMode === "non_human" ? "bg-[#B7FF00] text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+              >
+                Object/Product
+              </button>
+            </div>
+            <p className="mt-2 text-[10px] text-white/40">
+              {subjectMode === "human"
+                ? "Use validation rules for human faces."
+                : "Use validation rules for objects/products."}
+            </p>
           </Card>
 
           {/* Pack Assignment */}

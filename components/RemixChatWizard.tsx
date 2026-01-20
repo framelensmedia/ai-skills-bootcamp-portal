@@ -93,6 +93,7 @@ export default function RemixChatWizard({
 
     // Toggle for Subject Lock
     const [subjectLock, setSubjectLock] = useState(true);
+    const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("non_human");
 
     // Steps State
     const [stepIndex, setStepIndex] = useState(0);
@@ -166,7 +167,9 @@ export default function RemixChatWizard({
     useEffect(() => {
         if (isOpen && templateConfig) {
             setStepIndex(0);
-            const isHuman = templateConfig.subject_mode === "human";
+            const mode = templateConfig.subject_mode || "non_human";
+            setSubjectMode(mode);
+            const isHuman = mode === "human";
             const introText = isHuman
                 ? "This template features a human subject. Please upload a photo to replace them."
                 : "You can upload a reference image if you like, or skip to keep the current subject.";
@@ -282,8 +285,9 @@ export default function RemixChatWizard({
     }
 
     function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers, shouldGenerate = false) {
-        // Include subjectLock in answers
+        // Include subjectLock and subjectMode in answers
         finalAnswers.subjectLock = String(subjectLock);
+        finalAnswers.subjectMode = subjectMode;
 
         const sum = generateEditSummary(finalAnswers, uploads.length > 0);
         setMessages([
@@ -341,6 +345,8 @@ export default function RemixChatWizard({
                                                 setFiles={onUploadsChange}
                                                 subjectLock={subjectLock}
                                                 setSubjectLock={setSubjectLock}
+                                                subjectMode={subjectMode}
+                                                setSubjectMode={setSubjectMode}
                                             />
                                         </div>
                                     )}
@@ -465,29 +471,56 @@ function UploadStepWrapper({
     files,
     setFiles,
     subjectLock,
-    setSubjectLock
+    setSubjectLock,
+    subjectMode,
+    setSubjectMode
 }: {
     files: File[],
     setFiles: (f: File[]) => void,
     subjectLock: boolean,
-    setSubjectLock: (v: boolean) => void
+    setSubjectLock: (v: boolean) => void,
+    subjectMode: "human" | "non_human",
+    setSubjectMode: (v: "human" | "non_human") => void
 }) {
     return (
         <div className="w-full min-w-0">
             <ImageUploader files={files} onChange={setFiles} maxFiles={10} />
             {files.length > 0 && (
-                <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                    <input
-                        type="checkbox"
-                        checked={subjectLock}
-                        onChange={(e) => setSubjectLock(e.target.checked)}
-                        className="h-5 w-5 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400"
-                        id="subject-lock"
-                    />
-                    <label htmlFor="subject-lock" className="flex-1 cursor-pointer select-none text-sm text-white">
-                        <span className="block font-semibold">Keep exact outfit and body</span>
-                        <span className="block text-xs text-white/50">Uncheck to let the AI be creative with the design while preserving likeness. This offers more freedom for pleasantly surprising results.</span>
-                    </label>
+                <div className="mt-4 flex flex-col gap-2">
+                    {/* Subject Mode Selector */}
+                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-1">
+                        <button
+                            onClick={() => setSubjectMode("human")}
+                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${subjectMode === "human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
+                        >
+                            Human Subject
+                        </button>
+                        <button
+                            onClick={() => setSubjectMode("non_human")}
+                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${subjectMode === "non_human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
+                        >
+                            Object / Product
+                        </button>
+                    </div>
+
+                    {/* Lock Toggle */}
+                    <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <input
+                            type="checkbox"
+                            checked={subjectLock}
+                            onChange={(e) => setSubjectLock(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400"
+                            id="subject-lock"
+                        />
+                        <label htmlFor="subject-lock" className="flex-1 cursor-pointer select-none text-sm text-white">
+                            <span className="block font-semibold">Strict Subject Lock</span>
+                            <span className="block text-xs text-white/50">
+                                {subjectMode === "human"
+                                    ? "Maintains exact facial features, outfit, and body shape."
+                                    : "Maintains exact product details like labels, shape, and texture."}
+                            </span>
+                        </label>
+                    </div>
                 </div>
             )}
         </div>
