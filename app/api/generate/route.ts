@@ -296,21 +296,43 @@ export async function POST(req: Request) {
             if (!canvasFile) {
                 return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image (canvas_image)." }, { status: 400 });
             }
-            const data = await fileToBase64(canvasFile);
-            imageParts.push({ inlineData: { mimeType: canvasFile.type, data } });
+
+            // Define optimization helper (Scoped here for safety during refactor)
+            const processImage = async (buffer: Buffer) => {
+                try {
+                    return await sharp(buffer)
+                        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                } catch (e) {
+                    console.error("Image optimization failed, using original:", e);
+                    return buffer;
+                }
+            }
+
+            const ab = await canvasFile.arrayBuffer();
+            const buffer = Buffer.from(ab);
+            const optimized = await processImage(buffer);
+            imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
 
             // Also attach any additional images (reference style, object, etc)
             for (const f of imageFiles) {
-                const d = await fileToBase64(f);
-                imageParts.push({ inlineData: { mimeType: f.type, data: d } });
+                const ab = await f.arrayBuffer();
+                const buffer = Buffer.from(ab);
+                const optimized = await processImage(buffer);
+                imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
             }
             for (const url of imageUrls) {
                 try {
-                    const { data, mimeType } = await urlToBase64(url);
-                    imageParts.push({ inlineData: { mimeType, data } });
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const ab = await res.arrayBuffer();
+                        const buffer = Buffer.from(ab);
+                        const optimized = await processImage(buffer);
+                        imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                    }
                 } catch (e) {
                     console.error("Failed to download input url:", url, e);
-                    // Continue or fail?
                 }
             }
 
@@ -338,6 +360,9 @@ export async function POST(req: Request) {
 
             // 2. User Subject Image (if provided)
             // Optimize and Resize all inputs to reduce payload size (Fixes 429 Throughput errors)
+            // Helper defined above? No, let's redefine or move.
+            // Actually, I can't easily move it up without a large diff.
+            // I will just copy the helper for now to avoid breaking scope or massive refactor risk.
             const processImage = async (buffer: Buffer) => {
                 try {
                     return await sharp(buffer)
@@ -374,18 +399,44 @@ export async function POST(req: Request) {
 
         // 3. Add Logo Image (if present)
         let logoInstruction = "";
+
+        // Define optimization helper for Logo (Scoped)
+        const processLogo = async (buffer: Buffer) => {
+            try {
+                return await sharp(buffer)
+                    // Logos can be smaller, but 1536 is safe max
+                    .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+                    // Keep PNG for transparency if input was PNG, else JPEG?
+                    // Vertex prefers JPEG for size, but Logos need transparency.
+                    // If we convert to JPEG, we lose transparency -> Bad for logos.
+                    // Let's use PNG compression for Logos.
+                    .png({ quality: 80, compressionLevel: 8 })
+                    .toBuffer();
+            } catch (e) {
+                console.error("Logo optimization failed, using original:", e);
+                return buffer;
+            }
+        }
+
         if (logoFile) {
             const mimeType = String(logoFile.type || "image/png");
             if (mimeType.startsWith("image/")) {
-                const data = await fileToBase64(logoFile);
-                imageParts.push({ inlineData: { mimeType, data } });
+                const ab = await logoFile.arrayBuffer();
+                const buffer = Buffer.from(ab);
+                const optimized = await processLogo(buffer);
+                imageParts.push({ inlineData: { mimeType: "image/png", data: optimized.toString("base64") } });
                 logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
             }
         } else if (logoUrl) {
             try {
-                const { data, mimeType } = await urlToBase64(logoUrl);
-                imageParts.push({ inlineData: { mimeType, data } });
-                logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
+                const res = await fetch(logoUrl);
+                if (res.ok) {
+                    const ab = await res.arrayBuffer();
+                    const buffer = Buffer.from(ab);
+                    const optimized = await processLogo(buffer);
+                    imageParts.push({ inlineData: { mimeType: "image/png", data: optimized.toString("base64") } });
+                    logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
+                }
             } catch (e) {
                 console.error("Failed to download logo url:", logoUrl, e);
             }
