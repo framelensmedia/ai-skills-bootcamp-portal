@@ -809,6 +809,9 @@ function PromptContent() {
       return;
     }
 
+    // Sanitize prompt to prevent "String did not match expected pattern" (Control characters)
+    const safePrompt = (promptToUse || "").replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+
     setGenerating(true);
     setGenerateError(null);
 
@@ -829,13 +832,13 @@ function PromptContent() {
       }
 
       const payload = {
-        prompt: promptToUse,
+        prompt: safePrompt,
         userId,
         aspectRatio,
         promptId: metaRow.id,
         promptSlug: metaRow.slug,
-        edit_instructions: promptToUse,
-        combined_prompt_text: promptToUse,
+        edit_instructions: safePrompt,
+        combined_prompt_text: safePrompt,
 
         subjectMode: answersToUse?.subjectMode || templateConfig?.subject_mode || "non_human",
         template_reference_image: imageSrc, // Used as reference for Remix

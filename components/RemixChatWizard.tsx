@@ -333,7 +333,7 @@ export default function RemixChatWizard({
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`
-                                    rounded-2xl p-4 text-sm
+                                    rounded-2xl p-4 text-base
                                     ${m.role === 'user' ? 'bg-lime-400 text-black rounded-tr-none' : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'}
                                     ${m.isUploadStep ? 'w-full max-w-full' : 'max-w-[95%] md:max-w-[85%]'}
                                 `}>
@@ -383,8 +383,10 @@ export default function RemixChatWizard({
                                     maxFiles={1}
                                 />
                                 <div className="flex gap-2 justify-end">
-                                    <button onClick={() => advanceStep(true)} className="px-3 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
-                                        {logo ? "Confirm Logo" : "Skip / Text Fallback"}
+                                    <button
+                                        onClick={() => advanceStep(true)}
+                                        className="w-full rounded-xl bg-white/10 py-3 text-sm font-medium text-white hover:bg-white/20 transition">
+                                        {logo ? "Confirm Logo" : "I don't have a logo (Skip)"}
                                     </button>
                                 </div>
                             </div>
@@ -396,8 +398,8 @@ export default function RemixChatWizard({
                                 ✨ Generate Artwork
                             </button>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                <div className="flex gap-2">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-col md:flex-row gap-3">
                                     <input
                                         autoFocus={!isGuest}
                                         onClick={() => {
@@ -409,8 +411,8 @@ export default function RemixChatWizard({
                                                 e.target.blur();
                                             }
                                         }}
-                                        className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
-                                        placeholder={activeStep?.type === "group" ? "Enter numbered answers..." : "Enter new value..."}
+                                        className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-3 md:py-4 text-base text-white placeholder:text-white/60 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
+                                        placeholder={activeStep?.type === "group" ? "Enter numbered answers..." : "Type your answer..."}
                                         value={inputVal}
                                         onChange={(e) => setInputVal(e.target.value)}
                                         onKeyDown={(e) => {
@@ -428,11 +430,13 @@ export default function RemixChatWizard({
                                             }
                                             advanceStep();
                                         }}
-                                        className="rounded-xl bg-lime-400 px-5 py-3 text-sm font-bold text-black hover:bg-lime-300 whitespace-nowrap">
+                                        className="rounded-xl bg-lime-400 px-8 py-3 md:py-4 text-base font-bold text-black hover:bg-lime-300 whitespace-nowrap shadow-lg shadow-lime-400/10">
                                         Next
                                     </button>
                                 </div>
-                                <div className="flex gap-2 justify-end">
+
+                                {/* Secondary Actions Row */}
+                                <div className="flex flex-col md:flex-row gap-3 justify-end items-center pt-2 border-t border-white/5">
                                     <button
                                         onClick={() => {
                                             if (isGuest && onGuestInteraction) {
@@ -441,12 +445,16 @@ export default function RemixChatWizard({
                                             }
                                             advanceStep(true);
                                         }}
-                                        className="px-3 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
-                                        Skip / Keep Original
+                                        className="w-full md:w-auto rounded-lg bg-white/10 px-4 py-3 text-sm font-medium text-white hover:bg-white/20 transition text-center">
+                                        Keep Original (Skip)
                                     </button>
+
                                     {showRemove && (
-                                        <button onClick={() => advanceStep(false, true)} className="px-3 py-2 text-xs font-semibold text-red-400/60 hover:text-red-400 transition">
-                                            Remove from design
+                                        <button
+                                            onClick={() => advanceStep(false, true)}
+                                            className="w-full md:w-auto rounded-lg border border-red-500/30 px-4 py-3 text-sm font-medium text-red-300 hover:bg-red-500/10 transition text-center"
+                                        >
+                                            Remove this Element
                                         </button>
                                     )}
                                 </div>
