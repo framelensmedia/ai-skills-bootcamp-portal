@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const SYSTEM_CORE = `
 [GLOBAL SYSTEM INSTRUCTIONS]
@@ -355,13 +356,17 @@ export async function POST(req: Request) {
                 }
             }
 
-            // 2. User Subject Image (if provided)
             // Optimize and Resize all inputs to reduce payload size (Fixes 429 Throughput errors)
             const processImage = async (buffer: Buffer) => {
-                return await sharp(buffer)
-                    .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
-                    .jpeg({ quality: 80 })
-                    .toBuffer();
+                try {
+                    return await sharp(buffer)
+                        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                } catch (e) {
+                    console.error("Image optimization failed, using original:", e);
+                    return buffer;
+                }
             }
 
             for (const f of imageFiles) {
