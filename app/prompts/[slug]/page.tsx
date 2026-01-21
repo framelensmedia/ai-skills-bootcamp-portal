@@ -144,6 +144,7 @@ function PromptContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string>("");
   const [generateError, setGenerateError] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const shuffledRemixIds = useRef<string[]>([]);
@@ -855,20 +856,63 @@ function PromptContent() {
         subjectLock: answersToUse?.subjectLock
       };
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload),
-      });
+      // Step 3: API Fetch with Client-Side Retry
+      let res;
+      let json;
+      let attempts = 0;
+      const MAX_RETRIES = 5;
 
-      const json = await res.json();
+      setGenerationStatus("Initializing AI...");
 
-      if (!res.ok) {
-        setGenerateError(json?.error || json?.message || "Generation failed.");
-        setGenerating(false);
-        return;
+      while (attempts < MAX_RETRIES) {
+        attempts++;
+        try {
+          if (attempts > 1) {
+            setGenerationStatus(`System busy. Retrying... (${attempts}/${MAX_RETRIES})`);
+          }
+
+          res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          try {
+            json = await res.json();
+          } catch (jsonErr) {
+            json = null;
+          }
+
+          if (res.ok && json) {
+            break; // Success
+          }
+
+          // Retry on 429 (Busy) or 503/502/504
+          const status = res.status;
+          if (status === 429 || status >= 500) {
+            console.warn(`Attempt ${attempts} failed (${status}). Retrying...`);
+            setGenerationStatus(`High traffic. Waiting for slot... (${attempts}/${MAX_RETRIES})`);
+
+            if (attempts < MAX_RETRIES) {
+              // Backoff: 3s, 6s...
+              await new Promise(r => setTimeout(r, attempts * 3000));
+              continue;
+            }
+          }
+
+          // Non-retryable or exhausted
+          const reason = json?.error || json?.message || `Server Error ${status}`;
+          throw new Error(reason);
+
+        } catch (e: any) {
+          if (attempts < MAX_RETRIES) {
+            console.warn(`Attempt ${attempts} network error:`, e);
+            setGenerationStatus(`Connection glitch. Retrying... (${attempts}/${MAX_RETRIES})`);
+            await new Promise(r => setTimeout(r, attempts * 2000));
+            continue;
+          }
+          throw { cause: e, step: "API Execution" };
+        }
       }
 
       const url = (json?.imageUrl || "").trim();
@@ -1048,6 +1092,7 @@ function PromptContent() {
                   {generating && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
                       <LoadingOrb />
+                      <p className="mt-6 text-sm font-medium text-white/50 animate-pulse">{generationStatus || "Creating your image..."}</p>
                     </div>
                   )}
 
