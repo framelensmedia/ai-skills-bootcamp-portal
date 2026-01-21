@@ -227,7 +227,10 @@ export async function POST(req: Request) {
 
             // Extract Text Fields
             headline = body.headline || null;
-            // Map subheadline/cta/promotion if they exist on body
+            subheadline = body.subheadline || null;
+            cta = body.cta || body.call_to_action || null;
+            promotion = body.promotion || body.offer || null;
+            businessName = body.business_name || null;
             // Note: The variable names in route.ts top scope need to be available. 
             // They were let declarations: headline, but subheadline/cta/promotion might NOT be declared yet? 
             // Checking declarations in file...
@@ -492,7 +495,6 @@ Execute the user's instruction precisely.
             editModeInstruction,
             logoInstruction,
             "---",
-            "USER INSTRUCTIONS:",
             "USER INSTRUCTIONS:",
             rawPrompt,
             textRequirements,
