@@ -128,6 +128,9 @@ export async function POST(req: Request) {
         let logoFile: File | null = null;
         let businessName: string | null = null;
         let headline: string | null = null;
+        let subheadline: string | null = null; // New
+        let cta: string | null = null; // New
+        let promotion: string | null = null; // New
         let templateFile: File | null = null;
         let canvasFile: File | null = null;
         let userSubjectFile: File | null = null;
@@ -212,6 +215,12 @@ export async function POST(req: Request) {
             subjectLock = String(body.subjectLock ?? "false").trim() === "true";
             if (body.subjectMode) subjectMode = String(body.subjectMode).trim();
             industryIntent = String(body.industry_intent ?? "").trim() || null;
+
+            // New Text Fields
+            subheadline = body.subheadline ? String(body.subheadline).trim() : null;
+            cta = body.cta ? String(body.cta).trim() : null;
+            promotion = body.promotion ? String(body.promotion).trim() : null;
+
             intentQueue = body.intent_queue || [];
             if (Array.isArray(body.imageUrls)) {
                 imageUrls = body.imageUrls.map(String);
@@ -534,13 +543,20 @@ Execute the user's instruction precisely.
             (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,
+            editModeInstruction,
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
             rawPrompt,
             "---",
+            "TEXT CONTENT TO INCLUDE:",
+            headline ? `HEADLINE: "${headline}"` : "",
+            subheadline ? `SUBHEADLINE: "${subheadline}"` : "",
+            cta ? `CALL TO ACTION: "${cta}"` : "",
+            promotion ? `PROMO TEXT: "${promotion}"` : "",
+            businessName ? `BUSINESS NAME: "${businessName}"` : "",
+            "---",
             aspectHint(ar),
-            "No text overlays.",
             (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
         ]
             .filter(Boolean)
