@@ -229,6 +229,7 @@ function PromptContent() {
   // Fullscreen viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [remixRefreshTrigger, setRemixRefreshTrigger] = useState(0);
 
   function openLightbox(url: string) {
     if (!url) return;
@@ -448,7 +449,7 @@ function PromptContent() {
       setSpecificLoading(false);
     }
     loadSpecific();
-  }, [metaRow?.id]);
+  }, [metaRow?.id, remixRefreshTrigger]);
 
   // EFFECT: Load Global Community Remixes (Infinite)
   useEffect(() => {
@@ -578,9 +579,7 @@ function PromptContent() {
     fetchPrompts();
   }, []);
 
-  const forceRefreshRemixes = () => {
-    window.location.reload();
-  };
+
 
   const fullPromptText = useMemo(() => {
     if (isLocked) return "";
@@ -777,7 +776,7 @@ function PromptContent() {
   }
 
   async function refreshRemixes() {
-    forceRefreshRemixes();
+    setRemixRefreshTrigger(prev => prev + 1);
   }
 
   async function handleGenerate(overrides?: { prompt?: string; answers?: RemixAnswers; files?: File[] }) {
