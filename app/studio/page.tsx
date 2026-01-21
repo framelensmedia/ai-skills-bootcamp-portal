@@ -409,7 +409,7 @@ function StudioContent() {
           }
 
           const status = res.status;
-          if (status === 429 || status === 503 || status === 502 || status === 504) {
+          if (status === 429 || status >= 500) {
             console.warn(`Edit attempt ${attempts} failed (${status}). Retrying...`);
 
             if (attempts < MAX_RETRIES) {

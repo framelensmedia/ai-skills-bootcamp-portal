@@ -286,7 +286,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     }
 
                     const status = apiRes.status;
-                    if (status === 429 || status === 503 || status === 502 || status === 504) {
+                    if (status === 429 || status >= 500) {
                         console.warn(`Edit attempt ${attempts} failed (${status}). Retrying...`);
                         if (attempts < MAX_RETRIES) {
                             await new Promise(r => setTimeout(r, attempts * 2000));

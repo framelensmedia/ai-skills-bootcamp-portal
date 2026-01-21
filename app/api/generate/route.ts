@@ -633,9 +633,18 @@ Execute the user's instruction precisely.
         return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
     } catch (e: any) {
         console.error("GENERATE ERROR:", e);
+
+        // Try to respect upstream status code (e.g. 429 from Vertex)
+        let status = 500;
+        if (typeof e?.status === 'number' && e.status >= 400 && e.status < 600) {
+            status = e.status;
+        } else if (typeof e?.code === 'number' && e.code >= 400 && e.code < 600) {
+            status = e.code;
+        }
+
         return NextResponse.json(
             { error: "server_error", message: e?.message || "Unexpected error" },
-            { status: 500 }
+            { status }
         );
     }
 }

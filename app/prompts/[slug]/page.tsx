@@ -883,7 +883,7 @@ function PromptContent() {
 
           // Retry on 429 (Busy) or 503/502/504
           const status = res.status;
-          if (status === 429 || status === 503 || status === 502 || status === 504) {
+          if (status === 429 || status >= 500) {
             console.warn(`Attempt ${attempts} failed (${status}). Retrying...`);
 
             if (attempts < MAX_RETRIES) {
