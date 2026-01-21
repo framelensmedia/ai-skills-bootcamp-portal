@@ -855,20 +855,58 @@ function PromptContent() {
         subjectLock: answersToUse?.subjectLock
       };
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload),
-      });
+      // Step 3: API Fetch with Client-Side Retry
+      let res;
+      let json;
+      let attempts = 0;
+      const MAX_RETRIES = 3;
 
-      const json = await res.json();
+      while (attempts < MAX_RETRIES) {
+        attempts++;
+        try {
+          res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-      if (!res.ok) {
-        setGenerateError(json?.error || json?.message || "Generation failed.");
-        setGenerating(false);
-        return;
+          try {
+            json = await res.json();
+          } catch (jsonErr) {
+            // If response is not JSON (e.g. 502 HTML), ignore and handle status below
+            json = null;
+          }
+
+          if (res.ok && json) {
+            break; // Success
+          }
+
+          // Retry on 429 (Busy) or 503/502/504
+          const status = res.status;
+          if (status === 429 || status === 503 || status === 502 || status === 504) {
+            console.warn(`Attempt ${attempts} failed (${status}). Retrying...`);
+
+            if (attempts < MAX_RETRIES) {
+              // Backoff: 2s, 4s, 6s...
+              await new Promise(r => setTimeout(r, attempts * 2000));
+              continue;
+            }
+          }
+
+          // Non-retryable or exhausted
+          const reason = json?.error || json?.message || `Server Error ${status}`;
+          throw new Error(reason);
+
+        } catch (e: any) {
+          // Network errors are also retryable
+          if (attempts < MAX_RETRIES) {
+            console.warn(`Attempt ${attempts} network error:`, e);
+            await new Promise(r => setTimeout(r, attempts * 2000));
+            continue;
+          }
+          // Final throw (will be caught by outer wrapper)
+          throw { cause: e, step: "API Execution" };
+        }
       }
 
       const url = (json?.imageUrl || "").trim();
