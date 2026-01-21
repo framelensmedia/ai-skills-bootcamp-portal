@@ -383,17 +383,53 @@ function StudioContent() {
       if (remixAnswers?.subjectLock) form.append("subjectLock", remixAnswers.subjectLock);
 
       // 3. Call API
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        body: form,
-      });
+      // 3. Call API with Auto-Retry
+      let res;
+      let data;
+      let attempts = 0;
+      const MAX_RETRIES = 3;
 
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `Error ${res.status}`);
+      while (attempts < MAX_RETRIES) {
+        attempts++;
+        try {
+          res = await fetch("/api/generate", {
+            method: "POST",
+            body: form
+          });
+
+          try {
+            data = await res.json();
+          } catch (jsonErr) {
+            // If response is not JSON (e.g. 502 HTML), ignore
+            data = null;
+          }
+
+          if (res.ok && data) {
+            break; // Success
+          }
+
+          const status = res.status;
+          if (status === 429 || status === 503 || status === 502 || status === 504) {
+            console.warn(`Edit attempt ${attempts} failed (${status}). Retrying...`);
+
+            if (attempts < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, attempts * 2000));
+              continue;
+            }
+          }
+
+          const reason = data?.error || data?.message || (typeof data === 'string' ? data : `Server Error ${status}`);
+          throw new Error(reason);
+
+        } catch (e: any) {
+          if (attempts < MAX_RETRIES) {
+            console.warn(`Attempt ${attempts} network error:`, e);
+            await new Promise(r => setTimeout(r, attempts * 2000));
+            continue;
+          }
+          throw e;
+        }
       }
-
-      const data = await res.json();
       const imageUrl = data.imageUrl;
       const fullQualityUrl = data.full_quality_url || imageUrl;
 

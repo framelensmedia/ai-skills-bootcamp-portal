@@ -262,17 +262,50 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 form.append("images", img);
             });
 
-            const apiRes = await fetch("/api/generate", {
-                method: "POST",
-                body: form
-            });
+            let apiRes;
+            let data;
+            let attempts = 0;
+            const MAX_RETRIES = 3;
 
-            if (!apiRes.ok) {
-                const err = await apiRes.text();
-                throw new Error(err);
+            while (attempts < MAX_RETRIES) {
+                attempts++;
+                try {
+                    apiRes = await fetch("/api/generate", {
+                        method: "POST",
+                        body: form
+                    });
+
+                    try {
+                        data = await apiRes.json();
+                    } catch (jsonErr) {
+                        data = null;
+                    }
+
+                    if (apiRes.ok && data) {
+                        break; // Success
+                    }
+
+                    const status = apiRes.status;
+                    if (status === 429 || status === 503 || status === 502 || status === 504) {
+                        console.warn(`Edit attempt ${attempts} failed (${status}). Retrying...`);
+                        if (attempts < MAX_RETRIES) {
+                            await new Promise(r => setTimeout(r, attempts * 2000));
+                            continue;
+                        }
+                    }
+
+                    const reason = data?.error || data?.message || (typeof data === 'string' ? data : `Server Error ${status}`);
+                    throw new Error(reason);
+
+                } catch (e: any) {
+                    if (attempts < MAX_RETRIES) {
+                        console.warn(`Attempt ${attempts} network error:`, e);
+                        await new Promise(r => setTimeout(r, attempts * 2000));
+                        continue;
+                    }
+                    throw e; // Throw to outer catch to show toast
+                }
             }
-
-            const data = await apiRes.json();
 
             // Create new item with edit applied
             const newItem: LibraryItem = {
