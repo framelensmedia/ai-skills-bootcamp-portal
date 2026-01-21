@@ -845,6 +845,9 @@ function PromptContent() {
 
         business_name: businessName,
         headline: answersToUse?.headline,
+        subheadline: answersToUse?.subheadline,
+        cta: answersToUse?.cta || answersToUse?.call_to_action,
+        promotion: answersToUse?.offer || answersToUse?.promotion,
         industry_intent: answersToUse?.industry_intent,
         subjectLock: answersToUse?.subjectLock
       };
