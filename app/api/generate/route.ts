@@ -128,6 +128,9 @@ export async function POST(req: Request) {
         let logoFile: File | null = null;
         let businessName: string | null = null;
         let headline: string | null = null;
+        let subheadline: string | null = null;
+        let cta: string | null = null;
+        let promotion: string | null = null;
         let templateFile: File | null = null;
         let canvasFile: File | null = null;
         let userSubjectFile: File | null = null;
@@ -177,6 +180,10 @@ export async function POST(req: Request) {
             headline = String(form.get("headline") ?? "").trim() || null;
             if (!headline) headline = null;
 
+            subheadline = String(form.get("subheadline") ?? "").trim() || null;
+            cta = String(form.get("cta") ?? "").trim() || String(form.get("call_to_action") ?? "").trim() || null;
+            promotion = String(form.get("promotion") ?? "").trim() || String(form.get("offer") ?? "").trim() || null;
+
             industryIntent = String(form.get("industry_intent") ?? "").trim() || null;
 
             // Allow override from client
@@ -217,6 +224,15 @@ export async function POST(req: Request) {
                 imageUrls = body.imageUrls.map(String);
             }
             logoUrl = body.logo_image ? String(body.logo_image).trim() : null;
+
+            // Extract Text Fields
+            headline = body.headline || null;
+            // Map subheadline/cta/promotion if they exist on body
+            // Note: The variable names in route.ts top scope need to be available. 
+            // They were let declarations: headline, but subheadline/cta/promotion might NOT be declared yet? 
+            // Checking declarations in file...
+            // Step 1887 showed declarations for simple fields. I need to make sure I declare them if missing.
+            businessName = body.business_name || null;
         }
 
         // 2. Validation
@@ -453,6 +469,17 @@ Execute the user's instruction precisely.
 `;
         }
 
+        const textParts: string[] = [];
+        if (headline) textParts.push(`HEADLINE: "${headline}"`);
+        if (subheadline) textParts.push(`SUBHEAD: "${subheadline}"`);
+        if (cta) textParts.push(`CTA: "${cta}"`);
+        if (promotion) textParts.push(`PROMO: "${promotion}"`);
+        if (businessName) textParts.push(`BRAND: "${businessName}"`);
+
+        const textRequirements = textParts.length > 0
+            ? `[TEXT CONTENT]\n${textParts.join("\n")}\n(Include these exact text elements)`
+            : "";
+
         const finalPrompt = [
             SYSTEM_CORE,
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
@@ -466,7 +493,9 @@ Execute the user's instruction precisely.
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
+            "USER INSTRUCTIONS:",
             rawPrompt,
+            textRequirements,
             "---",
             aspectHint(ar),
 
