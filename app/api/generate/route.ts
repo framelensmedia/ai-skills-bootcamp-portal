@@ -356,15 +356,29 @@ export async function POST(req: Request) {
             }
 
             // 2. User Subject Image (if provided)
-            // Fix: We iterate over imageFiles. We implicitly treat the first one as the main subject if multiple.
+            // Optimize and Resize all inputs to reduce payload size (Fixes 429 Throughput errors)
+            const processImage = async (buffer: Buffer) => {
+                return await sharp(buffer)
+                    .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+                    .jpeg({ quality: 80 })
+                    .toBuffer();
+            }
+
             for (const f of imageFiles) {
-                const data = await fileToBase64(f);
-                imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data } });
+                const ab = await f.arrayBuffer();
+                const buffer = Buffer.from(ab);
+                const optimized = await processImage(buffer);
+                imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
             }
             for (const url of imageUrls) {
                 try {
-                    const { data, mimeType } = await urlToBase64(url);
-                    imageParts.push({ inlineData: { mimeType, data } });
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const ab = await res.arrayBuffer();
+                        const buffer = Buffer.from(ab);
+                        const optimized = await processImage(buffer);
+                        imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                    }
                 } catch (e) {
                     console.error("Failed to download remix input url:", url, e);
                 }
