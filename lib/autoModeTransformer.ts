@@ -78,6 +78,13 @@ export function transformAutoModeToPrompt(data: AutoModeData): TransformedOutput
     parts.push("Use modern, premium design principles.");
     parts.push("Make it visually striking and attention-grabbing.");
 
+    // Enforce Likeness & Cutout Style if Subject is present
+    if (data.assets?.subject_photo) {
+        parts.push("\nCRITICAL: Maintain 100% facial likeness of the subject provided.");
+        parts.push("Subject Style: Create a high-quality 'photoshop cutout' look for the subject, blending them naturally into the scene but keeping them as the focal point.");
+        parts.push("Do not cartoons or caricatures. Keep the face photorealistic.");
+    }
+
     const prompt = parts.join("\n");
 
     // Collect uploads

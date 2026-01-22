@@ -307,7 +307,11 @@ function CreatorContent() {
 
     const handleAutoModeComplete = async (data: AutoModeData) => {
         const { prompt, uploads: autoUploads } = transformAutoModeToPrompt(data);
-        await generateImage(prompt, autoUploads);
+
+        // Auto-detect Subject Lock if subject photo is present
+        const hasSubject = !!data.assets?.subject_photo;
+
+        await generateImage(prompt, autoUploads, { subjectLock: hasSubject });
     };
 
     const handleManualGenerate = async () => {
@@ -321,7 +325,7 @@ function CreatorContent() {
         await generateImage(manualPrompt, uploads);
     };
 
-    const generateImage = async (prompt: string, imageUploads: File[]) => {
+    const generateImage = async (prompt: string, imageUploads: File[], options: { subjectLock?: boolean } = {}) => {
         setGenerating(true);
         setError(null);
 
@@ -342,6 +346,10 @@ function CreatorContent() {
             form.append("userId", user.id);
             form.append("aspectRatio", aspectRatio);
             form.append("combined_prompt_text", prompt);
+
+            if (options.subjectLock) {
+                form.append("subjectLock", "true");
+            }
 
             // Upload images directly via FormData
             imageUploads.slice(0, 10).forEach((file) => {
