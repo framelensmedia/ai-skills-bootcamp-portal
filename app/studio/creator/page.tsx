@@ -360,7 +360,10 @@ function CreatorContent() {
 
             // Upload images directly via FormData
             imageUploads.slice(0, 10).forEach((file) => {
-                form.append("images", file, file.name);
+                // DEFENSE IN DEPTH: Sanitize filename one last time before append
+                // This prevents "Browser Security" (InvalidCharacterError) if upstream sanitization failed
+                const safeName = (file.name || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
+                form.append("images", file, safeName);
             });
 
             // Note: If we need template reference or remix details, append them here.
