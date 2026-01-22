@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { transformAutoModeToPrompt, type AutoModeData } from "@/lib/autoModeTransformer";
+import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
@@ -244,7 +245,13 @@ function CreatorContent() {
                     try {
                         const res = await fetch(imgUrl);
                         const blob = await res.blob();
-                        const file = new File([blob], "remix_reference.png", { type: blob.type || "image/png" });
+                        // Sanitize and Compress the reference image to prevent upload timeouts
+                        let file = new File([blob], "remix_reference.jpg", { type: "image/jpeg" });
+                        try {
+                            file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+                        } catch (e) {
+                            console.warn("Failed to compress remix ref", e);
+                        }
                         setUploads((prev) => [...prev, file]);
                     } catch (err) {
                         console.error("Failed to load remix image as file:", err);
