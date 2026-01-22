@@ -46,12 +46,13 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 [SUBJECT LOCK: ACTIVE]
 - **STRUCTURAL RULE**: The FIRST image provided is the TEMPLATE (Layout/Style). The LAST image provided is the SUBJECT REFERENCE (Target Face).
 - **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
-- STRICTLY PRESERVE the Subject Reference's facial identity, skin tone, and key features.
-- OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Cyberpunk", "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
-- Treated as a Photoshop cutout: Only crop, scale, color-match, and shadow-match are allowed.
-- NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
-- UNIFORM OVERRIDE: Even if the template shows a uniform, ignore it. Keep the subject's exact upload attire.
-- SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements. Never generate fake limbs.
+- **COMPOSITING LOGIC**: Treat the Subject Reference as a "Photoshop Smart Object" cutout.
+- **BLENDING ALLOWED**: You MAY apply lighting adjustments, color grading, and shadow matching to BLEND the subject into the scene.
+- **IDENTITY PRESERVATION**: Do NOT structurally change the face or features. Use "Adjustment Layers" logic, not "Inpainting" logic.
+- OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
+- NO RESYNTHESIS: Do not regenerate the subject's face. Do not change outfit unless explicitly asked.
+- UNIFORM OVERRIDE: Keep the subject's exact upload attire.
+- SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements.
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
