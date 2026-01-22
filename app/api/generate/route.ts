@@ -386,64 +386,63 @@ export async function POST(req: Request) {
                     imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
                     logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
                 }
-            }
             } catch (e) {
-            console.error("Failed to download logo url:", logoUrl, e);
+                console.error("Failed to download logo url:", logoUrl, e);
+            }
+        } else if (businessName) {
+            logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
         }
-    } else if (businessName) {
-        logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
-    }
 
-    // Fetch internal secret sauce
-    let internalRules = "";
-    // subjectMode is already initialized from form/body if present, or "non_human" by default?
-    // Wait, I defined 'subjectMode' variable inside step 1 block in my head but I need to check where it is defined in the file.
-    // It wasn't defined in the top scope in original file.
-    // Let's check line 325: 'let subjectMode = "non_human";'
+        // Fetch internal secret sauce
+        let internalRules = "";
+        // subjectMode is already initialized from form/body if present, or "non_human" by default?
+        // Wait, I defined 'subjectMode' variable inside step 1 block in my head but I need to check where it is defined in the file.
+        // It wasn't defined in the top scope in original file.
+        // Let's check line 325: 'let subjectMode = "non_human";'
 
-    // I should have defined it at top level.
-    // Since I only added it to the 'if multipart' block in the previous tool call, it might be scoped (if I used 'let' inside block).
-    // Actually I didn't verify if I used 'let' or assigned to outer.
-    // In the previous step I added: 'subjectMode = clientSubjectMode;' implies assignment.
-    // But 'subjectMode' wasn't defined in top scope in original file! It was defined at line 325.
-    // So my previous edit might have caused a reference error if I tried to assign it before declaration.
+        // I should have defined it at top level.
+        // Since I only added it to the 'if multipart' block in the previous tool call, it might be scoped (if I used 'let' inside block).
+        // Actually I didn't verify if I used 'let' or assigned to outer.
+        // In the previous step I added: 'subjectMode = clientSubjectMode;' implies assignment.
+        // But 'subjectMode' wasn't defined in top scope in original file! It was defined at line 325.
+        // So my previous edit might have caused a reference error if I tried to assign it before declaration.
 
-    // Let's fix it by properly initializing it at line 125, and using it here.
+        // Let's fix it by properly initializing it at line 125, and using it here.
 
-    if (promptId) {
-        const { data: dbTemplate } = await admin
-            .from("prompts")
-            .select("system_rules, subject_mode")
-            .eq("id", promptId)
-            .maybeSingle();
+        if (promptId) {
+            const { data: dbTemplate } = await admin
+                .from("prompts")
+                .select("system_rules, subject_mode")
+                .eq("id", promptId)
+                .maybeSingle();
 
-        if (dbTemplate) {
-            internalRules = dbTemplate.system_rules || "";
-            // Only override if not set by client? Or always prefer DB if strict?
-            // Usually DB template rules are strict. But if "Remix" allows changing mode...
-            // If client specifically sent it (from Wizard), we should probably respect it OR fallback.
-            if (!subjectMode || subjectMode === "non_human") {
-                subjectMode = dbTemplate.subject_mode || "non_human";
+            if (dbTemplate) {
+                internalRules = dbTemplate.system_rules || "";
+                // Only override if not set by client? Or always prefer DB if strict?
+                // Usually DB template rules are strict. But if "Remix" allows changing mode...
+                // If client specifically sent it (from Wizard), we should probably respect it OR fallback.
+                if (!subjectMode || subjectMode === "non_human") {
+                    subjectMode = dbTemplate.subject_mode || "non_human";
+                }
             }
         }
-    }
 
-    const subjectRules = imageFiles.length > 0
-        ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
-        : "";
+        const subjectRules = imageFiles.length > 0
+            ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
+            : "";
 
-    const bgSwapInstruction = industryIntent ? `
+        const bgSwapInstruction = industryIntent ? `
 [BACKGROUND SWAP: ACTIVE - Intent: ${industryIntent}]
 - You MUST change the background environment to match the Industry Intent '${industryIntent}'.
 - Keep the user photo as a locked 2D cutout (see SUBJECT LOCK).
 - If background swap cannot be done safely without breaking the layout or subject, fall back to original background.
 ` : "";
 
-    let editModeInstruction = "";
-    if (Array.isArray(intentQueue) && intentQueue.length > 0) {
-        const queueList = intentQueue.map((q, i) => `ACTION: ${String(q.intent).toUpperCase()} -> ${q.value}`).join("\n");
+        let editModeInstruction = "";
+        if (Array.isArray(intentQueue) && intentQueue.length > 0) {
+            const queueList = intentQueue.map((q, i) => `ACTION: ${String(q.intent).toUpperCase()} -> ${q.value}`).join("\n");
 
-        editModeInstruction = `
+            editModeInstruction = `
 ### EDIT INSTRUCTIONS (STRICT)
 You are an expert image editor. Your goal is to apply specific text or element changes to the provided CANVAS IMAGE while preserving everything else perfectly.
 
@@ -458,8 +457,8 @@ ${queueList}
 
 Apply ONLY the actions listed above.
 `;
-    } else if (isEditMode && edit_instructions) {
-        editModeInstruction = `
+        } else if (isEditMode && edit_instructions) {
+            editModeInstruction = `
 ### EDIT INSTRUCTIONS
 You are an expert image editor. Your goal is to apply changes to the provided CANVAS IMAGE.
 
@@ -472,166 +471,166 @@ You are an expert image editor. Your goal is to apply changes to the provided CA
 
 Execute the user's instruction precisely.
 `;
-    }
+        }
 
-    const finalPrompt = [
-        SYSTEM_CORE,
-        internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
-        subjectRules,
-        (subjectLock && imageFiles.length > 0)
-            ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
-            : "",
-        (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
-        bgSwapInstruction,
-        editModeInstruction,
-        editModeInstruction,
-        logoInstruction,
-        "---",
-        "USER INSTRUCTIONS:",
-        rawPrompt,
-        "---",
-        "TEXT CONTENT TO INCLUDE:",
-        headline ? `HEADLINE: "${headline}"` : "",
-        subheadline ? `SUBHEADLINE: "${subheadline}"` : "",
-        cta ? `CALL TO ACTION: "${cta}"` : "",
-        promotion ? `PROMO TEXT: "${promotion}"` : "",
-        businessName ? `BUSINESS NAME: "${businessName}"` : "",
-        "---",
-        aspectHint(ar),
-        (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
-    ]
-        .filter(Boolean)
-        .join("\n\n");
+        const finalPrompt = [
+            SYSTEM_CORE,
+            internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
+            subjectRules,
+            (subjectLock && imageFiles.length > 0)
+                ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
+                : "",
+            (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
+            bgSwapInstruction,
+            editModeInstruction,
+            editModeInstruction,
+            logoInstruction,
+            "---",
+            "USER INSTRUCTIONS:",
+            rawPrompt,
+            "---",
+            "TEXT CONTENT TO INCLUDE:",
+            headline ? `HEADLINE: "${headline}"` : "",
+            subheadline ? `SUBHEADLINE: "${subheadline}"` : "",
+            cta ? `CALL TO ACTION: "${cta}"` : "",
+            promotion ? `PROMO TEXT: "${promotion}"` : "",
+            businessName ? `BUSINESS NAME: "${businessName}"` : "",
+            "---",
+            aspectHint(ar),
+            (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
+        ]
+            .filter(Boolean)
+            .join("\n\n");
 
-    const payload = {
-        contents: [
-            {
-                role: "user",
-                parts: [...imageParts, { text: finalPrompt }],
+        const payload = {
+            contents: [
+                {
+                    role: "user",
+                    parts: [...imageParts, { text: finalPrompt }],
+                },
+            ],
+            generationConfig: { temperature: 0.7 },
+        };
+
+        // 6. Call Vertex
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token.token}`, // Fixed trailing space
+                "Content-Type": "application/json",
             },
-        ],
-        generationConfig: { temperature: 0.7 },
-    };
+            body: JSON.stringify(payload),
+        });
 
-    // 6. Call Vertex
-    const res = await fetch(url, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token.token}`, // Fixed trailing space
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-    });
+        const json: any = await res.json();
 
-    const json: any = await res.json();
+        if (!res.ok) {
+            if (res.status === 429) {
+                console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
+                return NextResponse.json(
+                    { error: "System is busy (High Traffic). Please wait a minute and try again." },
+                    { status: 429 }
+                );
+            }
 
-    if (!res.ok) {
-        if (res.status === 429) {
-            console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
+            console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
+
             return NextResponse.json(
-                { error: "System is busy (High Traffic). Please wait a minute and try again." },
-                { status: 429 }
+                { error: "vertex_error", status: res.status, details: json },
+                { status: res.status }
             );
         }
 
-        console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
+        // 7. Process Output
+        const parts = json?.candidates?.[0]?.content?.parts ?? [];
+        const inline = Array.isArray(parts)
+            ? parts.find(
+                (p) => p?.inlineData?.data && String(p?.inlineData?.mimeType || "").startsWith("image/")
+            )
+            : null;
 
-        return NextResponse.json(
-            { error: "vertex_error", status: res.status, details: json },
-            { status: res.status }
-        );
-    }
+        if (!inline) {
+            return NextResponse.json({ error: "No image returned", details: json }, { status: 502 });
+        }
 
-    // 7. Process Output
-    const parts = json?.candidates?.[0]?.content?.parts ?? [];
-    const inline = Array.isArray(parts)
-        ? parts.find(
-            (p) => p?.inlineData?.data && String(p?.inlineData?.mimeType || "").startsWith("image/")
-        )
-        : null;
+        const outMime = String(inline.inlineData.mimeType);
+        const outBase64 = String(inline.inlineData.data);
 
-    if (!inline) {
-        return NextResponse.json({ error: "No image returned", details: json }, { status: 502 });
-    }
+        const bytes = Buffer.from(outBase64, "base64");
 
-    const outMime = String(inline.inlineData.mimeType);
-    const outBase64 = String(inline.inlineData.data);
+        // 8a. Upload Original (Full Quality)
+        const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
+        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
 
-    const bytes = Buffer.from(outBase64, "base64");
+        const { error: uploadOriginalError } = await admin.storage
+            .from("generations")
+            .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
 
-    // 8a. Upload Original (Full Quality)
-    const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-    const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
+        if (uploadOriginalError) {
+            console.error("Failed to upload original:", uploadOriginalError);
+        }
 
-    const { error: uploadOriginalError } = await admin.storage
-        .from("generations")
-        .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
+        const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
+        const originalUrl = originalPub.publicUrl;
 
-    if (uploadOriginalError) {
-        console.error("Failed to upload original:", uploadOriginalError);
-    }
+        // 8b. Optimize with Sharp (webP)
+        const optimizedBytes = await sharp(bytes)
+            .resize({ width: 1080, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
 
-    const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
-    const originalUrl = originalPub.publicUrl;
+        const ext = "webp";
+        const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
 
-    // 8b. Optimize with Sharp (webP)
-    const optimizedBytes = await sharp(bytes)
-        .resize({ width: 1080, withoutEnlargement: true })
-        .webp({ quality: 80 })
-        .toBuffer();
+        // Upload Optimized
+        const { error: uploadError } = await admin.storage
+            .from("generations")
+            .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
 
-    const ext = "webp";
-    const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
+        if (uploadError) {
+            return NextResponse.json({ error: uploadError.message }, { status: 500 });
+        }
 
-    // Upload Optimized
-    const { error: uploadError } = await admin.storage
-        .from("generations")
-        .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
+        const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
+        const imageUrl = pub.publicUrl;
 
-    if (uploadError) {
-        return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
+        // 9. Insert History
+        try {
+            await admin.from("prompt_generations").insert({
+                user_id: userId,
+                prompt_id: promptId,
+                prompt_slug: promptSlug,
+                image_url: imageUrl,
 
-    const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
-    const imageUrl = pub.publicUrl;
-
-    // 9. Insert History
-    try {
-        await admin.from("prompt_generations").insert({
-            user_id: userId,
-            prompt_id: promptId,
-            prompt_slug: promptSlug,
-            image_url: imageUrl,
-
-            original_prompt_text,
-            remix_prompt_text,
-            combined_prompt_text: combined_prompt_text || rawPrompt,
-
-            settings: {
-                aspectRatio: ar,
-                model,
-                provider: "vertex",
-                input_images: imageFiles.length + imageUrls.length,
                 original_prompt_text,
                 remix_prompt_text,
                 combined_prompt_text: combined_prompt_text || rawPrompt,
-                edit_instructions,
-                template_reference_image,
-                headline,
-                full_quality_url: originalUrl, // Save Full Quality URL
-            },
-        });
-    } catch (e) {
-        console.error("prompt_generations insert failed:", e);
-        // don't fail the request, just log it
-    }
 
-    return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
-} catch (e: any) {
-    console.error("GENERATE ERROR:", e);
-    return NextResponse.json(
-        { error: "server_error", message: e?.message || "Unexpected error" },
-        { status: 500 }
-    );
-}
+                settings: {
+                    aspectRatio: ar,
+                    model,
+                    provider: "vertex",
+                    input_images: imageFiles.length + imageUrls.length,
+                    original_prompt_text,
+                    remix_prompt_text,
+                    combined_prompt_text: combined_prompt_text || rawPrompt,
+                    edit_instructions,
+                    template_reference_image,
+                    headline,
+                    full_quality_url: originalUrl, // Save Full Quality URL
+                },
+            });
+        } catch (e) {
+            console.error("prompt_generations insert failed:", e);
+            // don't fail the request, just log it
+        }
+
+        return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
+    } catch (e: any) {
+        console.error("GENERATE ERROR:", e);
+        return NextResponse.json(
+            { error: "server_error", message: e?.message || "Unexpected error" },
+            { status: 500 }
+        );
+    }
 }
