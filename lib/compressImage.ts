@@ -31,7 +31,10 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
                 canvas.toBlob(
                     (blob) => {
                         if (blob) {
-                            const newFile = new File([blob], file.name, {
+                            // Sanitize filename to prevent "InvalidCharacterError" in FormData
+                            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+
+                            const newFile = new File([blob], safeName, {
                                 type: "image/jpeg",
                                 lastModified: Date.now(),
                             });
