@@ -338,9 +338,17 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                 </label>
                                 <ImageUploader
                                     files={data.assets?.subject_photo ? [data.assets.subject_photo] : []}
-                                    onChange={(files) => {
+                                    onChange={async (files) => {
+                                        let file = files[0];
+                                        if (file) {
+                                            try {
+                                                file = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                                            } catch (e) {
+                                                console.error("Subject compression failed", e);
+                                            }
+                                        }
                                         const assets = data.assets || {};
-                                        setData({ ...data, assets: { ...assets, subject_photo: files[0] } });
+                                        setData({ ...data, assets: { ...assets, subject_photo: file } });
                                     }}
                                     maxFiles={1}
                                 />
@@ -351,9 +359,17 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                 </label>
                                 <ImageUploader
                                     files={data.assets?.logo ? [data.assets.logo] : []}
-                                    onChange={(files) => {
+                                    onChange={async (files) => {
+                                        let file = files[0];
+                                        if (file) {
+                                            try {
+                                                file = await compressImage(file, { maxWidth: 800, quality: 0.8 });
+                                            } catch (e) {
+                                                console.error("Logo compression failed", e);
+                                            }
+                                        }
                                         const assets = data.assets || {};
-                                        setData({ ...data, assets: { ...assets, logo: files[0] } });
+                                        setData({ ...data, assets: { ...assets, logo: file } });
                                     }}
                                     maxFiles={1}
                                 />
@@ -364,9 +380,17 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                 </label>
                                 <ImageUploader
                                     files={data.assets?.product ? [data.assets.product] : []}
-                                    onChange={(files) => {
+                                    onChange={async (files) => {
+                                        let file = files[0];
+                                        if (file) {
+                                            try {
+                                                file = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                                            } catch (e) {
+                                                console.error("Product compression failed", e);
+                                            }
+                                        }
                                         const assets = data.assets || {};
-                                        setData({ ...data, assets: { ...assets, product: files[0] } });
+                                        setData({ ...data, assets: { ...assets, product: file } });
                                     }}
                                     maxFiles={1}
                                 />
