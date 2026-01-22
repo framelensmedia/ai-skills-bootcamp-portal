@@ -563,45 +563,41 @@ Execute the user's instruction precisely.
 
         const bytes = Buffer.from(outBase64, "base64");
 
-        // 8a. Upload Original (Full Quality)
+        // 8. Parallel Uploads (Original & Optimized) to save time
         const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
+        const timestamp = Date.now();
 
-        const { error: uploadOriginalError } = await admin.storage
-            .from("generations")
-            .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
+        const originalFilePath = `users/${userId}/${timestamp}.${originalExt}`;
+        const optimizedFilePath = `users/${userId}/${timestamp}_opt.${originalExt}`;
 
-        if (uploadOriginalError) {
-            console.error("Failed to upload original:", uploadOriginalError);
+        // Since we are bypassing Sharp for now, optimizedBytes is just bytes
+        const optimizedBytes = bytes;
+
+        // Execute uploads in parallel
+        const [originalUpload, optimizedUpload] = await Promise.all([
+            admin.storage
+                .from("generations")
+                .upload(originalFilePath, bytes, { contentType: outMime, upsert: false }),
+            admin.storage
+                .from("generations")
+                .upload(optimizedFilePath, optimizedBytes, { contentType: outMime, upsert: false })
+        ]);
+
+        if (originalUpload.error) {
+            console.error("Failed to upload original:", originalUpload.error);
         }
 
+        if (optimizedUpload.error) {
+            return NextResponse.json({ error: optimizedUpload.error.message }, { status: 500 });
+        }
+
+        // Get URLs (synchronous usually, but good to be safe)
         const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
         const originalUrl = originalPub.publicUrl;
 
-        // 8b. Optimize with Sharp (webP) - Dynamic Import to prevent top-level crash
-        // BYPASS: To prevent Vercel 10s timeout, we skip server-side compression for now.
-        // We just upload the raw bytes as the "optimized" version.
-        const optimizedBytes = bytes;
-        // const { default: sharp } = await import("sharp");
-        // const optimizedBytes = await sharp(bytes)
-        //     .resize({ width: 1080, withoutEnlargement: true })
-        //     .webp({ quality: 80 })
-        //     .toBuffer();
-
-        const ext = originalExt;
-        const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
-
-        // Upload Optimized
-        const { error: uploadError } = await admin.storage
-            .from("generations")
-            .upload(filePath, optimizedBytes, { contentType: outMime, upsert: false });
-
-        if (uploadError) {
-            return NextResponse.json({ error: uploadError.message }, { status: 500 });
-        }
-
-        const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
-        const imageUrl = pub.publicUrl;
+        // const { data: optimizedPub } = admin.storage.from("generations").getPublicUrl(optimizedFilePath); // Already declared above or not needed if we just use the line below
+        const { data: optimizedPub } = admin.storage.from("generations").getPublicUrl(optimizedFilePath);
+        const imageUrl = optimizedPub.publicUrl;
 
         // 9. Insert History
         try {
