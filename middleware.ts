@@ -14,6 +14,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - .*\\.(?:svg|png|jpg|jpeg|gif|webp)$ (image files)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/admin/templates/import).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api).*)',
   ],
 };
