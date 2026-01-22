@@ -574,19 +574,22 @@ Execute the user's instruction precisely.
         const originalUrl = originalPub.publicUrl;
 
         // 8b. Optimize with Sharp (webP) - Dynamic Import to prevent top-level crash
-        const { default: sharp } = await import("sharp");
-        const optimizedBytes = await sharp(bytes)
-            .resize({ width: 1080, withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toBuffer();
+        // BYPASS: To prevent Vercel 10s timeout, we skip server-side compression for now.
+        // We just upload the raw bytes as the "optimized" version.
+        const optimizedBytes = bytes;
+        // const { default: sharp } = await import("sharp");
+        // const optimizedBytes = await sharp(bytes)
+        //     .resize({ width: 1080, withoutEnlargement: true })
+        //     .webp({ quality: 80 })
+        //     .toBuffer();
 
-        const ext = "webp";
+        const ext = originalExt;
         const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
 
         // Upload Optimized
         const { error: uploadError } = await admin.storage
             .from("generations")
-            .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
+            .upload(filePath, optimizedBytes, { contentType: outMime, upsert: false });
 
         if (uploadError) {
             return NextResponse.json({ error: uploadError.message }, { status: 500 });
