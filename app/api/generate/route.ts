@@ -54,10 +54,10 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 - **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
 - **COMPOSITING LOGIC**: Perform a "Professional High-End Composite". The subject must look like they were photographed ON LOCATION in the scene.
 - **MANDATORY BLENDING (CRITICAL)**:
-  1. **MATCH LEVELS**: You MUST adjust the subject's Black Levels and White Levels to match the background perfectly. No crushed blacks or blown-out highlights unless the scene demands it.
+  1. **ANCHOR BLACK LEVELS**: You MUST ensure the subject has deep, rich blacks that match the darkest point of the scene. DO NOT lift the blacks or make the subject look washed out/faded.
   2. **MATCH SATURATION**: Adjust the subject's color saturation to match the film stock/grading of the template.
-  3. **MATCH CONTRAST**: If the background is soft/hazy, the subject MUST be soft/hazy. If the background is high-contrast, the subject MUST be high-contrast.
-- **LIGHTING**: Apply "Subtle Studio Lighting" to the subject's face to model it dimensionally, BUT ensure the *direction* and *color* still match the scene's key light.
+  3. **MATCH CONTRAST**: The subject should have "POP". Match the contrast of the template. If the template is high-contrast, the subject MUST be high-contrast.
+- **LIGHTING**: Apply "Subtle Studio Lighting" to the subject's face to model it dimensionally. Ensure it looks PREMIUM and HIGH-QUALITY.
 - **GLOBAL ILLUMINATION**: The subject must reflect the environment's colors (e.g., green bounce from grass, blue kill from sky).
 - **IDENTITY PRESERVATION**: Keep the facial structure and features 100% accurate.
 - **NO "CUTOUT" LOOK**: The edges must wrap naturally.
