@@ -88,10 +88,11 @@ export function transformAutoModeToPrompt(data: AutoModeData): TransformedOutput
     const prompt = parts.join("\n");
 
     // Collect uploads
+    // ORDER MATTERS: Route.ts expects FIRST = TEMPLATE, LAST = SUBJECT
     const uploads: File[] = [];
-    if (data.assets?.subject_photo) uploads.push(data.assets.subject_photo);
+    if (data.assets?.product) uploads.push(data.assets.product); // Template / Style Ref
     if (data.assets?.logo) uploads.push(data.assets.logo);
-    if (data.assets?.product) uploads.push(data.assets.product);
+    if (data.assets?.subject_photo) uploads.push(data.assets.subject_photo); // Subject Target
 
     return {
         prompt,

@@ -227,7 +227,9 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
     const [step, setStep] = useState(1);
     const [data, setData] = useState<Partial<AutoModeData>>({
         copy_block: {},
-        assets: initialReferenceImage ? { subject_photo: initialReferenceImage } : {},
+        // Map initial image (Remix Source) to 'product' so it acts as the Template/Style Reference
+        // This leaves 'subject_photo' free for the user to upload their new subject
+        assets: initialReferenceImage ? { product: initialReferenceImage } : {},
     });
 
     const activeConfig = useMemo(() => {
