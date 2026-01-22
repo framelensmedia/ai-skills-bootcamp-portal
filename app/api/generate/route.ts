@@ -44,7 +44,9 @@ const SYSTEM_NON_HUMAN_RULES = `
 
 const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 [SUBJECT LOCK: ACTIVE]
-- STRICTLY PRESERVE the Uploaded Subject's identity, clothing, body type, and pose.
+- **STRUCTURAL RULE**: The FIRST image provided is the TEMPLATE (Layout/Style). The LAST image provided is the SUBJECT REFERENCE (Target Face).
+- **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
+- STRICTLY PRESERVE the Subject Reference's facial identity, skin tone, and key features.
 - OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Cyberpunk", "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
 - Treated as a Photoshop cutout: Only crop, scale, color-match, and shadow-match are allowed.
 - NO RESYNTHESIS: Do not regenerate the subject. Do not change outfit or uniform.
