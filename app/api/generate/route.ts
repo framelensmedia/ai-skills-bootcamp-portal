@@ -46,13 +46,12 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 [SUBJECT LOCK: ACTIVE]
 - **STRUCTURAL RULE**: The FIRST image provided is the TEMPLATE (Layout/Style). The LAST image provided is the SUBJECT REFERENCE (Target Face).
 - **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
-- **COMPOSITING LOGIC**: Treat the Subject Reference as a "Photoshop Smart Object" cutout.
-- **BLENDING ALLOWED**: You MAY apply lighting adjustments, color grading, and shadow matching to BLEND the subject into the scene.
-- **IDENTITY PRESERVATION**: Do NOT structurally change the face or features. Use "Adjustment Layers" logic, not "Inpainting" logic.
-- OVERRIDE TEMPLATE RULES: If the Template style conflicts with the Subject's realism (e.g. "Sketch"), the Subject's Face MUST remain PHOTOREALISTIC.
-- NO RESYNTHESIS: Do not regenerate the subject's face. Do not change outfit unless explicitly asked.
-- UNIFORM OVERRIDE: Keep the subject's exact upload attire.
-- SMART COMPOSITING: Anchor the subject to screen bottom or hide cut-off torso behind layout elements.
+- **COMPOSITING LOGIC**: Perform a "Professional High-End Composite". The subject must look like they were photographed ON LOCATION in the scene.
+- **MANDATORY BLENDING**: You MUST adjust the subject's skin tone, lighting direction, color temperature, and shadows to MATCH the Template's environment perfectly.
+- **GLOBAL ILLUMINATION**: Apply the environment's ambient light to the subject. If the scene is warm, the subject must be warm. If the scene is dark/contrasty, the subject must match.
+- **IDENTITY PRESERVATION**: Keep the facial structure and features 100% accurate. However, lighting modifications on the face are REQUIRED for realism.
+- **NO "CUTOUT" LOOK**: The edges of the subject must wrap naturally with the background. No sharp white halos or mismatched black levels.
+- **OUTFIT PRESERVATION**: Keep the subject's exact upload attire unless explicitly asked to change.
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
