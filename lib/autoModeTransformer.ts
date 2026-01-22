@@ -91,7 +91,7 @@ export function transformAutoModeToPrompt(data: AutoModeData): TransformedOutput
     // ORDER MATTERS: Route.ts expects FIRST = TEMPLATE, LAST = SUBJECT
     const uploads: File[] = [];
     if (data.assets?.product) uploads.push(data.assets.product); // Template / Style Ref
-    if (data.assets?.logo) uploads.push(data.assets.logo);
+    // if (data.assets?.logo) uploads.push(data.assets.logo); // Handled separately as logo_image
     if (data.assets?.subject_photo) uploads.push(data.assets.subject_photo); // Subject Target
 
     return {

@@ -318,7 +318,7 @@ function CreatorContent() {
         // Auto-detect Subject Lock if subject photo is present
         const hasSubject = !!data.assets?.subject_photo;
 
-        await generateImage(prompt, autoUploads, { subjectLock: hasSubject });
+        await generateImage(prompt, autoUploads, { subjectLock: hasSubject, logoFile: data.assets?.logo });
     };
 
     const handleManualGenerate = async () => {
@@ -329,10 +329,10 @@ function CreatorContent() {
             return;
         }
 
-        await generateImage(manualPrompt, uploads);
+        await generateImage(manualPrompt, uploads, { logoFile: logo });
     };
 
-    const generateImage = async (prompt: string, imageUploads: File[], options: { subjectLock?: boolean } = {}) => {
+    const generateImage = async (prompt: string, imageUploads: File[], options: { subjectLock?: boolean, logoFile?: File | null } = {}) => {
         setGenerating(true);
         setError(null);
 
@@ -356,6 +356,11 @@ function CreatorContent() {
 
             if (options.subjectLock) {
                 form.append("subjectLock", "true");
+            }
+
+            if (options.logoFile) {
+                const safeName = (options.logoFile.name || "logo.png").replace(/[^a-zA-Z0-9.-]/g, "_");
+                form.append("logo_image", options.logoFile, safeName);
             }
 
             // Upload images directly via FormData

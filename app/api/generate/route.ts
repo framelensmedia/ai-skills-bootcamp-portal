@@ -13,6 +13,12 @@ const SYSTEM_CORE = `
 3. Safe Rules: You may change clothing, background, lighting, and style. You must NOT change face geometry or distort the subject.
 4. FRAMING ADAPTATION: If the Subject Reference pose differs significantly from the Template, you may adapt the composition/framing to fit the subject naturally.
 
+[MAGIC LIGHTING & BLENDING (STRICT)]
+1. GLOBAL ILLUMINATION: You MUST apply the scene's ambient light to all inserted subjects. Match the color temperature (Kelvin) and dynamic range.
+2. SHADOW INTEGRATION: Subjects must cast realistic shadows that match the direction and hardness of the scene's light sources.
+3. ATMOSPHERIC DEPTH: Apply atmospheric perspective (haze/depth) to the subject if they are further back in the scene.
+4. NO FLAT LIGHTING: Never use flat front lighting unless the scene demands it. Use rim lighting and key lighting to match the template.
+
 [MANDATORY SEMANTIC TEXT REPLACEMENT]
 1. CONTEXT SYNC: If the user's instructions imply a change in Industry, Service, or Topic (e.g., Plumbing -> Tree Removal), you MUST REGENERATE ALL TEXT fields (Headline, Subhead, CTA, etc.) to match the new topic.
 2. NO LEGACY TEXT: Never leave text from the old industry in the new design. If the template says "Emergency Plumbing" and the user asks for "Bakery", you must change it to something like "Fresh Bread".
