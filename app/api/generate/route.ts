@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { createClient } from "@supabase/supabase-js";
-import sharp from "sharp";
+// sharp import removed (dynamic import used instead)
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -573,7 +573,8 @@ Execute the user's instruction precisely.
         const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
         const originalUrl = originalPub.publicUrl;
 
-        // 8b. Optimize with Sharp (webP)
+        // 8b. Optimize with Sharp (webP) - Dynamic Import to prevent top-level crash
+        const { default: sharp } = await import("sharp");
         const optimizedBytes = await sharp(bytes)
             .resize({ width: 1080, withoutEnlargement: true })
             .webp({ quality: 80 })

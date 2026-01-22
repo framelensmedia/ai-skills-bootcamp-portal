@@ -375,16 +375,25 @@ function CreatorContent() {
             });
 
 
-            const json = await res.json();
+            const text = await res.text();
+            let json;
+            try {
+                json = JSON.parse(text);
+            } catch (e) {
+                // If not JSON, it's likely an HTML 500 error or network failure text
+                console.error("Non-JSON response:", text);
+            }
 
             if (!res.ok) {
-                throw new Error(json?.message || json?.error || "Generation failed");
+                const msg = json?.message || json?.error || (text.length < 200 ? text : `Server Error (${res.status})`);
+                throw new Error(msg || "Generation failed");
             }
 
             // Navigate to library to see result
             router.push("/library");
 
         } catch (err: any) {
+            console.error("Generate Error:", err);
             setError(err.message || "Failed to generate");
         } finally {
             setGenerating(false);
