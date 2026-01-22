@@ -304,44 +304,26 @@ export async function POST(req: Request) {
 
         if (isEditMode) {
             // --- EDIT MODE ---
-            // Must use Canvas Image. No Template.
             if (!canvasFile) {
                 return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image (canvas_image)." }, { status: 400 });
             }
 
-            // Define optimization helper (Scoped here for safety during refactor)
-            const processImage = async (buffer: Buffer) => {
-                try {
-                    return await sharp(buffer)
-                        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
-                        .jpeg({ quality: 80 })
-                        .toBuffer();
-                } catch (e) {
-                    console.error("Image optimization failed, using original:", e);
-                    return buffer;
-                }
-            }
-
             const ab = await canvasFile.arrayBuffer();
-            const buffer = Buffer.from(ab);
-            const optimized = await processImage(buffer);
-            imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+            imageParts.push({ inlineData: { mimeType: canvasFile.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
 
-            // Also attach any additional images (reference style, object, etc)
+            // Attach user uploads (already compressed client-side)
             for (const f of imageFiles) {
                 const ab = await f.arrayBuffer();
-                const buffer = Buffer.from(ab);
-                const optimized = await processImage(buffer);
-                imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
             }
+            // Attach URLs
             for (const url of imageUrls) {
                 try {
                     const res = await fetch(url);
                     if (res.ok) {
                         const ab = await res.arrayBuffer();
-                        const buffer = Buffer.from(ab);
-                        const optimized = await processImage(buffer);
-                        imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                        const mimeType = res.headers.get("content-type") || "image/jpeg";
+                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
                     }
                 } catch (e) {
                     console.error("Failed to download input url:", url, e);
@@ -350,12 +332,11 @@ export async function POST(req: Request) {
 
         } else {
             // --- REMIX MODE ---
-            // Inputs: Template (File or URL) + Optional User Subject
 
             // 1. Template Image
             if (templateFile) {
                 const data = await fileToBase64(templateFile);
-                imageParts.push({ inlineData: { mimeType: templateFile.type, data } });
+                imageParts.push({ inlineData: { mimeType: templateFile.type || "image/jpeg", data } });
             } else if (template_reference_image) {
                 try {
                     const res = await fetch(template_reference_image);
@@ -370,38 +351,18 @@ export async function POST(req: Request) {
                 }
             }
 
-            // 2. User Subject Image (if provided)
-            // Optimize and Resize all inputs to reduce payload size (Fixes 429 Throughput errors)
-            // Helper defined above? No, let's redefine or move.
-            // Actually, I can't easily move it up without a large diff.
-            // I will just copy the helper for now to avoid breaking scope or massive refactor risk.
-            const processImage = async (buffer: Buffer) => {
-                try {
-                    return await sharp(buffer)
-                        .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
-                        .jpeg({ quality: 80 })
-                        .toBuffer();
-                } catch (e) {
-                    console.error("Image optimization failed, using original:", e);
-                    return buffer;
-                }
-            }
-
-            // Fix: We iterate over imageFiles. We implicitly treat the first one as the main subject if multiple.
+            // 2. User Subject Image (Already optimized client-side)
             for (const f of imageFiles) {
                 const ab = await f.arrayBuffer();
-                const buffer = Buffer.from(ab);
-                const optimized = await processImage(buffer);
-                imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                imageParts.push({ inlineData: { mimeType: f.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
             }
             for (const url of imageUrls) {
                 try {
                     const res = await fetch(url);
                     if (res.ok) {
                         const ab = await res.arrayBuffer();
-                        const buffer = Buffer.from(ab);
-                        const optimized = await processImage(buffer);
-                        imageParts.push({ inlineData: { mimeType: "image/jpeg", data: optimized.toString("base64") } });
+                        const mimeType = res.headers.get("content-type") || "image/jpeg";
+                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
                     }
                 } catch (e) {
                     console.error("Failed to download remix input url:", url, e);
@@ -412,100 +373,81 @@ export async function POST(req: Request) {
         // 3. Add Logo Image (if present)
         let logoInstruction = "";
 
-        // Define optimization helper for Logo (Scoped)
-        const processLogo = async (buffer: Buffer) => {
-            try {
-                return await sharp(buffer)
-                    // Logos can be smaller, but 1536 is safe max
-                    .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
-                    // Keep PNG for transparency if input was PNG, else JPEG?
-                    // Vertex prefers JPEG for size, but Logos need transparency.
-                    // If we convert to JPEG, we lose transparency -> Bad for logos.
-                    // Let's use PNG compression for Logos.
-                    .png({ quality: 80, compressionLevel: 8 })
-                    .toBuffer();
-            } catch (e) {
-                console.error("Logo optimization failed, using original:", e);
-                return buffer;
-            }
-        }
-
         if (logoFile) {
-            const mimeType = String(logoFile.type || "image/png");
-            if (mimeType.startsWith("image/")) {
-                const ab = await logoFile.arrayBuffer();
-                const buffer = Buffer.from(ab);
-                const optimized = await processLogo(buffer);
-                imageParts.push({ inlineData: { mimeType: "image/png", data: optimized.toString("base64") } });
-                logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
-            }
+            const ab = await logoFile.arrayBuffer();
+            imageParts.push({ inlineData: { mimeType: logoFile.type || "image/png", data: Buffer.from(ab).toString("base64") } });
+            logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
         } else if (logoUrl) {
             try {
                 const res = await fetch(logoUrl);
                 if (res.ok) {
                     const ab = await res.arrayBuffer();
-                    const buffer = Buffer.from(ab);
-                    const optimized = await processLogo(buffer);
-                    imageParts.push({ inlineData: { mimeType: "image/png", data: optimized.toString("base64") } });
+                    const mimeType = res.headers.get("content-type") || "image/png";
+                    imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
                     logoInstruction = "LOGO REPLACEMENT: The FINAL IMAGE in the input list is the LOGO. Replace the template's existing logo/brand text with this exact logo image. Maintain its aspect ratio.";
                 }
             } catch (e) {
                 console.error("Failed to download logo url:", logoUrl, e);
             }
+        }
+    }
+            } catch (e) {
+    console.error("Failed to download logo url:", logoUrl, e);
+}
         } else if (businessName) {
-            logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
+    logoInstruction = `LOGO GENERATION: Generate a professional logo for '${businessName}' and place it in the template's designated logo area.`;
+}
+
+// Fetch internal secret sauce
+let internalRules = "";
+// subjectMode is already initialized from form/body if present, or "non_human" by default?
+// Wait, I defined 'subjectMode' variable inside step 1 block in my head but I need to check where it is defined in the file.
+// It wasn't defined in the top scope in original file.
+// Let's check line 325: 'let subjectMode = "non_human";'
+
+// I should have defined it at top level.
+// Since I only added it to the 'if multipart' block in the previous tool call, it might be scoped (if I used 'let' inside block).
+// Actually I didn't verify if I used 'let' or assigned to outer.
+// In the previous step I added: 'subjectMode = clientSubjectMode;' implies assignment.
+// But 'subjectMode' wasn't defined in top scope in original file! It was defined at line 325.
+// So my previous edit might have caused a reference error if I tried to assign it before declaration.
+
+// Let's fix it by properly initializing it at line 125, and using it here.
+
+if (promptId) {
+    const { data: dbTemplate } = await admin
+        .from("prompts")
+        .select("system_rules, subject_mode")
+        .eq("id", promptId)
+        .maybeSingle();
+
+    if (dbTemplate) {
+        internalRules = dbTemplate.system_rules || "";
+        // Only override if not set by client? Or always prefer DB if strict?
+        // Usually DB template rules are strict. But if "Remix" allows changing mode...
+        // If client specifically sent it (from Wizard), we should probably respect it OR fallback.
+        if (!subjectMode || subjectMode === "non_human") {
+            subjectMode = dbTemplate.subject_mode || "non_human";
         }
+    }
+}
 
-        // Fetch internal secret sauce
-        let internalRules = "";
-        // subjectMode is already initialized from form/body if present, or "non_human" by default?
-        // Wait, I defined 'subjectMode' variable inside step 1 block in my head but I need to check where it is defined in the file.
-        // It wasn't defined in the top scope in original file.
-        // Let's check line 325: 'let subjectMode = "non_human";'
+const subjectRules = imageFiles.length > 0
+    ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
+    : "";
 
-        // I should have defined it at top level.
-        // Since I only added it to the 'if multipart' block in the previous tool call, it might be scoped (if I used 'let' inside block).
-        // Actually I didn't verify if I used 'let' or assigned to outer.
-        // In the previous step I added: 'subjectMode = clientSubjectMode;' implies assignment.
-        // But 'subjectMode' wasn't defined in top scope in original file! It was defined at line 325.
-        // So my previous edit might have caused a reference error if I tried to assign it before declaration.
-
-        // Let's fix it by properly initializing it at line 125, and using it here.
-
-        if (promptId) {
-            const { data: dbTemplate } = await admin
-                .from("prompts")
-                .select("system_rules, subject_mode")
-                .eq("id", promptId)
-                .maybeSingle();
-
-            if (dbTemplate) {
-                internalRules = dbTemplate.system_rules || "";
-                // Only override if not set by client? Or always prefer DB if strict?
-                // Usually DB template rules are strict. But if "Remix" allows changing mode...
-                // If client specifically sent it (from Wizard), we should probably respect it OR fallback.
-                if (!subjectMode || subjectMode === "non_human") {
-                    subjectMode = dbTemplate.subject_mode || "non_human";
-                }
-            }
-        }
-
-        const subjectRules = imageFiles.length > 0
-            ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
-            : "";
-
-        const bgSwapInstruction = industryIntent ? `
+const bgSwapInstruction = industryIntent ? `
 [BACKGROUND SWAP: ACTIVE - Intent: ${industryIntent}]
 - You MUST change the background environment to match the Industry Intent '${industryIntent}'.
 - Keep the user photo as a locked 2D cutout (see SUBJECT LOCK).
 - If background swap cannot be done safely without breaking the layout or subject, fall back to original background.
 ` : "";
 
-        let editModeInstruction = "";
-        if (Array.isArray(intentQueue) && intentQueue.length > 0) {
-            const queueList = intentQueue.map((q, i) => `ACTION: ${String(q.intent).toUpperCase()} -> ${q.value}`).join("\n");
+let editModeInstruction = "";
+if (Array.isArray(intentQueue) && intentQueue.length > 0) {
+    const queueList = intentQueue.map((q, i) => `ACTION: ${String(q.intent).toUpperCase()} -> ${q.value}`).join("\n");
 
-            editModeInstruction = `
+    editModeInstruction = `
 ### EDIT INSTRUCTIONS (STRICT)
 You are an expert image editor. Your goal is to apply specific text or element changes to the provided CANVAS IMAGE while preserving everything else perfectly.
 
@@ -520,8 +462,8 @@ ${queueList}
 
 Apply ONLY the actions listed above.
 `;
-        } else if (isEditMode && edit_instructions) {
-            editModeInstruction = `
+} else if (isEditMode && edit_instructions) {
+    editModeInstruction = `
 ### EDIT INSTRUCTIONS
 You are an expert image editor. Your goal is to apply changes to the provided CANVAS IMAGE.
 
@@ -534,166 +476,166 @@ You are an expert image editor. Your goal is to apply changes to the provided CA
 
 Execute the user's instruction precisely.
 `;
-        }
+}
 
-        const finalPrompt = [
-            SYSTEM_CORE,
-            internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
-            subjectRules,
-            (subjectLock && imageFiles.length > 0)
-                ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
-                : "",
-            (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
-            bgSwapInstruction,
-            editModeInstruction,
-            editModeInstruction,
-            logoInstruction,
-            "---",
-            "USER INSTRUCTIONS:",
-            rawPrompt,
-            "---",
-            "TEXT CONTENT TO INCLUDE:",
-            headline ? `HEADLINE: "${headline}"` : "",
-            subheadline ? `SUBHEADLINE: "${subheadline}"` : "",
-            cta ? `CALL TO ACTION: "${cta}"` : "",
-            promotion ? `PROMO TEXT: "${promotion}"` : "",
-            businessName ? `BUSINESS NAME: "${businessName}"` : "",
-            "---",
-            aspectHint(ar),
-            (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
-        ]
-            .filter(Boolean)
-            .join("\n\n");
+const finalPrompt = [
+    SYSTEM_CORE,
+    internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
+    subjectRules,
+    (subjectLock && imageFiles.length > 0)
+        ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
+        : "",
+    (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
+    bgSwapInstruction,
+    editModeInstruction,
+    editModeInstruction,
+    logoInstruction,
+    "---",
+    "USER INSTRUCTIONS:",
+    rawPrompt,
+    "---",
+    "TEXT CONTENT TO INCLUDE:",
+    headline ? `HEADLINE: "${headline}"` : "",
+    subheadline ? `SUBHEADLINE: "${subheadline}"` : "",
+    cta ? `CALL TO ACTION: "${cta}"` : "",
+    promotion ? `PROMO TEXT: "${promotion}"` : "",
+    businessName ? `BUSINESS NAME: "${businessName}"` : "",
+    "---",
+    aspectHint(ar),
+    (subjectMode === "human") ? "CRITICAL: The final image MUST look exactly like the uploaded person. Do not 'beautify' or 'cartoonify' the face." : ""
+]
+    .filter(Boolean)
+    .join("\n\n");
 
-        const payload = {
-            contents: [
-                {
-                    role: "user",
-                    parts: [...imageParts, { text: finalPrompt }],
-                },
-            ],
-            generationConfig: { temperature: 0.7 },
-        };
+const payload = {
+    contents: [
+        {
+            role: "user",
+            parts: [...imageParts, { text: finalPrompt }],
+        },
+    ],
+    generationConfig: { temperature: 0.7 },
+};
 
-        // 6. Call Vertex
-        const res = await fetch(url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token.token}`, // Fixed trailing space
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+// 6. Call Vertex
+const res = await fetch(url, {
+    method: "POST",
+    headers: {
+        Authorization: `Bearer ${token.token}`, // Fixed trailing space
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+});
 
-        const json: any = await res.json();
+const json: any = await res.json();
 
-        if (!res.ok) {
-            if (res.status === 429) {
-                console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
-                return NextResponse.json(
-                    { error: "System is busy (High Traffic). Please wait a minute and try again." },
-                    { status: 429 }
-                );
-            }
-
-            console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
-
-            return NextResponse.json(
-                { error: "vertex_error", status: res.status, details: json },
-                { status: res.status }
-            );
-        }
-
-        // 7. Process Output
-        const parts = json?.candidates?.[0]?.content?.parts ?? [];
-        const inline = Array.isArray(parts)
-            ? parts.find(
-                (p) => p?.inlineData?.data && String(p?.inlineData?.mimeType || "").startsWith("image/")
-            )
-            : null;
-
-        if (!inline) {
-            return NextResponse.json({ error: "No image returned", details: json }, { status: 502 });
-        }
-
-        const outMime = String(inline.inlineData.mimeType);
-        const outBase64 = String(inline.inlineData.data);
-
-        const bytes = Buffer.from(outBase64, "base64");
-
-        // 8a. Upload Original (Full Quality)
-        const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
-        const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
-
-        const { error: uploadOriginalError } = await admin.storage
-            .from("generations")
-            .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
-
-        if (uploadOriginalError) {
-            console.error("Failed to upload original:", uploadOriginalError);
-        }
-
-        const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
-        const originalUrl = originalPub.publicUrl;
-
-        // 8b. Optimize with Sharp (webP)
-        const optimizedBytes = await sharp(bytes)
-            .resize({ width: 1080, withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toBuffer();
-
-        const ext = "webp";
-        const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
-
-        // Upload Optimized
-        const { error: uploadError } = await admin.storage
-            .from("generations")
-            .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
-
-        if (uploadError) {
-            return NextResponse.json({ error: uploadError.message }, { status: 500 });
-        }
-
-        const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
-        const imageUrl = pub.publicUrl;
-
-        // 9. Insert History
-        try {
-            await admin.from("prompt_generations").insert({
-                user_id: userId,
-                prompt_id: promptId,
-                prompt_slug: promptSlug,
-                image_url: imageUrl,
-
-                original_prompt_text,
-                remix_prompt_text,
-                combined_prompt_text: combined_prompt_text || rawPrompt,
-
-                settings: {
-                    aspectRatio: ar,
-                    model,
-                    provider: "vertex",
-                    input_images: imageFiles.length + imageUrls.length,
-                    original_prompt_text,
-                    remix_prompt_text,
-                    combined_prompt_text: combined_prompt_text || rawPrompt,
-                    edit_instructions,
-                    template_reference_image,
-                    headline,
-                    full_quality_url: originalUrl, // Save Full Quality URL
-                },
-            });
-        } catch (e) {
-            console.error("prompt_generations insert failed:", e);
-            // don't fail the request, just log it
-        }
-
-        return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
-    } catch (e: any) {
-        console.error("GENERATE ERROR:", e);
+if (!res.ok) {
+    if (res.status === 429) {
+        console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
         return NextResponse.json(
-            { error: "server_error", message: e?.message || "Unexpected error" },
-            { status: 500 }
+            { error: "System is busy (High Traffic). Please wait a minute and try again." },
+            { status: 429 }
         );
     }
+
+    console.error("VERTEX ERROR", res.status, JSON.stringify(json, null, 2));
+
+    return NextResponse.json(
+        { error: "vertex_error", status: res.status, details: json },
+        { status: res.status }
+    );
+}
+
+// 7. Process Output
+const parts = json?.candidates?.[0]?.content?.parts ?? [];
+const inline = Array.isArray(parts)
+    ? parts.find(
+        (p) => p?.inlineData?.data && String(p?.inlineData?.mimeType || "").startsWith("image/")
+    )
+    : null;
+
+if (!inline) {
+    return NextResponse.json({ error: "No image returned", details: json }, { status: 502 });
+}
+
+const outMime = String(inline.inlineData.mimeType);
+const outBase64 = String(inline.inlineData.data);
+
+const bytes = Buffer.from(outBase64, "base64");
+
+// 8a. Upload Original (Full Quality)
+const originalExt = outMime.includes("png") ? "png" : outMime.includes("webp") ? "webp" : "jpg";
+const originalFilePath = `users/${userId}/${Date.now()}.${originalExt}`;
+
+const { error: uploadOriginalError } = await admin.storage
+    .from("generations")
+    .upload(originalFilePath, bytes, { contentType: outMime, upsert: false });
+
+if (uploadOriginalError) {
+    console.error("Failed to upload original:", uploadOriginalError);
+}
+
+const { data: originalPub } = admin.storage.from("generations").getPublicUrl(originalFilePath);
+const originalUrl = originalPub.publicUrl;
+
+// 8b. Optimize with Sharp (webP)
+const optimizedBytes = await sharp(bytes)
+    .resize({ width: 1080, withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toBuffer();
+
+const ext = "webp";
+const filePath = `users/${userId}/${Date.now()}_opt.${ext}`;
+
+// Upload Optimized
+const { error: uploadError } = await admin.storage
+    .from("generations")
+    .upload(filePath, optimizedBytes, { contentType: "image/webp", upsert: false });
+
+if (uploadError) {
+    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+}
+
+const { data: pub } = admin.storage.from("generations").getPublicUrl(filePath);
+const imageUrl = pub.publicUrl;
+
+// 9. Insert History
+try {
+    await admin.from("prompt_generations").insert({
+        user_id: userId,
+        prompt_id: promptId,
+        prompt_slug: promptSlug,
+        image_url: imageUrl,
+
+        original_prompt_text,
+        remix_prompt_text,
+        combined_prompt_text: combined_prompt_text || rawPrompt,
+
+        settings: {
+            aspectRatio: ar,
+            model,
+            provider: "vertex",
+            input_images: imageFiles.length + imageUrls.length,
+            original_prompt_text,
+            remix_prompt_text,
+            combined_prompt_text: combined_prompt_text || rawPrompt,
+            edit_instructions,
+            template_reference_image,
+            headline,
+            full_quality_url: originalUrl, // Save Full Quality URL
+        },
+    });
+} catch (e) {
+    console.error("prompt_generations insert failed:", e);
+    // don't fail the request, just log it
+}
+
+return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
+    } catch (e: any) {
+    console.error("GENERATE ERROR:", e);
+    return NextResponse.json(
+        { error: "server_error", message: e?.message || "Unexpected error" },
+        { status: 500 }
+    );
+}
 }
