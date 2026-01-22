@@ -345,7 +345,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                         let file = files[0];
                                         if (file) {
                                             try {
-                                                file = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                                                file = await compressImage(file, { maxWidth: 512, quality: 0.7 });
                                             } catch (e) {
                                                 console.error("Subject compression failed", e);
                                             }
@@ -387,7 +387,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                         let file = files[0];
                                         if (file) {
                                             try {
-                                                file = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                                                file = await compressImage(file, { maxWidth: 512, quality: 0.7 });
                                             } catch (e) {
                                                 console.error("Product compression failed", e);
                                             }
