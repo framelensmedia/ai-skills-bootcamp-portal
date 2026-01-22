@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import ChipSelector from "./ChipSelector";
 import CopyBlockInput from "./CopyBlockInput";
 import ImageUploader from "@/components/ImageUploader";
+import { compressImage } from "@/lib/compressImage";
 import type { AutoModeData } from "@/lib/autoModeTransformer";
 
 const ASSET_TYPES = [
