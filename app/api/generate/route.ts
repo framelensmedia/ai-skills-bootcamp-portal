@@ -53,10 +53,14 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 - **STRUCTURAL RULE**: The FIRST image provided is the TEMPLATE (Layout/Style). The LAST image provided is the SUBJECT REFERENCE (Target Face).
 - **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
 - **COMPOSITING LOGIC**: Perform a "Professional High-End Composite". The subject must look like they were photographed ON LOCATION in the scene.
-- **MANDATORY BLENDING**: You MUST adjust the subject's skin tone, lighting direction, color temperature, and shadows to MATCH the Template's environment perfectly.
-- **GLOBAL ILLUMINATION**: Apply the environment's ambient light to the subject. If the scene is warm, the subject must be warm. If the scene is dark/contrasty, the subject must match.
-- **IDENTITY PRESERVATION**: Keep the facial structure and features 100% accurate. However, lighting modifications on the face are REQUIRED for realism.
-- **NO "CUTOUT" LOOK**: The edges of the subject must wrap naturally with the background. No sharp white halos or mismatched black levels.
+- **MANDATORY BLENDING (CRITICAL)**:
+  1. **MATCH LEVELS**: You MUST adjust the subject's Black Levels and White Levels to match the background perfectly. No crushed blacks or blown-out highlights unless the scene demands it.
+  2. **MATCH SATURATION**: Adjust the subject's color saturation to match the film stock/grading of the template.
+  3. **MATCH CONTRAST**: If the background is soft/hazy, the subject MUST be soft/hazy. If the background is high-contrast, the subject MUST be high-contrast.
+- **LIGHTING**: Apply "Subtle Studio Lighting" to the subject's face to model it dimensionally, BUT ensure the *direction* and *color* still match the scene's key light.
+- **GLOBAL ILLUMINATION**: The subject must reflect the environment's colors (e.g., green bounce from grass, blue kill from sky).
+- **IDENTITY PRESERVATION**: Keep the facial structure and features 100% accurate.
+- **NO "CUTOUT" LOOK**: The edges must wrap naturally.
 - **OUTFIT PRESERVATION**: Keep the subject's exact upload attire unless explicitly asked to change.
 `;
 

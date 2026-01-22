@@ -359,8 +359,16 @@ function CreatorContent() {
             }
 
             if (options.logoFile) {
-                const safeName = (options.logoFile.name || "logo.png").replace(/[^a-zA-Z0-9.-]/g, "_");
-                form.append("logo_image", options.logoFile, safeName);
+                let logoToSend = options.logoFile;
+                try {
+                    // Compress logo to prevent payload limits and timeouts
+                    logoToSend = await compressImage(options.logoFile, { maxWidth: 512, quality: 0.8 });
+                } catch (e) {
+                    console.warn("Logo compression failed, sending original", e);
+                }
+
+                const safeName = (logoToSend.name || "logo.png").replace(/[^a-zA-Z0-9.-]/g, "_");
+                form.append("logo_image", logoToSend, safeName);
             }
 
             // Upload images directly via FormData
