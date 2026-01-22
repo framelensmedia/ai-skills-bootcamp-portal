@@ -366,7 +366,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                                         let file = files[0];
                                         if (file) {
                                             try {
-                                                file = await compressImage(file, { maxWidth: 800, quality: 0.8 });
+                                                file = await compressImage(file, { maxWidth: 512, quality: 0.8 });
                                             } catch (e) {
                                                 console.error("Logo compression failed", e);
                                             }

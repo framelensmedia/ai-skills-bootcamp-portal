@@ -28,14 +28,22 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
 
                 ctx.drawImage(img, 0, 0, width, height);
 
+                // Preserve PNG transparency if original was PNG
+                const outputType = file.type === "image/png" ? "image/png" : "image/jpeg";
+
+                // For PNG, sanitizing filename extension
+                let safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+                if (outputType === "image/png" && !safeName.endsWith(".png")) {
+                    safeName = safeName.replace(/\.[^/.]+$/, "") + ".png";
+                } else if (outputType === "image/jpeg" && !safeName.endsWith(".jpg") && !safeName.endsWith(".jpeg")) {
+                    safeName = safeName.replace(/\.[^/.]+$/, "") + ".jpg";
+                }
+
                 canvas.toBlob(
                     (blob) => {
                         if (blob) {
-                            // Sanitize filename to prevent "InvalidCharacterError" in FormData
-                            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-
                             const newFile = new File([blob], safeName, {
-                                type: "image/jpeg",
+                                type: outputType,
                                 lastModified: Date.now(),
                             });
                             resolve(newFile);
@@ -43,7 +51,7 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
                             reject(new Error("Canvas to Blob failed"));
                         }
                     },
-                    "image/jpeg",
+                    outputType,
                     quality
                 );
             };
