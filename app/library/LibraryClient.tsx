@@ -47,6 +47,7 @@ export type LibraryItem = {
     id: string; // Generation ID
     imageUrl: string;
     videoUrl?: string | null;
+    thumbnailUrl?: string | null;
     mediaType: "image" | "video";
     createdAt: string;
     createdAtMs: number;
@@ -593,7 +594,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     // 2. Prepare Videos Query (only if no specific slug filter)
                     let vQ = supabase
                         .from("video_generations")
-                        .select("id, video_url, created_at, prompt, is_public, status")
+                        .select("id, video_url, thumbnail_url, created_at, prompt, is_public, status")
                         .eq("user_id", user.id)
                         .eq("status", "completed")
                         .limit(50);
@@ -659,6 +660,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         id: v.id,
                         imageUrl: "",
                         videoUrl: v.video_url,
+                        thumbnailUrl: v.thumbnail_url || null,
                         mediaType: "video",
                         createdAt: v.created_at,
                         createdAtMs: Date.parse(v.created_at || "") || 0,
@@ -749,6 +751,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                     id: v.id,
                                     imageUrl: "",
                                     videoUrl: v.video_url,
+                                    thumbnailUrl: v.thumbnail_url || null,
                                     mediaType: "video",
                                     createdAt: v.created_at,
                                     createdAtMs: Date.parse(v.created_at),
@@ -1002,6 +1005,11 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     setLightboxOpen(false);
                     setIsVideoModalOpen(true);
                 } : undefined}
+                onExtend={lbMediaType === "video" && lbVideoUrl ? (vUrl) => {
+                    const target = `/prompts/extend?video=${encodeURIComponent(vUrl)}&prompt=${encodeURIComponent(lbCombined || "")}`;
+                    router.push(target);
+                    closeLightbox();
+                } : undefined}
             />
 
             {/* Edit Mode Modal */}
@@ -1202,6 +1210,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                         {it.mediaType === "video" && it.videoUrl ? (
                                             <>
                                                 <video
+                                                    poster={it.thumbnailUrl || undefined}
                                                     src={it.videoUrl}
                                                     className="absolute inset-0 w-full h-full object-cover"
                                                     muted

@@ -161,6 +161,7 @@ function PromptContent() {
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
   const [logo, setLogo] = useState<File | null>(null);
   const [businessName, setBusinessName] = useState<string>("");
+  const [inputVideo, setInputVideo] = useState<string | null>(null); // For extension
 
   useEffect(() => {
     // revoke old urls
@@ -259,6 +260,16 @@ function PromptContent() {
     const img = (searchParams.get("img") || "").trim();
     const prefill = (searchParams.get("prefill") || "").trim();
     const remix = (searchParams.get("remix") || "").trim();
+    const extendVideo = (searchParams.get("video") || searchParams.get("extend") || "").trim();
+    const promptParam = (searchParams.get("prompt") || "").trim();
+
+    if (extendVideo) {
+      setMediaType("video");
+      setManualMode(true);
+      setInputVideo(extendVideo);
+      if (promptParam) setEditSummary(promptParam);
+      return;
+    }
 
     if (img.length) setOverridePreviewUrl(img);
 
@@ -268,7 +279,7 @@ function PromptContent() {
       setEditSummary(remix);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   // Fetch creator profile
   const [creatorProfile, setCreatorProfile] = useState<{
@@ -877,7 +888,8 @@ function PromptContent() {
       // --- VIDEO GENERATION ---
       if (mediaType === "video") {
         const videoPayload = {
-          image: imageUrls.length > 0 ? imageUrls[0] : imageSrc, // Prefer user upload if any, else template
+          image: !inputVideo && imageUrls.length > 0 ? imageUrls[0] : (!inputVideo ? imageSrc : undefined),
+          inputVideo: inputVideo || undefined, // Send video if extending
           prompt: promptToUse,
           sourceImageId: metaRow.id,
         };
@@ -1039,6 +1051,20 @@ function PromptContent() {
           combinedPromptText={editSummary || fullPromptText || ""}
           onShare={handleShare}
           onRemix={handleRemixFocus}
+          onExtend={(vUrl) => {
+            console.log("Extending video:", vUrl);
+            // Direct state update for responsiveness
+            setMediaType("video");
+            setManualMode(true);
+            setInputVideo(vUrl);
+            setEditSummary(editSummary || "");
+
+            // Sync URL
+            const target = `/prompts/${slug}?video=${encodeURIComponent(vUrl)}&prompt=${encodeURIComponent(editSummary || "")}`;
+            router.push(target);
+
+            closeLightbox();
+          }}
         />
 
         <div className="mb-5 sm:mb-7">
@@ -1125,9 +1151,9 @@ function PromptContent() {
                     previewAspectClass,
                   ].join(" ")}
                 >
-                  {mediaType === "video" && generatedImageUrl ? (
+                  {mediaType === "video" && (generatedImageUrl || inputVideo) ? (
                     <video
-                      src={generatedImageUrl}
+                      src={generatedImageUrl || inputVideo || ""}
                       className="absolute inset-0 w-full h-full object-cover"
                       autoPlay
                       muted

@@ -33,6 +33,7 @@ type Props = {
   fullQualityUrl?: string | null;
   onEdit?: () => void;
   onAnimate?: () => void;
+  onExtend?: (url: string) => void;
 };
 
 function normalize(v: any) {
@@ -121,6 +122,7 @@ export default function GenerationLightbox({
   fullQualityUrl,
   onEdit,
   onAnimate,
+  onExtend,
   id
 }: Props) {
   const [downloading, setDownloading] = useState(false);
@@ -358,6 +360,22 @@ export default function GenerationLightbox({
                 >
                   <span className="hidden md:block">Animate</span>
                   <Film className="w-4 h-4" />
+                </button>
+              )}
+
+              {isVideo && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onExtend) onExtend(safeVideoUrl);
+                  }}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-lime-500/20 bg-lime-500/10 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-lime-200 hover:bg-lime-500/20 hover:border-lime-500/40"
+                  title="Extend Video"
+                >
+                  <span className="hidden md:block">Extend</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
                 </button>
               )}
 
