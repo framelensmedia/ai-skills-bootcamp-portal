@@ -41,3 +41,57 @@ create policy "Service role can do anything"
     with check (true);
 
 -- Ensure 'generations' bucket exists (already does), but we will store videos in 'generations/videos/{userId}/{id}.mp4'
+
+-- =====================================================
+-- VIDEO UPVOTES TABLE
+-- =====================================================
+create table if not exists public.video_upvotes (
+    id uuid not null default gen_random_uuid(),
+    user_id uuid not null references auth.users(id),
+    video_id uuid not null references public.video_generations(id) on delete cascade,
+    created_at timestamp with time zone default now(),
+    
+    constraint video_upvotes_pkey primary key (id),
+    constraint video_upvotes_unique unique (user_id, video_id)
+);
+
+alter table public.video_upvotes enable row level security;
+
+create policy "Users can view video upvotes"
+    on public.video_upvotes for select
+    using (true);
+
+create policy "Users can insert their own video upvotes"
+    on public.video_upvotes for insert
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete their own video upvotes"
+    on public.video_upvotes for delete
+    using (auth.uid() = user_id);
+
+-- =====================================================
+-- VIDEO FAVORITES TABLE
+-- =====================================================
+create table if not exists public.video_favorites (
+    id uuid not null default gen_random_uuid(),
+    user_id uuid not null references auth.users(id),
+    video_id uuid not null references public.video_generations(id) on delete cascade,
+    created_at timestamp with time zone default now(),
+    
+    constraint video_favorites_pkey primary key (id),
+    constraint video_favorites_unique unique (user_id, video_id)
+);
+
+alter table public.video_favorites enable row level security;
+
+create policy "Users can view their own video favorites"
+    on public.video_favorites for select
+    using (auth.uid() = user_id);
+
+create policy "Users can insert their own video favorites"
+    on public.video_favorites for insert
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete their own video favorites"
+    on public.video_favorites for delete
+    using (auth.uid() = user_id);

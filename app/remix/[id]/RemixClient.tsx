@@ -297,18 +297,23 @@ export default function RemixClient({ initialRemix }: Props) {
             const newIsFavorited = !isFavorited;
             setIsFavorited(newIsFavorited);
 
+            // Use different tables for videos vs images
+            const isVideo = remix.mediaType === "video";
+            const tableName = isVideo ? "video_favorites" : "prompt_favorites";
+            const idColumn = isVideo ? "video_id" : "generation_id";
+
             if (isFavorited) {
                 await supabase
-                    .from("prompt_favorites")
+                    .from(tableName)
                     .delete()
                     .eq("user_id", user.id)
-                    .eq("generation_id", remix.id);
+                    .eq(idColumn, remix.id);
             } else {
                 await supabase
-                    .from("prompt_favorites")
+                    .from(tableName)
                     .insert({
                         user_id: user.id,
-                        generation_id: remix.id
+                        [idColumn]: remix.id
                     });
             }
         } catch (err) {
@@ -320,7 +325,7 @@ export default function RemixClient({ initialRemix }: Props) {
     };
 
     const handleUpvote = async () => {
-        if (isTogglingLike) return;
+        if (isTogglingLike || !remix) return;
         const supabase = createSupabaseBrowserClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -335,16 +340,21 @@ export default function RemixClient({ initialRemix }: Props) {
         setHasLiked(newHasLiked);
         setLikesCount((prev) => (newHasLiked ? prev + 1 : Math.max(0, prev - 1)));
 
+        // Use different tables for videos vs images
+        const isVideo = remix.mediaType === "video";
+        const tableName = isVideo ? "video_upvotes" : "remix_upvotes";
+        const idColumn = isVideo ? "video_id" : "generation_id";
+
         try {
             if (newHasLiked) {
-                await supabase.from("remix_upvotes").insert({
+                await supabase.from(tableName).insert({
                     user_id: user.id,
-                    generation_id: id
+                    [idColumn]: id
                 });
             } else {
-                await supabase.from("remix_upvotes").delete()
+                await supabase.from(tableName).delete()
                     .eq("user_id", user.id)
-                    .eq("generation_id", id);
+                    .eq(idColumn, id);
             }
         } catch (err) {
             console.error("Failed to toggle like:", err);
