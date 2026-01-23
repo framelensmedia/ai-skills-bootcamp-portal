@@ -98,6 +98,7 @@ export async function POST(req: Request) {
         // 3. Prepare Image
         let imageBase64: string;
         let mimeType = "image/jpeg";
+        let detectedAspectRatio = "16:9"; // Default fallback
 
         if (image.startsWith("http://") || image.startsWith("https://")) {
             console.log("Fetching image from URL...");
@@ -121,12 +122,33 @@ export async function POST(req: Request) {
             imageBase64 = image;
         }
 
-        // Resize for optimal Veo input
+        // Detect aspect ratio and resize while preserving it
         try {
             const sharp = (await import("sharp")).default;
             const imageBuffer = Buffer.from(imageBase64, "base64");
+            const metadata = await sharp(imageBuffer).metadata();
+
+            if (metadata.width && metadata.height) {
+                const ratio = metadata.width / metadata.height;
+                // Map to Veo supported aspect ratios
+                if (ratio >= 1.7) { // ~16:9 (1.77)
+                    detectedAspectRatio = "16:9";
+                } else if (ratio >= 1.3) { // ~4:3 (1.33)
+                    detectedAspectRatio = "16:9"; // Veo may not support 4:3, use closest
+                } else if (ratio <= 0.6) { // ~9:16 (0.56)
+                    detectedAspectRatio = "9:16";
+                } else if (ratio <= 0.8) { // ~3:4 (0.75)
+                    detectedAspectRatio = "9:16"; // Veo may not support 3:4, use closest
+                } else {
+                    detectedAspectRatio = "1:1"; // Square-ish
+                }
+                console.log(`Detected aspect ratio: ${metadata.width}x${metadata.height} -> ${detectedAspectRatio}`);
+            }
+
+            // Resize while maintaining aspect ratio
+            const maxDim = 1280;
             const resizedBuffer = await sharp(imageBuffer)
-                .resize(1280, 720, { fit: "inside", withoutEnlargement: true })
+                .resize(maxDim, maxDim, { fit: "inside", withoutEnlargement: true })
                 .jpeg({ quality: 90 })
                 .toBuffer();
             imageBase64 = resizedBuffer.toString("base64");
@@ -150,7 +172,7 @@ export async function POST(req: Request) {
                 }
             ],
             parameters: {
-                aspectRatio: "16:9",
+                aspectRatio: detectedAspectRatio,
                 sampleCount: 1,
                 durationSeconds: 6,
                 negativePrompt: "distortion, low quality, shaky, blurry",
@@ -243,7 +265,8 @@ export async function POST(req: Request) {
             video_url: videoUrl,
             prompt,
             dialogue,
-            status: "completed"
+            status: "completed",
+            is_public: true
         });
 
         return NextResponse.json({ videoUrl, model: modelId });
