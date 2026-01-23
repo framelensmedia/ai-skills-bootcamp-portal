@@ -5,6 +5,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { RefreshCw, User, ArrowBigUp, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
+import AutoplayVideo from "./AutoplayVideo";
 
 // Define the shape of a Remix Item
 export type RemixItem = {
@@ -58,13 +59,10 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
             <Link href={`/remix/${item.id}`} className="block relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/40">
                 {item.mediaType === "video" && item.videoUrl ? (
                     <>
-                        <video
+                        <AutoplayVideo
                             src={item.videoUrl}
                             className="absolute inset-0 w-full h-full object-cover"
-                            autoPlay
-                            muted
-                            loop
-                            playsInline
+                            poster={item.imageUrl || undefined} // Use imageUrl as poster if available
                         />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">

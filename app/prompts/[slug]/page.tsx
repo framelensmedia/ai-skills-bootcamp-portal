@@ -18,6 +18,7 @@ import { GenerationFailureNotification } from "@/components/GenerationFailureNot
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
+import AutoplayVideo from "@/components/AutoplayVideo";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -1152,14 +1153,11 @@ function PromptContent() {
                   ].join(" ")}
                 >
                   {mediaType === "video" && (generatedImageUrl || inputVideo) ? (
-                    <video
+                    <AutoplayVideo
                       src={generatedImageUrl || inputVideo || ""}
                       className="absolute inset-0 w-full h-full object-cover"
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
                       controls
+                      poster={imageSrc}
                     />
                   ) : (
                     <Image
@@ -1478,13 +1476,10 @@ function PromptContent() {
                         <div className="relative aspect-square w-full">
                           {r.mediaType === "video" && r.videoUrl ? (
                             <>
-                              <video
-                                src={r.videoUrl}
+                              <AutoplayVideo
+                                src={r.videoUrl || ""}
                                 className="absolute inset-0 w-full h-full object-cover"
-                                autoPlay
-                                muted
-                                loop
-                                playsInline
+                                poster={r.imageUrl || undefined}
                               />
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-8 h-8 rounded-full border border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_10px_rgba(0,0,0,0.5)]">

@@ -518,7 +518,17 @@ Execute the user's instruction precisely.
                     parts: [...imageParts, { text: finalPrompt }],
                 },
             ],
-            generationConfig: { temperature: 0.7 },
+            generationConfig: {
+                temperature: 0.7,
+                // @ts-ignore - personGeneration is a valid param for newer models but might not be in types yet
+                personGeneration: "allow_all",
+            },
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+            ],
         };
 
         // 6. Call Vertex

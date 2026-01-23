@@ -222,7 +222,7 @@ export async function POST(req: Request) {
             sampleCount: 1,
             durationSeconds,
             negativePrompt: "distortion, low quality, shaky, blurry",
-            personGeneration: "allow_adult",
+            personGeneration: "allow_all",
             storageUri: storageUri  // Required for large video outputs
         };
 
