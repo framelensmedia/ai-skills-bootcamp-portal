@@ -7,7 +7,7 @@ export default async function FeedPage() {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // 1. Fetch Generations (Page 0, 8 items, Newest)
+    // 1. Fetch Image Generations (Page 0, 8 items, Newest)
     const { data: generations, error } = await supabase
         .from("prompt_generations")
         .select(`
@@ -18,27 +18,39 @@ export default async function FeedPage() {
         .order("created_at", { ascending: false })
         .limit(8);
 
+    // 2. Fetch Video Generations
+    const { data: videoGenerations } = await supabase
+        .from("video_generations")
+        .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id`)
+        .eq("is_public", true)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(4);
+
     if (error || !generations) {
         console.error("Feed fetch error:", error);
         return <FeedClient initialItems={[]} />;
     }
 
-    // 2. Fetch User Profiles
-    const userIds = Array.from(new Set(generations.map(d => d.user_id)));
+    // 3. Merge and collect user IDs
+    const allUserIds = new Set<string>();
+    generations.forEach(d => allUserIds.add(d.user_id));
+    videoGenerations?.forEach(d => allUserIds.add(d.user_id));
+
+    const userIds = Array.from(allUserIds);
     let profileMap = new Map();
     if (userIds.length > 0) {
         const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
         profiles?.forEach(p => profileMap.set(p.user_id, p));
     }
 
-    // 3. Fetch Upvotes & Favorites (if user)
+    // 4. Fetch Upvotes & Favorites (if user)
     let myUpvotedSet = new Set<string>();
     let mySavedSet = new Set<string>();
 
     if (user && generations.length > 0) {
         const genIds = generations.map(d => d.id);
 
-        // Parallel fetch status
         const [upvoteRes, savedRes] = await Promise.all([
             supabase.from("remix_upvotes").select("generation_id").eq("user_id", user.id).in("generation_id", genIds),
             supabase.from("prompt_favorites").select("generation_id").eq("user_id", user.id).in("generation_id", genIds)
@@ -52,8 +64,8 @@ export default async function FeedPage() {
         }
     }
 
-    // 4. Map to FeedItem
-    const initialItems: FeedItem[] = generations.map(d => {
+    // 5. Map Images to FeedItem
+    const imageItems: FeedItem[] = generations.map(d => {
         const profile = profileMap.get(d.user_id) || {};
         const settings = d.settings || {};
         const original = d.original_prompt_text || settings.original_prompt_text || "";
@@ -63,6 +75,7 @@ export default async function FeedPage() {
         return {
             id: d.id,
             imageUrl: d.image_url,
+            mediaType: "image" as const,
             createdAt: d.created_at,
             upvotesCount: d.upvotes_count || 0,
             isLiked: myUpvotedSet.has(d.id),
@@ -78,5 +91,35 @@ export default async function FeedPage() {
         };
     });
 
-    return <FeedClient initialItems={initialItems} />;
+    // 6. Map Videos to FeedItem
+    const videoItems: FeedItem[] = (videoGenerations || []).map(d => {
+        const profile = profileMap.get(d.user_id) || {};
+
+        return {
+            id: d.id,
+            imageUrl: "", // Videos don't have a separate thumbnail (could use source_image_id later)
+            videoUrl: d.video_url,
+            mediaType: "video" as const,
+            createdAt: d.created_at,
+            upvotesCount: d.upvotes_count || 0,
+            isLiked: false, // TODO: Add video upvotes table
+            isSaved: false,
+            userId: d.user_id,
+            username: profile.full_name || "Anonymous Creator",
+            userAvatar: profile.profile_image || null,
+            promptTitle: d.prompt?.slice(0, 50) || "Animated Scene",
+            originalPromptText: d.prompt || "",
+            remixPromptText: "",
+            combinedPromptText: d.prompt || "",
+            fullQualityUrl: null,
+        };
+    });
+
+    // 7. Merge and sort by createdAt
+    const allItems = [...imageItems, ...videoItems].sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ).slice(0, 12); // Limit to 12 initial items
+
+    return <FeedClient initialItems={allItems} />;
 }
+

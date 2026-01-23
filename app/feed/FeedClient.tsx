@@ -13,6 +13,8 @@ import GalleryBackToTop from "@/components/GalleryBackToTop";
 export type FeedItem = {
     id: string; // generation id
     imageUrl: string;
+    videoUrl?: string | null; // For video generations
+    mediaType: "image" | "video"; // Type of media
     createdAt: string;
     upvotesCount: number;
     isLiked: boolean; // has current user upvoted? (Upvote status)
@@ -155,6 +157,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 return {
                     id: d.id,
                     imageUrl: d.image_url,
+                    mediaType: "image" as const,
                     createdAt: d.created_at,
                     upvotesCount: d.upvotes_count || 0,
                     isLiked: myUpvotedSet.has(d.id),
@@ -264,7 +267,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     const openLightbox = (item: FeedItem) => {
-        // Navigate to remix detail page instead of opening lightbox
+        // Navigate to detail page for both images and videos
         router.push(`/remix/${item.id}`);
     };
 
@@ -308,19 +311,46 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 {items.map((item, index) => (
                     <article ref={index === items.length - 1 ? lastElementRef : null} key={`${item.id}-${index}`} className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden">
                         <div className="relative aspect-[9/16] w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
-                            {/* Guard image rendering */}
-                            {item.imageUrl ? (
+                            {/* Render Video or Image */}
+                            {item.mediaType === "video" && item.videoUrl ? (
+                                <>
+                                    <video
+                                        src={item.videoUrl}
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                    />
+                                    {/* Play Button Overlay */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-16 h-16 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                            <svg className="w-8 h-8 text-white/90 ml-1 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M8 5v14l11-7z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : item.imageUrl ? (
                                 <Image
                                     src={item.imageUrl}
                                     alt={item.promptTitle}
                                     fill
                                     className="object-contain"
                                     sizes="(max-width: 768px) 50vw, 33vw"
-                                    loading={index < 2 ? "eager" : "lazy"} // Eager load first 2
+                                    loading={index < 2 ? "eager" : "lazy"}
                                     unoptimized
                                 />
                             ) : (
                                 <div className="h-full w-full bg-zinc-900 flex items-center justify-center text-white/20">Processing...</div>
+                            )}
+
+                            {/* Video Badge */}
+                            {item.mediaType === "video" && (
+                                <div className="absolute top-3 right-3 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                    <span className="w-2 h-2 bg-lime-400 rounded-full animate-pulse" />
+                                    Video
+                                </div>
                             )}
 
                             {/* Overlay Gradient */}
@@ -409,12 +439,14 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 <GenerationLightbox
                     open={lightboxOpen}
                     url={selectedItem.imageUrl}
+                    videoUrl={selectedItem.videoUrl}
+                    mediaType={selectedItem.mediaType}
                     onClose={() => setLightboxOpen(false)}
                     originalPromptText={selectedItem.originalPromptText}
                     remixPromptText={selectedItem.remixPromptText}
                     combinedPromptText={selectedItem.combinedPromptText}
                     onShare={() => { }}
-                    onRemix={handleRemix}
+                    onRemix={selectedItem.mediaType === "image" ? handleRemix : undefined}
                     title={selectedItem.promptTitle}
                     fullQualityUrl={selectedItem.fullQualityUrl}
                 />

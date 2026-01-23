@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
-import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 import { cleanPrompt } from "@/lib/stringUtils";
 
 type Props = {
   open: boolean;
   url: string | null;
+  videoUrl?: string | null;
+  mediaType?: "image" | "video";
   onClose: () => void;
 
   // Standardized prompt fields (final stored text)
@@ -29,6 +31,7 @@ type Props = {
   onDelete?: () => void;
   fullQualityUrl?: string | null;
   onEdit?: () => void;
+  onAnimate?: () => void;
 };
 
 function normalize(v: any) {
@@ -103,6 +106,8 @@ async function copyToClipboard(text: string) {
 export default function GenerationLightbox({
   open,
   url,
+  videoUrl,
+  mediaType = "image",
   onClose,
   originalPromptText,
   remixPromptText,
@@ -113,7 +118,8 @@ export default function GenerationLightbox({
   onRename,
   onDelete,
   fullQualityUrl,
-  onEdit
+  onEdit,
+  onAnimate
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -127,13 +133,20 @@ export default function GenerationLightbox({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(title);
 
+  // Video controls
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+
   // Update tempTitle when prop changes
   useEffect(() => {
     setTempTitle(title);
   }, [title]);
 
   const safeUrl = useMemo(() => normalize(url), [url]);
-  const canShow = open && safeUrl.length > 0;
+  const safeVideoUrl = useMemo(() => normalize(videoUrl), [videoUrl]);
+  const isVideo = mediaType === "video" && safeVideoUrl.length > 0;
+  const canShow = open && (safeUrl.length > 0 || safeVideoUrl.length > 0);
 
   const o = normalize(originalPromptText);
   const r = normalize(remixPromptText);
@@ -201,8 +214,20 @@ export default function GenerationLightbox({
   if (isFullScreen) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black animate-in fade-in duration-200">
-        <div className="relative h-full w-full" onClick={() => setIsFullScreen(false)}>
-          <Image src={safeUrl} alt="Full Screen" fill className="object-contain cursor-zoom-out" priority unoptimized />
+        <div className="relative h-full w-full flex items-center justify-center" onClick={() => setIsFullScreen(false)}>
+          {isVideo ? (
+            <video
+              src={safeVideoUrl}
+              className="max-h-full max-w-full object-contain cursor-pointer"
+              autoPlay
+              loop
+              playsInline
+              controls
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <Image src={safeUrl} alt="Full Screen" fill className="object-contain cursor-zoom-out" priority unoptimized />
+          )}
         </div>
         <button
           onClick={() => setIsFullScreen(false)}
@@ -318,6 +343,22 @@ export default function GenerationLightbox({
                 </button>
               )}
 
+              {onAnimate && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAnimate();
+                  }}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-indigo-200 hover:bg-indigo-500/20 hover:border-indigo-500/40"
+                  title="Animate"
+                >
+                  <span className="hidden md:block">Animate</span>
+                  <Film className="w-4 h-4" />
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleShare}
@@ -364,15 +405,73 @@ export default function GenerationLightbox({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden md:grid md:grid-cols-2 md:overflow-hidden">
-          {/* Image Column */}
+          {/* Media Column */}
           <div className="relative min-h-[50vh] w-full bg-black md:h-full md:border-r md:border-white/10">
             <div className="absolute inset-0 flex items-center justify-center p-6 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(to_bottom,transparent,black)]">
-              <div
-                className="relative h-full w-full cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                onClick={() => setIsFullScreen(true)}
-              >
-                <Image src={safeUrl} alt="Preview" fill className="object-contain drop-shadow-2xl" priority unoptimized />
-              </div>
+              {isVideo ? (
+                <div className="relative h-full w-full flex items-center justify-center">
+                  <video
+                    ref={videoRef}
+                    src={safeVideoUrl}
+                    className="w-full h-full object-cover drop-shadow-2xl"
+                    loop
+                    playsInline
+                    muted={isMuted}
+                    autoPlay
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                  />
+                  {/* Video Controls */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full">
+                    <button
+                      onClick={() => {
+                        if (videoRef.current) {
+                          if (isPlaying) {
+                            videoRef.current.pause();
+                          } else {
+                            videoRef.current.play();
+                          }
+                        }
+                      }}
+                      className="text-white hover:text-lime-400 transition"
+                      title={isPlaying ? "Pause" : "Play"}
+                    >
+                      {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMuted(!isMuted);
+                        if (videoRef.current) {
+                          videoRef.current.muted = !isMuted;
+                        }
+                      }}
+                      className="text-white hover:text-lime-400 transition"
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
+                    <button
+                      onClick={() => setIsFullScreen(true)}
+                      className="text-white hover:text-lime-400 transition"
+                      title="Fullscreen"
+                    >
+                      <Maximize size={20} />
+                    </button>
+                  </div>
+                  {/* Video Badge */}
+                  <div className="absolute top-4 right-4 bg-black/70 text-lime-400 text-xs font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-lime-400 rounded-full animate-pulse" />
+                    Video
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="relative h-full w-full cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  onClick={() => setIsFullScreen(true)}
+                >
+                  <Image src={safeUrl} alt="Preview" fill className="object-contain drop-shadow-2xl" priority unoptimized />
+                </div>
+              )}
             </div>
           </div>
 

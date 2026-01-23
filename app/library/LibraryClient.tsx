@@ -8,11 +8,12 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import {
     Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon,
     Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder,
-    Globe, Lock
+    Globe, Lock, Film
 } from "lucide-react";
 import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
 import EditModeModal from "@/components/EditModeModal";
+import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 
 type SortMode = "newest" | "oldest";
 
@@ -45,6 +46,8 @@ export type PromptPublicRow = {
 export type LibraryItem = {
     id: string; // Generation ID
     imageUrl: string;
+    videoUrl?: string | null;
+    mediaType: "image" | "video";
     createdAt: string;
     createdAtMs: number;
     promptId: string | null;
@@ -109,6 +112,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
     const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<"remixes" | "favorites">("remixes");
+    const [mediaFilter, setMediaFilter] = useState<"all" | "images" | "videos">("all");
 
     const [remixItems, setRemixItems] = useState<LibraryItem[]>(initialRemixItems);
     const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
@@ -131,10 +135,18 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
     const [lbRemix, setLbRemix] = useState("");
     const [lbCombined, setLbCombined] = useState("");
     const [lbFullQualityUrl, setLbFullQualityUrl] = useState<string | null>(null);
+    const [lbVideoUrl, setLbVideoUrl] = useState<string | null>(null);
+    const [lbMediaType, setLbMediaType] = useState<"image" | "video">("image");
     const [isOwnedByCurrentUser, setIsOwnedByCurrentUser] = useState(false);
 
     // Global Private Toggle
     const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+
+    // Video Modal
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [videoSourceImage, setVideoSourceImage] = useState<string | null>(null);
+    const [videoSourceId, setVideoSourceId] = useState<string | undefined>(undefined);
+
 
     // Derived state for the toggle
     const areAllPrivate = remixItems.length > 0 && remixItems.every(i => !i.is_public);
@@ -200,6 +212,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         setLightboxUrl(it.imageUrl);
         setLightboxItemId(it.id);
         setLbFullQualityUrl(it.fullQualityUrl || null);
+        setLbVideoUrl(it.videoUrl || null);
+        setLbMediaType(it.mediaType || "image");
         setLightboxOpen(true);
     }
 
@@ -278,6 +292,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             const newItem: LibraryItem = {
                 id: data.id || `gen-${Date.now()}`,
                 imageUrl: data.imageUrl,
+                mediaType: "image",
                 createdAt: new Date().toISOString(),
                 createdAtMs: Date.now(),
                 promptId: null,
@@ -757,8 +772,18 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 return null;
             }).filter(Boolean) as LibraryItem[];
         }
-        return items.filter(it => !selectedFolder || it.folder_id === selectedFolder);
-    }, [activeTab, remixItems, favoriteItems, selectedFolder]);
+        // Apply folder filter
+        items = items.filter(it => !selectedFolder || it.folder_id === selectedFolder);
+
+        // Apply media type filter (only for remixes tab)
+        if (activeTab === "remixes" && mediaFilter !== "all") {
+            items = items.filter(it =>
+                mediaFilter === "images" ? it.mediaType === "image" : it.mediaType === "video"
+            );
+        }
+
+        return items;
+    }, [activeTab, remixItems, favoriteItems, selectedFolder, mediaFilter]);
 
     return (
         <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans pb-32">
@@ -789,13 +814,15 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             <GenerationLightbox
                 open={lightboxOpen}
                 url={lightboxUrl}
+                videoUrl={lbVideoUrl}
+                mediaType={lbMediaType}
                 onClose={closeLightbox}
                 originalPromptText={lbOriginal}
                 remixPromptText={lbRemix}
                 combinedPromptText={lbCombined}
                 onShare={handleShare}
                 onRemix={handleRemix}
-                onEdit={isOwnedByCurrentUser ? () => {
+                onEdit={isOwnedByCurrentUser && lbMediaType === "image" ? () => {
                     setLightboxOpen(false);
                     setEditModalOpen(true);
                 } : undefined}
@@ -806,8 +833,16 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 } : undefined}
                 title="Remix"
                 fullQualityUrl={lbFullQualityUrl}
+                onAnimate={lbMediaType === "image" ? () => {
+                    if (!lightboxUrl) return;
+                    setVideoSourceImage(lightboxUrl);
+                    setVideoSourceId(lightboxItemId || undefined);
+                    setLightboxOpen(false);
+                    setIsVideoModalOpen(true);
+                } : undefined}
             />
 
+            {/* Edit Mode Modal */}
             <EditModeModal
                 isOpen={editModalOpen}
                 onClose={() => !isEditing && setEditModalOpen(false)}
@@ -815,6 +850,17 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 onGenerate={handleEditGenerate}
                 isGenerating={isEditing}
             />
+
+            {/* Video Generator Modal */}
+            {videoSourceImage && (
+                <VideoGeneratorModal
+                    isOpen={isVideoModalOpen}
+                    onClose={() => setIsVideoModalOpen(false)}
+                    sourceImage={videoSourceImage}
+                    sourceImageId={videoSourceId}
+                    userId={undefined} // Route handles authentication
+                />
+            )}
 
             <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
                 <div>
@@ -911,6 +957,15 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         </div>
                     </div>
 
+                    {/* Media Type Filter - Mobile */}
+                    {activeTab === "remixes" && (
+                        <div className="lg:hidden flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mb-6">
+                            <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
+                            <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} />Images</button>
+                            <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} />Videos</button>
+                        </div>
+                    )}
+
                     <div className="hidden lg:block space-y-1">
                         <button onClick={() => setSelectedFolder(null)} className={`w-full text-left px-3 py-2 rounded text-sm mb-1 ${!selectedFolder ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}>All {activeTab === "remixes" ? "Remixes" : "Favorites"}</button>
                         {folders.map(f => (
@@ -947,6 +1002,15 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                             </button>
                         ))}
                     </div>
+
+                    {/* Media Type Filter - Desktop */}
+                    {activeTab === "remixes" && (
+                        <div className="hidden lg:flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mt-4">
+                            <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
+                            <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} /></button>
+                            <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} /></button>
+                        </div>
+                    )}
                 </aside>
 
                 <section className="flex-1 min-h-[50vh]">
@@ -972,8 +1036,24 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {displayedItems.map(it => (
                                     <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => handleItemClick(it)}>
-                                        {/* Guard image */}
-                                        {it.imageUrl ? (
+                                        {/* Render Video or Image */}
+                                        {it.mediaType === "video" && it.videoUrl ? (
+                                            <>
+                                                <video
+                                                    src={it.videoUrl}
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                    onMouseEnter={(e) => e.currentTarget.play()}
+                                                    onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                                />
+                                                <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                                                    Video
+                                                </div>
+                                            </>
+                                        ) : it.imageUrl ? (
                                             <Image
                                                 src={it.imageUrl}
                                                 alt={it.promptTitle}

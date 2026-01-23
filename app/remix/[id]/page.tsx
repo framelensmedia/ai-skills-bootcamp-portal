@@ -14,11 +14,27 @@ export async function generateMetadata(
     const { id } = await params;
     const supabase = await createSupabaseServerClient();
 
-    const { data: remix } = await supabase
+    // Try prompt_generations first
+    let remix = null;
+    const { data: imageData } = await supabase
         .from("prompt_generations")
         .select("image_url, settings")
         .eq("id", id)
         .maybeSingle();
+
+    if (imageData) {
+        remix = imageData;
+    } else {
+        // Try video_generations
+        const { data: videoData } = await supabase
+            .from("video_generations")
+            .select("video_url, prompt")
+            .eq("id", id)
+            .maybeSingle();
+        if (videoData) {
+            remix = { image_url: null, settings: { headline: videoData.prompt?.slice(0, 50) || "Video" } };
+        }
+    }
 
     if (!remix) {
         return {
@@ -35,7 +51,7 @@ export async function generateMetadata(
         openGraph: {
             title: title,
             description: description,
-            images: [`/remix/${id}/opengraph-image`], // Explicitly override layout default
+            images: [`/remix/${id}/opengraph-image`],
         },
         twitter: {
             card: "summary_large_image",
@@ -51,36 +67,80 @@ export default async function RemixPage({ params }: Props) {
     const { id } = await params;
     const supabase = await createSupabaseServerClient();
 
-    // Fetch Full Data
+    // Try prompt_generations first (images)
     const { data: remixData } = await supabase
         .from("prompt_generations")
         .select("*")
         .eq("id", id)
         .maybeSingle();
 
-    if (!remixData) {
+    let fullRemixData: RemixDetail | null = null;
+
+    if (remixData) {
+        // Image generation found
+        const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name, profile_image")
+            .eq("user_id", remixData.user_id)
+            .maybeSingle();
+
+        fullRemixData = {
+            ...remixData,
+            mediaType: "image",
+            profiles: profileData ? {
+                full_name: profileData.full_name,
+                avatar_url: profileData.profile_image,
+                created_at: ""
+            } : {
+                full_name: "Anonymous Creator",
+                avatar_url: null,
+                created_at: ""
+            }
+        };
+    } else {
+        // Try video_generations
+        const { data: videoData } = await supabase
+            .from("video_generations")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (videoData) {
+            const { data: profileData } = await supabase
+                .from("profiles")
+                .select("full_name, profile_image")
+                .eq("user_id", videoData.user_id)
+                .maybeSingle();
+
+            fullRemixData = {
+                id: videoData.id,
+                image_url: "", // No thumbnail
+                video_url: videoData.video_url,
+                mediaType: "video",
+                created_at: videoData.created_at,
+                prompt_slug: null,
+                prompt_id: null,
+                combined_prompt_text: videoData.prompt,
+                user_id: videoData.user_id,
+                settings: { headline: videoData.prompt?.slice(0, 50) || "Video" },
+                upvotes_count: videoData.upvotes_count || 0,
+                profiles: profileData ? {
+                    full_name: profileData.full_name,
+                    avatar_url: profileData.profile_image,
+                    created_at: ""
+                } : {
+                    full_name: "Anonymous Creator",
+                    avatar_url: null,
+                    created_at: ""
+                }
+            };
+        }
+    }
+
+    if (!fullRemixData) {
         return <RemixClient initialRemix={null} />;
     }
 
-    // Fetch Profile
-    const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name, profile_image")
-        .eq("user_id", remixData.user_id)
-        .maybeSingle();
-
-    const fullRemixData: RemixDetail = {
-        ...remixData,
-        profiles: profileData ? {
-            full_name: profileData.full_name,
-            avatar_url: profileData.profile_image,
-            created_at: ""
-        } : {
-            full_name: "Anonymous Creator",
-            avatar_url: null,
-            created_at: ""
-        }
-    };
-
     return <RemixClient key={id} initialRemix={fullRemixData} />;
 }
+

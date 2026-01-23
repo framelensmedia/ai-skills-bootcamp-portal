@@ -24,8 +24,8 @@ export default async function LibraryPage() {
     redirect("/login?redirect=/library");
   }
 
-  // Parallel Fetch: Folders & Remixes
-  const [foldersRes, remixesRes, profileRes] = await Promise.all([
+  // Parallel Fetch: Folders, Remixes, Videos & Profile
+  const [foldersRes, remixesRes, videosRes, profileRes] = await Promise.all([
     supabase
       .from("folders")
       .select("*")
@@ -37,8 +37,15 @@ export default async function LibraryPage() {
         "id, image_url, created_at, prompt_id, prompt_slug, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, folder_id, is_public"
       )
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false }) // Newest first default
+      .order("created_at", { ascending: false })
       .limit(200),
+    supabase
+      .from("video_generations")
+      .select("id, video_url, created_at, prompt, dialogue, is_public, source_image_id, status")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(50),
     supabase
       .from("profiles")
       .select("plan, role, staff_pro")
@@ -48,6 +55,7 @@ export default async function LibraryPage() {
 
   const initialFolders = (foldersRes.data || []) as FolderType[];
   const genRows = (remixesRes.data || []) as GenRow[];
+  const videoRows = videosRes.data || [];
   const profile = profileRes.data;
 
   const isPro = (() => {
@@ -72,7 +80,8 @@ export default async function LibraryPage() {
     (prompts || []).forEach((p: any) => promptMap.set(p.id, p));
   }
 
-  const initialRemixItems: LibraryItem[] = genRows.map((g) => {
+  // Map Images to LibraryItem
+  const imageItems: LibraryItem[] = genRows.map((g) => {
     const p = g.prompt_id ? promptMap.get(g.prompt_id) : null;
     const fb = fallbackFromSettings(g?.settings);
     const originalPromptText = normalize(g.original_prompt_text) || fb.original;
@@ -85,6 +94,7 @@ export default async function LibraryPage() {
     return {
       id: g.id,
       imageUrl: g.image_url,
+      mediaType: "image" as const,
       createdAt: g.created_at,
       createdAtMs: Date.parse(g.created_at || "") || 0,
       promptId: g.prompt_id,
@@ -102,6 +112,35 @@ export default async function LibraryPage() {
     };
   });
 
+  // Map Videos to LibraryItem
+  const videoItems: LibraryItem[] = videoRows.map((v: any) => {
+    return {
+      id: v.id,
+      imageUrl: "", // No thumbnail for now
+      videoUrl: v.video_url,
+      mediaType: "video" as const,
+      createdAt: v.created_at,
+      createdAtMs: Date.parse(v.created_at || "") || 0,
+      promptId: null,
+      promptSlug: null,
+      aspectRatio: "16:9",
+      promptTitle: v.prompt?.slice(0, 50) || "Animated Scene",
+      promptCategory: null,
+      originalPromptText: v.prompt || "",
+      remixPromptText: "",
+      combinedPromptText: v.prompt || "",
+      folder: null,
+      folder_id: null,
+      is_public: v.is_public ?? false,
+      fullQualityUrl: null,
+    };
+  });
+
+  // Merge and sort by createdAtMs
+  const initialRemixItems = [...imageItems, ...videoItems].sort(
+    (a, b) => b.createdAtMs - a.createdAtMs
+  );
+
   return (
     <LibraryClient
       initialFolders={initialFolders}
@@ -110,3 +149,4 @@ export default async function LibraryPage() {
     />
   );
 }
+

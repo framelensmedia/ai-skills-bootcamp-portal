@@ -4,13 +4,15 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp } from "lucide-react";
+import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp, Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 export type RemixDetail = {
     id: string;
     image_url: string;
+    video_url?: string | null;
+    mediaType?: "image" | "video";
     created_at: string;
     prompt_slug: string | null;
     prompt_id?: string | null;
@@ -474,19 +476,40 @@ export default function RemixClient({ initialRemix }: Props) {
                 </div>
 
                 <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
-                    {/* Image Column */}
+                    {/* Media Column */}
                     <div
-                        onClick={() => setIsLightboxOpen(true)}
-                        className="relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                        onClick={() => remix.mediaType !== "video" && setIsLightboxOpen(true)}
+                        className={`relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last ${remix.mediaType !== "video" ? "cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]" : ""}`}
                     >
-                        <Image
-                            src={remix.image_url}
-                            alt="User Remix"
-                            fill
-                            className="object-contain"
-                            priority
-                            unoptimized
-                        />
+                        {remix.mediaType === "video" && remix.video_url ? (
+                            <video
+                                src={remix.video_url}
+                                className="w-full h-full object-cover"
+                                controls
+                                autoPlay
+                                loop
+                                playsInline
+                            />
+                        ) : remix.image_url ? (
+                            <Image
+                                src={remix.image_url}
+                                alt="User Remix"
+                                fill
+                                className="object-contain"
+                                priority
+                                unoptimized
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center text-white/40">No media</div>
+                        )}
+
+                        {/* Video Badge */}
+                        {remix.mediaType === "video" && (
+                            <div className="absolute top-4 right-4 z-10 bg-black/70 text-lime-400 text-xs font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
+                                <span className="w-2 h-2 bg-lime-400 rounded-full animate-pulse" />
+                                Video
+                            </div>
+                        )}
                     </div>
 
                     {/* Info Column */}
