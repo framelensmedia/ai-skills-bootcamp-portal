@@ -520,8 +520,6 @@ Execute the user's instruction precisely.
             ],
             generationConfig: {
                 temperature: 0.7,
-                // @ts-ignore - personGeneration is a valid param for newer models but might not be in types yet
-                personGeneration: "allow_all",
             },
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
