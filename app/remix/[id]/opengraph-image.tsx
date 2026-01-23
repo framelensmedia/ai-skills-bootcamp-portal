@@ -19,14 +19,34 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch Remix Image
+    // Try prompt_generations first (images)
     const { data: remix } = await supabase
         .from("prompt_generations")
         .select("image_url")
         .eq("id", id)
         .maybeSingle();
 
-    const imageUrl = remix?.image_url;
+    let imageUrl = remix?.image_url;
+
+    // If not found, try video_generations and get source image
+    if (!imageUrl) {
+        const { data: video } = await supabase
+            .from("video_generations")
+            .select("source_image_id")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (video?.source_image_id) {
+            // Get the source image for the video thumbnail
+            const { data: sourceImage } = await supabase
+                .from("prompt_generations")
+                .select("image_url")
+                .eq("id", video.source_image_id)
+                .maybeSingle();
+
+            imageUrl = sourceImage?.image_url;
+        }
+    }
 
     // Fallback Image
     if (!imageUrl) {
