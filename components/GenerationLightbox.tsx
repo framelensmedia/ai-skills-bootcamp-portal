@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
+import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize, ExternalLink } from "lucide-react";
 import { cleanPrompt } from "@/lib/stringUtils";
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
   remixPromptText?: string | null;
   combinedPromptText?: string | null;
 
+  id?: string;
   onShare?: (url: string) => void;
 
   onRemix?: (payload: {
@@ -119,7 +120,8 @@ export default function GenerationLightbox({
   onDelete,
   fullQualityUrl,
   onEdit,
-  onAnimate
+  onAnimate,
+  id
 }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -373,6 +375,17 @@ export default function GenerationLightbox({
                 <Share2 className="w-4 h-4" />
               </button>
 
+              {id && (
+                <a
+                  href={`/remix/${id}`}
+                  className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 hover:border-white/20"
+                  title="View Details Page"
+                >
+                  <span className="hidden md:block">Details</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+
               {onDelete && (
                 <button
                   type="button"
@@ -413,7 +426,7 @@ export default function GenerationLightbox({
                   <video
                     ref={videoRef}
                     src={safeVideoUrl}
-                    className="w-full h-full object-cover drop-shadow-2xl"
+                    className="w-full h-full object-contain drop-shadow-2xl"
                     loop
                     playsInline
                     muted={isMuted}

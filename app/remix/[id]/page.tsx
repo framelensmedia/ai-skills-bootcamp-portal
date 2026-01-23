@@ -32,7 +32,11 @@ export async function generateMetadata(
             .eq("id", id)
             .maybeSingle();
         if (videoData) {
-            remix = { image_url: null, settings: { headline: videoData.prompt?.slice(0, 50) || "Video" } };
+            remix = {
+                image_url: null,
+                video_url: videoData.video_url,
+                settings: { headline: videoData.prompt?.slice(0, 50) || "Video" }
+            };
         }
     }
 
@@ -52,6 +56,7 @@ export async function generateMetadata(
             title: title,
             description: description,
             images: [`/remix/${id}/opengraph-image`],
+            videos: (remix as any).video_url ? [(remix as any).video_url] : undefined,
         },
         twitter: {
             card: "summary_large_image",

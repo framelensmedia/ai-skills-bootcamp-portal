@@ -100,32 +100,83 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             // Don't force redirect here on client fetch, maybe user is exploring? 
             // Although page requires auth generally.
 
-            let q = supabase
+            let qImages = supabase
                 .from("prompt_generations")
                 .select(`
                 id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, is_public,
                 user_id, prompt_id
             `)
                 .eq("is_public", true)
-                .range(page * 8, (page + 1) * 8 - 1);
+                .range(page * 12, (page + 1) * 12 - 1); // Increased fetch size
 
-
+            let qVideos = supabase
+                .from("video_generations")
+                .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id`)
+                .eq("is_public", true)
+                .eq("status", "completed")
+                .range(page * 12, (page + 1) * 12 - 1);
 
             if (sort === "newest") {
-                q = q.order("created_at", { ascending: false });
+                qImages = qImages.order("created_at", { ascending: false });
+                qVideos = qVideos.order("created_at", { ascending: false });
             } else {
-                q = q.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
+                qImages = qImages.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
+                qVideos = qVideos.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
             }
 
-            const { data, error } = await q;
+            const [resImages, resVideos] = await Promise.all([qImages, qVideos]);
 
-            if (error) {
-                console.error(error);
+            if (resImages.error) {
+                console.error(resImages.error);
                 setLoading(false);
                 return;
             }
 
-            if (data.length < 8) setHasMore(false);
+            // Merge Data
+            const images = resImages.data || [];
+            const videos = resVideos.data || [];
+
+            // If we run out of both, stop
+            if (images.length === 0 && videos.length === 0) {
+                setHasMore(false);
+                setLoading(false);
+                return;
+            }
+
+            // Combine and Sort
+            let combinedData = [];
+
+            // Map Images
+            const mappedImages = images.map((d: any) => ({
+                ...d,
+                mediaType: "image",
+                timestamp: new Date(d.created_at).getTime()
+            }));
+
+            // Map Videos
+            const mappedVideos = videos.map((d: any) => ({
+                ...d,
+                mediaType: "video",
+                timestamp: new Date(d.created_at).getTime(),
+                image_url: "", // Need to resolve this later if possible? Or just use video
+                settings: { headline: d.prompt?.slice(0, 50) || "Video" },
+                original_prompt_text: d.prompt,
+                remix_prompt_text: "",
+                combined_prompt_text: d.prompt
+            }));
+
+            combinedData = [...mappedImages, ...mappedVideos].sort((a, b) => {
+                if (sort === "newest") {
+                    return b.timestamp - a.timestamp;
+                }
+                return (b.upvotes_count || 0) - (a.upvotes_count || 0);
+            });
+
+            // Since we fetched 12 of each, we might have too many. 
+            // In a simple naive pagination without cursor, we just append them all.
+            // It's not perfect but works for now.
+
+            const data = combinedData;
 
             const userIds = Array.from(new Set(data.map((d: any) => d.user_id)));
             let profileMap = new Map();
@@ -141,9 +192,20 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 const genIds = data.map((d: any) => d.id);
                 if (genIds.length > 0) {
                     const { data: myUpvotes } = await supabase.from("remix_upvotes").select("generation_id").eq("user_id", user.id).in("generation_id", genIds);
-                    myUpvotedSet = new Set(myUpvotes?.map((u: any) => u.generation_id));
+                    const { data: myVideoUpvotes } = await supabase.from("video_upvotes").select("video_id").eq("user_id", user.id).in("video_id", genIds);
+
+                    myUpvotedSet = new Set([
+                        ...(myUpvotes?.map((u: any) => u.generation_id) || []),
+                        ...(myVideoUpvotes?.map((u: any) => u.video_id) || [])
+                    ]);
+
                     const { data: mySaved } = await supabase.from("prompt_favorites").select("generation_id").eq("user_id", user.id).in("generation_id", genIds);
-                    mySavedSet = new Set(mySaved?.map((u: any) => u.generation_id));
+                    const { data: myVideoSaved } = await supabase.from("video_favorites").select("video_id").eq("user_id", user.id).in("video_id", genIds);
+
+                    mySavedSet = new Set([
+                        ...(mySaved?.map((u: any) => u.generation_id) || []),
+                        ...(myVideoSaved?.map((u: any) => u.video_id) || [])
+                    ]);
                 }
             }
 
@@ -157,7 +219,8 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 return {
                     id: d.id,
                     imageUrl: d.image_url,
-                    mediaType: "image" as const,
+                    videoUrl: d.video_url,
+                    mediaType: d.mediaType,
                     createdAt: d.created_at,
                     upvotesCount: d.upvotes_count || 0,
                     isLiked: myUpvotedSet.has(d.id),
@@ -165,7 +228,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                     userId: d.user_id,
                     username: profile.full_name || "Anonymous Creator",
                     userAvatar: profile.profile_image || null,
-                    promptTitle: settings.headline || "Untitled Remix",
+                    promptTitle: settings.headline || "Untitled",
                     originalPromptText: original,
                     remixPromptText: remix,
                     combinedPromptText: combined,
@@ -234,9 +297,18 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
         if (!user) return;
 
         if (wasLiked) {
-            await supabase.from("remix_upvotes").delete().match({ user_id: user.id, generation_id: item.id });
+            if (item.mediaType === "video") {
+                await supabase.from("video_upvotes").delete().match({ user_id: user.id, video_id: item.id });
+            } else {
+                await supabase.from("remix_upvotes").delete().match({ user_id: user.id, generation_id: item.id });
+            }
         } else {
-            await supabase.from("remix_upvotes").insert({ user_id: user.id, generation_id: item.id });
+            // Use maybeSingle or ignore error if it already exists (race condition with optimistic UI)
+            if (item.mediaType === "video") {
+                await supabase.from("video_upvotes").upsert({ user_id: user.id, video_id: item.id }, { onConflict: "user_id, video_id", ignoreDuplicates: true });
+            } else {
+                await supabase.from("remix_upvotes").upsert({ user_id: user.id, generation_id: item.id }, { onConflict: "user_id, generation_id", ignoreDuplicates: true });
+            }
         }
     };
 
@@ -253,11 +325,22 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
         let error;
         if (wasSaved) {
-            const { error: err } = await supabase.from("prompt_favorites").delete().match({ user_id: user.id, generation_id: item.id });
-            error = err;
+            if (item.mediaType === "video") {
+                const { error: err } = await supabase.from("video_favorites").delete().match({ user_id: user.id, video_id: item.id });
+                error = err;
+            } else {
+                const { error: err } = await supabase.from("prompt_favorites").delete().match({ user_id: user.id, generation_id: item.id });
+                error = err;
+            }
         } else {
-            const { error: err } = await supabase.from("prompt_favorites").insert({ user_id: user.id, generation_id: item.id });
-            error = err;
+            if (item.mediaType === "video") {
+                // Use upsert to ignore duplicates
+                const { error: err } = await supabase.from("video_favorites").upsert({ user_id: user.id, video_id: item.id }, { onConflict: "user_id, video_id", ignoreDuplicates: true });
+                error = err;
+            } else {
+                const { error: err } = await supabase.from("prompt_favorites").upsert({ user_id: user.id, generation_id: item.id }, { onConflict: "user_id, generation_id", ignoreDuplicates: true });
+                error = err;
+            }
         }
 
         if (error) {

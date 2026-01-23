@@ -25,7 +25,7 @@ export default async function FeedPage() {
         .eq("is_public", true)
         .eq("status", "completed")
         .order("created_at", { ascending: false })
-        .limit(4);
+        .limit(8);
 
     if (error || !generations) {
         console.error("Feed fetch error:", error);
@@ -48,20 +48,25 @@ export default async function FeedPage() {
     let myUpvotedSet = new Set<string>();
     let mySavedSet = new Set<string>();
 
-    if (user && generations.length > 0) {
-        const genIds = generations.map(d => d.id);
+    if (user) {
+        const imageIds = generations.map(d => d.id);
+        const videoIds = videoGenerations?.map(d => d.id) || [];
 
-        const [upvoteRes, savedRes] = await Promise.all([
-            supabase.from("remix_upvotes").select("generation_id").eq("user_id", user.id).in("generation_id", genIds),
-            supabase.from("prompt_favorites").select("generation_id").eq("user_id", user.id).in("generation_id", genIds)
-        ]);
+        const promises = [
+            // Images
+            imageIds.length > 0 ? supabase.from("remix_upvotes").select("generation_id").eq("user_id", user.id).in("generation_id", imageIds) : Promise.resolve({ data: [] }),
+            imageIds.length > 0 ? supabase.from("prompt_favorites").select("generation_id").eq("user_id", user.id).in("generation_id", imageIds) : Promise.resolve({ data: [] }),
+            // Videos
+            videoIds.length > 0 ? supabase.from("video_upvotes").select("video_id").eq("user_id", user.id).in("video_id", videoIds) : Promise.resolve({ data: [] }),
+            videoIds.length > 0 ? supabase.from("video_favorites").select("video_id").eq("user_id", user.id).in("video_id", videoIds) : Promise.resolve({ data: [] })
+        ];
 
-        if (upvoteRes.data) {
-            upvoteRes.data.forEach((u: any) => myUpvotedSet.add(u.generation_id));
-        }
-        if (savedRes.data) {
-            savedRes.data.forEach((u: any) => mySavedSet.add(u.generation_id));
-        }
+        const [imgUpvotes, imgSaved, vidUpvotes, vidSaved] = await Promise.all(promises);
+
+        imgUpvotes.data?.forEach((u: any) => myUpvotedSet.add(u.generation_id));
+        imgSaved.data?.forEach((u: any) => mySavedSet.add(u.generation_id));
+        vidUpvotes.data?.forEach((u: any) => myUpvotedSet.add(u.video_id));
+        vidSaved.data?.forEach((u: any) => mySavedSet.add(u.video_id));
     }
 
     // 5. Map Images to FeedItem
@@ -102,8 +107,8 @@ export default async function FeedPage() {
             mediaType: "video" as const,
             createdAt: d.created_at,
             upvotesCount: d.upvotes_count || 0,
-            isLiked: false, // TODO: Add video upvotes table
-            isSaved: false,
+            isLiked: myUpvotedSet.has(d.id),
+            isSaved: mySavedSet.has(d.id),
             userId: d.user_id,
             username: profile.full_name || "Anonymous Creator",
             userAvatar: profile.profile_image || null,

@@ -62,7 +62,7 @@ export default function RemixClient({ initialRemix }: Props) {
     const isFetchingRef = useRef(false); // Ref to track fetching state synchronously
     // const sentinelRef = useRef<HTMLDivElement>(null); // REMOVED
     const observerRef = useRef<IntersectionObserver | null>(null);
-    const shuffledRemixIds = useRef<string[]>([]);
+    const shuffledRemixIds = useRef<{ id: string, type: "image" | "video" }[]>([]);
 
     const sentinelRef = useCallback((node: HTMLDivElement | null) => {
         if (loading) return;
@@ -180,9 +180,28 @@ export default function RemixClient({ initialRemix }: Props) {
                 .order("created_at", { ascending: false })
                 .limit(32);
 
-            if (otherRemixes) {
+            const { data: otherVideos } = await supabase
+                .from("video_generations")
+                .select("id, video_url, created_at, user_id, prompt_generations!source_image_id(image_url)")
+                .eq("user_id", currentRemix.user_id)
+                .neq("id", id)
+                .eq("is_public", true)
+                .order("created_at", { ascending: false })
+                .limit(32);
+
+            const combined = [
+                ...(otherRemixes || []).map((r: any) => ({ ...r, mediaType: "image" })),
+                ...(otherVideos || []).map((r: any) => ({
+                    ...r,
+                    mediaType: "video",
+                    image_url: r.prompt_generations?.image_url || "/orb-neon.gif",
+                    video_url: r.video_url
+                }))
+            ];
+
+            if (combined.length > 0) {
                 // Shuffle "More from this Creator" as well for freshness
-                const shuffled = [...otherRemixes].sort(() => 0.5 - Math.random());
+                const shuffled = combined.sort(() => 0.5 - Math.random());
                 setUserRemixes(shuffled as any);
             }
 
@@ -206,22 +225,34 @@ export default function RemixClient({ initialRemix }: Props) {
                 // Initial Fetch & Shuffle (Client-side)
                 if (page === 0 && shuffledRemixIds.current.length === 0) {
                     try {
-                        const { data: allIds } = await supabase
+                        const { data: allImageIds } = await supabase
                             .from("prompt_generations")
                             .select("id")
                             .eq("is_public", true)
                             .neq("id", id || "")
                             .order("created_at", { ascending: false })
-                            .limit(1000); // Fetch recent 1000 to shuffle
+                            .limit(1000);
 
-                        if (allIds && allIds.length > 0) {
-                            const ids = allIds.map((x: any) => x.id);
+                        const { data: allVideoIds } = await supabase
+                            .from("video_generations")
+                            .select("id")
+                            .eq("is_public", true)
+                            .neq("id", id || "")
+                            .eq("status", "completed")
+                            .order("created_at", { ascending: false })
+                            .limit(500);
+
+                        let mixedIds: { id: string, type: "image" | "video" }[] = [];
+                        if (allImageIds) mixedIds.push(...allImageIds.map((x: any) => ({ id: x.id, type: "image" as const })));
+                        if (allVideoIds) mixedIds.push(...allVideoIds.map((x: any) => ({ id: x.id, type: "video" as const })));
+
+                        if (mixedIds.length > 0) {
                             // Fisher-Yates Shuffle
-                            for (let i = ids.length - 1; i > 0; i--) {
+                            for (let i = mixedIds.length - 1; i > 0; i--) {
                                 const j = Math.floor(Math.random() * (i + 1));
-                                [ids[i], ids[j]] = [ids[j], ids[i]];
+                                [mixedIds[i], mixedIds[j]] = [mixedIds[j], mixedIds[i]];
                             }
-                            shuffledRemixIds.current = ids;
+                            shuffledRemixIds.current = mixedIds;
                         }
                     } catch (e) {
                         console.error("Failed to fetch ids", e);
@@ -230,32 +261,56 @@ export default function RemixClient({ initialRemix }: Props) {
 
                 const start = page * LIMIT;
                 const end = start + LIMIT;
-                const pageIds = shuffledRemixIds.current.slice(start, end);
+                const pageItems = shuffledRemixIds.current.slice(start, end);
 
-                if (pageIds.length === 0) {
-                    // If pool is empty or we reached end
+                if (pageItems.length === 0) {
                     if (shuffledRemixIds.current.length > 0) {
                         setHasMore(false);
                     } else {
-                        // Fallback to normal fetch if shuffle failed? 
-                        // Or just stop.
                         setHasMore(false);
                     }
                     return;
                 }
 
-                const { data, error } = await supabase
-                    .from("prompt_generations")
-                    .select("id, image_url, created_at")
-                    .in("id", pageIds);
+                const imageIds = pageItems.filter(p => p.type === "image").map(p => p.id);
+                const videoIds = pageItems.filter(p => p.type === "video").map(p => p.id);
 
-                if (data) {
-                    if (data.length < LIMIT) {
-                        setHasMore(false);
+                const promises = [];
+                if (imageIds.length > 0) promises.push(supabase.from("prompt_generations").select("id, image_url, created_at").in("id", imageIds));
+                if (videoIds.length > 0) promises.push(supabase.from("video_generations").select("id, video_url, created_at, prompt_generations!source_image_id(image_url)").in("id", videoIds));
+
+                const results = await Promise.all(promises);
+                let combinedData: any[] = [];
+
+                results.forEach(res => {
+                    if (res.data) {
+                        // determine type based on content or we can map it back?
+                        // Actually easier:
+                        const rows = res.data;
+                        if (rows.length > 0) {
+                            if (rows[0].video_url) {
+                                combinedData.push(...rows.map((r: any) => ({
+                                    ...r,
+                                    mediaType: "video",
+                                    image_url: r.prompt_generations?.image_url || "/orb-neon.gif",
+                                    video_url: r.video_url
+                                })));
+                            } else {
+                                combinedData.push(...rows.map((r: any) => ({ ...r, mediaType: "image" })));
+                            }
+                        }
                     }
+                });
 
-                    // Sort data to match pageIds order to preserve shuffling
-                    const sortedData = pageIds.map(pid => data.find((d: any) => d.id === pid)).filter(Boolean);
+                if (combinedData.length > 0) {
+                    if (combinedData.length < LIMIT && pageItems.length < LIMIT) {
+                        // Only stop if we requested less than LIMIT (end of list)
+                        // But mixed fetching might result in partials if one fails.
+                    }
+                    if (combinedData.length === 0) setHasMore(false); // fetch failed
+
+                    // Sort data to match pageItems order
+                    const sortedData = pageItems.map(p => combinedData.find((d: any) => d.id === p.id)).filter(Boolean);
 
                     setCommunityRemixes((prev) => {
                         if (page === 0) return sortedData as any;
@@ -494,7 +549,7 @@ export default function RemixClient({ initialRemix }: Props) {
                         {remix.mediaType === "video" && remix.video_url ? (
                             <video
                                 src={remix.video_url}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                                 controls
                                 autoPlay
                                 loop
@@ -648,13 +703,37 @@ export default function RemixClient({ initialRemix }: Props) {
                                         onClick={() => router.push(`/remix/${r.id}`)}
                                         className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
                                     >
-                                        <Image
-                                            src={r.image_url}
-                                            alt="Creator Remix"
-                                            fill
-                                            className="object-cover group-hover:opacity-90 transition-opacity"
-                                            unoptimized
-                                        />
+                                        {r.mediaType === "video" && r.video_url ? (
+                                            <>
+                                                <video
+                                                    src={r.video_url}
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                    autoPlay
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                                        <svg className="w-5 h-5 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M8 5v14l11-7z" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                                                    Video
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <Image
+                                                src={r.image_url}
+                                                alt="Creator Remix"
+                                                fill
+                                                className="object-cover group-hover:opacity-90 transition-opacity"
+                                                unoptimized
+                                            />
+                                        )}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
@@ -699,15 +778,39 @@ export default function RemixClient({ initialRemix }: Props) {
                                         onClick={() => router.push(`/remix/${r.id}`)}
                                         className="group relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-white/10 bg-black/40 hover:border-[#B7FF00]/50 transition-all hover:scale-[1.02]"
                                     >
-                                        <Image
-                                            src={r.image_url}
-                                            alt="Community Remix"
-                                            fill
-                                            loading="lazy"
-                                            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                                            className="object-cover group-hover:opacity-90 transition-opacity"
-                                            unoptimized
-                                        />
+                                        {r.mediaType === "video" && r.video_url ? (
+                                            <>
+                                                <video
+                                                    src={r.video_url}
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                    autoPlay
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                                        <svg className="w-5 h-5 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                                            <path d="M8 5v14l11-7z" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                                                    Video
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <Image
+                                                src={r.image_url}
+                                                alt="Community Remix"
+                                                fill
+                                                loading="lazy"
+                                                sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+                                                className="object-cover group-hover:opacity-90 transition-opacity"
+                                                unoptimized
+                                            />
+                                        )}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}

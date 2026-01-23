@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 export type RemixItem = {
     id: string;
     imageUrl: string;
+    videoUrl?: string; // Added videoUrl
+    mediaType?: "image" | "video"; // Added mediaType
     title: string;
     username: string;
     userAvatar: string | null;
@@ -54,7 +56,29 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
         <div className="relative group rounded-2xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 hover:bg-white/10 transition-all duration-300">
             {/* Image Area - Link to Detail Page */}
             <Link href={`/remix/${item.id}`} className="block relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/40">
-                {item.imageUrl && !imgFailed ? (
+                {item.mediaType === "video" && item.videoUrl ? (
+                    <>
+                        <video
+                            src={item.videoUrl}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                <svg className="w-5 h-5 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                            Video
+                        </div>
+                    </>
+                ) : item.imageUrl && !imgFailed ? (
                     <Image
                         src={item.imageUrl}
                         alt={item.title}

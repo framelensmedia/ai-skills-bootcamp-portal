@@ -146,7 +146,7 @@ function PromptContent() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const shuffledRemixIds = useRef<string[]>([]);
+  const shuffledRemixIds = useRef<{ id: string, type: "image" | "video" }[]>([]);
 
   // Interaction State
   const [manualMode, setManualMode] = useState(false);
@@ -229,17 +229,28 @@ function PromptContent() {
   // Fullscreen viewer (lightbox)
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxVideoUrl, setLightboxVideoUrl] = useState<string | null>(null);
+  const [lightboxMediaType, setLightboxMediaType] = useState<"image" | "video">("image");
   const [remixRefreshTrigger, setRemixRefreshTrigger] = useState(0);
 
-  function openLightbox(url: string) {
+  function openLightbox(url: string, type: "image" | "video" = "image", videoUrl?: string) {
     if (!url) return;
     setLightboxUrl(url);
+    if (type === "video" && videoUrl) {
+      setLightboxVideoUrl(videoUrl);
+      setLightboxMediaType("video");
+    } else {
+      setLightboxMediaType("image");
+      setLightboxVideoUrl(null);
+    }
     setLightboxOpen(true);
   }
 
   function closeLightbox() {
     setLightboxOpen(false);
     setLightboxUrl(null);
+    setLightboxVideoUrl(null);
+    setLightboxMediaType("image");
   }
 
   // Apply query params once on mount
@@ -409,16 +420,31 @@ function PromptContent() {
     async function loadSpecific() {
       setSpecificLoading(true);
       const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
+
+      // Fetch Images
+      const { data: imageData } = await supabase
         .from("prompt_generations")
         .select("*")
         .eq("prompt_id", metaRow!.id)
         .order("created_at", { ascending: false })
-        .limit(8);
+        .limit(16);
 
-      if (data) {
-        // Fetch profiles for specific remixes
-        const userIds = Array.from(new Set(data.map((r: any) => r.user_id).filter(Boolean)));
+      // Fetch Videos (linked via source_image -> prompt_id)
+      // We assume relation name is 'prompt_generations' based on FK
+      const { data: videoData } = await supabase
+        .from("video_generations")
+        .select("*, prompt_generations!inner(prompt_id)")
+        .eq("prompt_generations.prompt_id", metaRow!.id)
+        .order("created_at", { ascending: false })
+        .limit(16);
+
+      const combined = [
+        ...(imageData || []).map((r: any) => ({ ...r, mediaType: "image" })),
+        ...(videoData || []).map((r: any) => ({ ...r, mediaType: "video", image_url: "", video_url: r.video_url }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 16);
+
+      if (combined.length > 0) {
+        const userIds = Array.from(new Set(combined.map((r: any) => r.user_id).filter(Boolean)));
         let profileMap = new Map();
 
         if (userIds.length > 0) {
@@ -426,25 +452,27 @@ function PromptContent() {
           profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
         }
 
-        const rows = data.map((r: any) => {
+        const rows = combined.map((r: any) => {
           const profile = profileMap.get(r.user_id) || {};
           const settings = r.settings || {};
           return {
             id: String(r.id),
             imageUrl: String(r.image_url || ""),
-            title: settings.headline || "Untitled Remix",
+            videoUrl: r.video_url, // Add this
+            mediaType: r.mediaType, // Add this
+            title: settings.headline || (r.mediaType === "video" ? "Animated Scene" : "Untitled Remix"),
             username: profile.full_name || "Anonymous Creator",
             userAvatar: profile.profile_image || null,
             upvotesCount: r.upvotes_count || 0,
-            originalPromptText: r.prompt_text || r.original_prompt_text,
-            remixPromptText: r.remix || r.remix_prompt_text,
-            combinedPromptText: r.final_prompt || r.combined_prompt_text,
+            originalPromptText: r.prompt_text || r.original_prompt_text || r.prompt || "", // Fallback for video 'prompt'
+            remixPromptText: r.remix || r.remix_prompt_text || "",
+            combinedPromptText: r.final_prompt || r.combined_prompt_text || r.prompt || "",
             createdAt: r.created_at,
             promptId: r.prompt_id || null,
             prompt_slug: r.prompt_slug ?? null,
           };
         });
-        setSpecificRemixes(rows.filter((r: any) => r.imageUrl.trim().length > 0));
+        setSpecificRemixes(rows); // Removed filter because videos don't have imageUrl
       }
       setSpecificLoading(false);
     }
@@ -463,21 +491,32 @@ function PromptContent() {
       // Initial Fetch & Shuffle (Client-side)
       if (communityPage === 0 && shuffledRemixIds.current.length === 0) {
         try {
-          const { data: allIds } = await supabase
+          const { data: allImageIds } = await supabase
             .from("prompt_generations")
             .select("id")
             .eq("is_public", true)
             .order("created_at", { ascending: false })
-            .limit(500); // Fetch recent 500 to shuffle
+            .limit(500);
 
-          if (allIds && allIds.length > 0) {
-            const ids = allIds.map((x: any) => x.id);
+          const { data: allVideoIds } = await supabase
+            .from("video_generations")
+            .select("id")
+            .eq("is_public", true)
+            .eq("status", "completed")
+            .order("created_at", { ascending: false })
+            .limit(200);
+
+          let mixedIds: { id: string, type: "image" | "video" }[] = [];
+          if (allImageIds) mixedIds.push(...allImageIds.map((x: any) => ({ id: x.id, type: "image" as const })));
+          if (allVideoIds) mixedIds.push(...allVideoIds.map((x: any) => ({ id: x.id, type: "video" as const })));
+
+          if (mixedIds.length > 0) {
             // Fisher-Yates Shuffle
-            for (let i = ids.length - 1; i > 0; i--) {
+            for (let i = mixedIds.length - 1; i > 0; i--) {
               const j = Math.floor(Math.random() * (i + 1));
-              [ids[i], ids[j]] = [ids[j], ids[i]];
+              [mixedIds[i], mixedIds[j]] = [mixedIds[j], mixedIds[i]];
             }
-            shuffledRemixIds.current = ids;
+            shuffledRemixIds.current = mixedIds;
           }
         } catch (e) {
           console.error("Failed to fetch ids", e);
@@ -486,34 +525,46 @@ function PromptContent() {
 
       const start = communityPage * LIMIT;
       const end = start + LIMIT;
-      const pageIds = shuffledRemixIds.current.slice(start, end);
+      const pageItems = shuffledRemixIds.current.slice(start, end);
 
-      if (pageIds.length === 0 && shuffledRemixIds.current.length > 0) {
-        setHasMoreCommunity(false);
-        setCommunityLoading(false);
-        return;
-      }
-
-      // If pool is empty (no public remixes), stop
-      if (shuffledRemixIds.current.length === 0 && communityPage === 0) {
-        // Attempt to fetch normal if shuffle failed? No, just handle empty.
-        setHasMoreCommunity(false);
-        setCommunityLoading(false);
-        return;
-      }
-
-      const { data: remixesData } = await supabase
-        .from("prompt_generations")
-        .select("*")
-        .in("id", pageIds);
-
-      if (remixesData) {
-        if (remixesData.length < LIMIT) {
+      if (pageItems.length === 0) {
+        if (shuffledRemixIds.current.length > 0) {
+          setHasMoreCommunity(false);
+        } else {
           setHasMoreCommunity(false);
         }
+        setCommunityLoading(false);
+        return;
+      }
 
+      const imageIds = pageItems.filter(p => p.type === "image").map(p => p.id);
+      const videoIds = pageItems.filter(p => p.type === "video").map(p => p.id);
+
+      const promises = [];
+      if (imageIds.length > 0) promises.push(supabase.from("prompt_generations").select("*").in("id", imageIds));
+      if (videoIds.length > 0) promises.push(supabase.from("video_generations").select("*").in("id", videoIds));
+
+      const results = await Promise.all(promises);
+      let mixedData: any[] = [];
+
+      results.forEach(res => {
+        if (res.data) {
+          // Heuristic to detect type: video_url vs no video_url
+          const rows = res.data;
+          if (rows.length > 0) {
+            if (rows[0].video_url) {
+              mixedData.push(...rows.map((r: any) => ({ ...r, mediaType: "video", image_url: "", video_url: r.video_url })));
+            } else {
+              mixedData.push(...rows.map((r: any) => ({ ...r, mediaType: "image" })));
+            }
+          }
+        }
+      });
+
+      if (mixedData.length > 0) {
         // Fetch profiles for remixes similar to Creator Studio
-        const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id).filter(Boolean)));
+        // Note: mixedData has user_id, but different fields maybe? Both tables have user_id.
+        const userIds = Array.from(new Set(mixedData.map((r: any) => r.user_id).filter(Boolean)));
         let profileMap = new Map();
 
         if (userIds.length > 0) {
@@ -521,31 +572,33 @@ function PromptContent() {
           profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
         }
 
-        const processedRemixes = remixesData.map((r: any) => {
+        const processedRemixes = mixedData.map((r: any) => {
           const profile = profileMap.get(r.user_id) || {};
           const settings = r.settings || {};
           // Map to RemixItem shape
           return {
             id: String(r.id),
             imageUrl: String(r.image_url || ""),
-            title: settings.headline || "Untitled Remix",
+            videoUrl: r.video_url, // Add this
+            mediaType: r.mediaType, // Add this
+            title: settings.headline || (r.mediaType === "video" ? "Animated Scene" : "Untitled Remix"),
             username: profile.full_name || "Anonymous Creator",
             userAvatar: profile.profile_image || null,
             upvotesCount: r.upvotes_count || 0,
-            originalPromptText: r.prompt_text || r.original_prompt_text,
+            originalPromptText: r.prompt_text || r.original_prompt_text || r.prompt,
             remixPromptText: r.remix || r.remix_prompt_text,
-            combinedPromptText: r.final_prompt || r.combined_prompt_text,
+            combinedPromptText: r.final_prompt || r.combined_prompt_text || r.prompt,
             createdAt: r.created_at,
             promptId: r.prompt_id || null,
-            // Additional fields for compatibility if needed
             prompt_slug: r.prompt_slug ?? null,
           };
         });
 
-        const validRows = processedRemixes.filter((r: any) => r.imageUrl.trim().length > 0);
+        // We permit items with videoUrl even if imageUrl is empty
+        const validRows = processedRemixes.filter((r: any) => (r.imageUrl && r.imageUrl.trim().length > 0) || (r.videoUrl));
 
-        // Sort validRows to match pageIds order (to maintain randomization)
-        const sortedRows = pageIds.map(id => validRows.find((r: any) => r.id === String(id))).filter(Boolean);
+        // Sort validRows to match pageItems order
+        const sortedRows = pageItems.map(p => validRows.find((r: any) => r.id === String(p.id))).filter(Boolean);
 
         setCommunityRemixes((prev) => {
           if (communityPage === 0) return sortedRows;
@@ -553,10 +606,7 @@ function PromptContent() {
           return [...prev, ...sortedRows.filter((p: any) => !existing.has(p.id))];
         });
       } else {
-        if (communityPage === 0) {
-          // If query returned null but we had IDs? weird.
-          // Just ignore.
-        }
+        setHasMoreCommunity(false);
       }
       setCommunityLoading(false);
     };
@@ -789,10 +839,7 @@ function PromptContent() {
       return;
     }
 
-    if (mediaType === "video") {
-      setGenerateError("Video generation is disabled for V1.");
-      return;
-    }
+
 
     if (!userId || !metaRow?.id) {
       setGenerateError("Missing user info. Please refresh and try again.");
@@ -827,6 +874,40 @@ function PromptContent() {
         logoUrl = await uploadFile(logo); // Re-use uploadFile
       }
 
+      // --- VIDEO GENERATION ---
+      if (mediaType === "video") {
+        const videoPayload = {
+          image: imageUrls.length > 0 ? imageUrls[0] : imageSrc, // Prefer user upload if any, else template
+          prompt: promptToUse,
+          sourceImageId: metaRow.id,
+        };
+
+        const res = await fetch("/api/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(videoPayload),
+        });
+
+        const json = await res.json();
+        if (!res.ok) {
+          setGenerateError(json?.error || "Video generation failed.");
+          setGenerating(false);
+          return;
+        }
+
+        const vUrl = (json?.videoUrl || "").trim();
+        if (vUrl) {
+          setGeneratedImageUrl(vUrl);
+          setOverridePreviewUrl(vUrl);
+          refreshRemixes();
+        } else {
+          setGenerateError("No video returned.");
+        }
+        setGenerating(false);
+        return;
+      }
+
+      // --- IMAGE GENERATION (Existing) ---
       const payload = {
         prompt: promptToUse,
         userId,
@@ -879,7 +960,7 @@ function PromptContent() {
     } catch (e: any) {
       setGenerateError(e?.message || "Failed.");
     } finally {
-      setGenerating(false);
+      if (mediaType !== "video") setGenerating(false); // Video handles its own setGenerating(false)
     }
   }
 
@@ -887,6 +968,8 @@ function PromptContent() {
   function clearGenerated() {
     setGeneratedImageUrl(null);
     setGenerateError(null);
+    // Reset to template image when clearing
+    setOverridePreviewUrl(null);
   }
 
   if (loading) {
@@ -950,6 +1033,8 @@ function PromptContent() {
         <GenerationLightbox
           open={lightboxOpen}
           url={lightboxUrl}
+          videoUrl={lightboxVideoUrl}
+          mediaType={lightboxMediaType}
           onClose={closeLightbox}
           combinedPromptText={editSummary || fullPromptText || ""}
           onShare={handleShare}
@@ -1024,7 +1109,14 @@ function PromptContent() {
               <button
                 type="button"
                 className="group relative block w-full text-left"
-                onClick={() => openLightbox(imageSrc)}
+                onClick={() => {
+                  // check if we are showing video
+                  if (mediaType === "video" && generatedImageUrl) {
+                    openLightbox(imageSrc, "video", generatedImageUrl);
+                  } else {
+                    openLightbox(imageSrc);
+                  }
+                }}
                 title="Open full screen"
               >
                 <div
@@ -1033,14 +1125,26 @@ function PromptContent() {
                     previewAspectClass,
                   ].join(" ")}
                 >
-                  <Image
-                    src={imageSrc}
-                    alt={metaRow.title}
-                    fill
-                    className="object-contain"
-                    priority
-                    unoptimized
-                  />
+                  {mediaType === "video" && generatedImageUrl ? (
+                    <video
+                      src={generatedImageUrl}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      controls
+                    />
+                  ) : (
+                    <Image
+                      src={imageSrc}
+                      alt={metaRow.title}
+                      fill
+                      className="object-contain"
+                      priority
+                      unoptimized
+                    />
+                  )}
                   {/* Generating Overlay */}
                   {generating && (
                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
@@ -1248,7 +1352,7 @@ function PromptContent() {
                   onClick={() => setMediaType("image")}
                   disabled={isLocked || generating}
                 />
-                <SelectPill label="Video" selected={mediaType === "video"} disabled onClick={() => setMediaType("video")} />
+                <SelectPill label="Video" selected={mediaType === "video"} disabled={isLocked || generating} onClick={() => setMediaType("video")} />
               </div>
 
               <div className="mt-3">
@@ -1346,12 +1450,36 @@ function PromptContent() {
                         title="View Community Remix"
                       >
                         <div className="relative aspect-square w-full">
-                          <Image src={r.imageUrl} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" unoptimized />
+                          {r.mediaType === "video" && r.videoUrl ? (
+                            <>
+                              <video
+                                src={r.videoUrl}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                autoPlay
+                                muted
+                                loop
+                                playsInline
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-8 h-8 rounded-full border border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+                                  <svg className="w-4 h-4 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                </div>
+                              </div>
+                              <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                                Video
+                              </div>
+                            </>
+                          ) : (
+                            <Image src={r.imageUrl} alt="Remix" fill className="object-cover transition duration-500 group-hover:scale-110" unoptimized />
+                          )}
                         </div>
                       </button>
 
                       {/* Hover actions */}
-                      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+                      < div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 bg-gradient-to-t from-black/90 via-black/40 to-transparent" >
                         <div className="pointer-events-auto absolute bottom-2 left-2 right-2 flex gap-1 justify-center">
                           <button
                             type="button"
@@ -1438,11 +1566,11 @@ function PromptContent() {
               </div>
             )}
 
-          </section>
+          </section >
         </div >
 
 
-      </main>
+      </main >
     </>
   );
 }

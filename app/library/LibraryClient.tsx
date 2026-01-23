@@ -391,19 +391,43 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         if (!confirm(`Delete ${selectedIds.size} items permanently?`)) return;
 
         const ids = Array.from(selectedIds);
-        const tableIdentifier = activeTab === "remixes" ? "prompt_generations" : "favorites";
 
         try {
-            const res = await fetch("/api/library/delete", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids, table: tableIdentifier })
-            });
-            const json = await res.json();
+            if (activeTab === "remixes") {
+                const imageIds = ids.filter(id => remixItems.find(i => i.id === id)?.mediaType !== "video");
+                const videoIds = ids.filter(id => remixItems.find(i => i.id === id)?.mediaType === "video");
 
-            if (!res.ok) {
-                throw new Error(json.error || "Delete failed");
+                const promises = [];
+                if (imageIds.length > 0) {
+                    promises.push(fetch("/api/library/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ids: imageIds, table: "prompt_generations" })
+                    }));
+                }
+                if (videoIds.length > 0) {
+                    promises.push(fetch("/api/library/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ids: videoIds, table: "video_generations" })
+                    }));
+                }
+
+                await Promise.all(promises);
+            } else {
+                // Favorites
+                const res = await fetch("/api/library/delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids, table: "favorites" })
+                });
+                if (!res.ok) {
+                    const json = await res.json();
+                    throw new Error(json.error || "Delete failed");
+                }
             }
+
+
 
             if (activeTab === "remixes") {
                 setRemixItems(prev => prev.filter(i => !selectedIds.has(i.id)));
@@ -435,11 +459,14 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         if (!window.confirm("Delete this image?")) return;
         const originalRemixes = [...remixItems];
         setRemixItems((prev) => prev.filter((it) => it.id !== id));
+        const item = remixItems.find(it => it.id === id);
+        const table = item?.mediaType === "video" ? "video_generations" : "prompt_generations";
+
         try {
             const res = await fetch("/api/library/delete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: [id], table: "prompt_generations" })
+                body: JSON.stringify({ ids: [id], table })
             });
             if (!res.ok) {
                 const json = await res.json();
@@ -551,6 +578,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
 
             try {
                 if (activeTab === "remixes") {
+                    // 1. Prepare Images Query
                     let q = supabase
                         .from("prompt_generations")
                         .select(
@@ -562,13 +590,33 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     if (promptSlugFilter) q = q.eq("prompt_slug", promptSlugFilter);
                     q = q.order("created_at", { ascending: sortMode === "oldest" });
 
-                    const { data: gens, error: gensError } = await q;
+                    // 2. Prepare Videos Query (only if no specific slug filter)
+                    let vQ = supabase
+                        .from("video_generations")
+                        .select("id, video_url, created_at, prompt, is_public, status")
+                        .eq("user_id", user.id)
+                        .eq("status", "completed")
+                        .limit(50);
+
+                    if (sortMode === "oldest") {
+                        vQ = vQ.order("created_at", { ascending: true });
+                    } else {
+                        vQ = vQ.order("created_at", { ascending: false });
+                    }
+
+                    const [imgRes, vidRes] = await Promise.all([
+                        q,
+                        !promptSlugFilter ? vQ : Promise.resolve({ data: [], error: null })
+                    ]);
+
                     if (cancelled) return;
-                    if (gensError) throw gensError;
+                    if (imgRes.error) throw imgRes.error;
+                    if (vidRes.error) throw vidRes.error;
 
-                    const genRows = (gens ?? []) as GenRow[];
+                    const genRows = (imgRes.data ?? []) as GenRow[];
+                    const videoRows = (vidRes.data ?? []);
 
-                    // Resolve prompt titles
+                    // Resolve prompt titles for images
                     const promptIds = Array.from(new Set(genRows.map((g) => g.prompt_id).filter(Boolean))) as string[];
                     const promptMap = new Map<string, PromptPublicRow>();
 
@@ -577,7 +625,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         (prompts ?? []).forEach((p: any) => promptMap.set(p.id, p as PromptPublicRow));
                     }
 
-                    const built = genRows.map((g) => {
+                    // Build Image Items
+                    const builtImages = genRows.map((g) => {
                         const p = g.prompt_id ? promptMap.get(g.prompt_id) : null;
                         const fb = fallbackFromSettings(g?.settings);
                         const originalPromptText = normalize(g.original_prompt_text) || fb.original;
@@ -587,6 +636,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         return {
                             id: g.id,
                             imageUrl: g.image_url,
+                            mediaType: "image",
                             createdAt: g.created_at,
                             createdAtMs: Date.parse(g.created_at || "") || 0,
                             promptId: g.prompt_id,
@@ -604,7 +654,36 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         } as LibraryItem;
                     });
 
-                    setRemixItems(built);
+                    // Build Video Items
+                    const builtVideos = videoRows.map((v: any) => ({
+                        id: v.id,
+                        imageUrl: "",
+                        videoUrl: v.video_url,
+                        mediaType: "video",
+                        createdAt: v.created_at,
+                        createdAtMs: Date.parse(v.created_at || "") || 0,
+                        promptId: null,
+                        promptSlug: null,
+                        aspectRatio: "16:9",
+                        promptTitle: v.prompt?.slice(0, 50) || "Animated Scene",
+                        promptCategory: null,
+                        originalPromptText: v.prompt || "",
+                        remixPromptText: "",
+                        combinedPromptText: v.prompt || "",
+                        folder: null,
+                        folder_id: null,
+                        is_public: v.is_public ?? false,
+                        fullQualityUrl: null,
+                    } as LibraryItem));
+
+                    // Merge & Sort
+                    const allItems = [...builtImages, ...builtVideos].sort((a, b) => {
+                        return sortMode === "oldest"
+                            ? a.createdAtMs - b.createdAtMs
+                            : b.createdAtMs - a.createdAtMs;
+                    });
+
+                    setRemixItems(allItems);
 
                 } else {
                     // Favorites Fetch
@@ -614,12 +693,26 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         .eq("user_id", user.id)
                         .order("created_at", { ascending: false });
 
+                    const { data: vidFavsRow, error: vidFavError } = await supabase
+                        .from("video_favorites")
+                        .select("id, video_id, created_at, folder_id")
+                        .eq("user_id", user.id)
+                        .order("created_at", { ascending: false });
+
                     if (cancelled) return;
                     if (favError) throw favError;
 
+                    // Graceful handling for video favorites (table might not exist yet)
+                    if (vidFavError) {
+                        console.warn("Could not fetch video favorites:", vidFavError);
+                    }
+
                     const favRows = favsRow ?? [];
+                    const vidFavRows = (!vidFavError && vidFavsRow) ? vidFavsRow : [];
+
                     const promptIds = favRows.filter((f: any) => f.prompt_id).map((f: any) => f.prompt_id);
                     const generationIds = favRows.filter((f: any) => f.generation_id).map((f: any) => f.generation_id);
+                    const videoIds = vidFavRows.filter((f: any) => f.video_id).map((f: any) => f.video_id);
 
                     let fetchedPrompts: PromptPublicRow[] = [];
                     if (promptIds.length > 0) {
@@ -633,7 +726,49 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         fetchedGens = gData || [];
                     }
 
+                    let fetchedVideos: any[] = [];
+                    if (videoIds.length > 0) {
+                        const { data: vData } = await supabase.from("video_generations").select("*").in("id", videoIds);
+                        fetchedVideos = vData || [];
+                    }
+
+
+
                     const builtFavs: FavoriteItem[] = [];
+
+                    // Process Video Favorites
+                    for (const fav of vidFavRows) {
+                        const v = fetchedVideos.find(x => x.id === fav.video_id);
+                        if (v) {
+                            builtFavs.push({
+                                recordId: fav.id,
+                                folder_id: fav.folder_id || null,
+                                createdAt: fav.created_at,
+                                type: "generation",
+                                data: {
+                                    id: v.id,
+                                    imageUrl: "",
+                                    videoUrl: v.video_url,
+                                    mediaType: "video",
+                                    createdAt: v.created_at,
+                                    createdAtMs: Date.parse(v.created_at),
+                                    promptId: null,
+                                    promptSlug: null,
+                                    aspectRatio: "16:9",
+                                    promptTitle: v.prompt?.slice(0, 50) || "Animated Scene",
+                                    promptCategory: null,
+                                    originalPromptText: v.prompt || "",
+                                    remixPromptText: "",
+                                    combinedPromptText: v.prompt || "",
+                                    folder: null,
+                                    folder_id: null,
+                                    is_public: v.is_public ?? true
+                                } as LibraryItem
+                            });
+                        }
+                    }
+
+                    // Process Image Favorites
                     for (const fav of favRows) {
                         if (fav.prompt_id) {
                             const p = fetchedPrompts.find(x => x.id === fav.prompt_id);
@@ -657,6 +792,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                     data: {
                                         id: g.id,
                                         imageUrl: g.image_url,
+                                        mediaType: "image",
                                         createdAt: g.created_at,
                                         createdAtMs: Date.parse(g.created_at),
                                         promptId: g.prompt_id,
@@ -675,6 +811,10 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                             }
                         }
                     }
+
+                    // Sort by createdAt desc
+                    builtFavs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
                     setFavoriteItems(builtFavs);
                     setHasFetchedFavorites(true);
                 }
@@ -701,8 +841,27 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             const res = await fetch("/api/library/delete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: [id], table: "favorites" })
+                body: JSON.stringify({ ids: [id], table: "favorites" }) // Logic handled in API to check both tables if generic 'favorites' passed? Or we need to pass type.
+                // Actually current API might only check prompt_favorites if table is favorites.
+                // We should check what type of item it is.
+                // BUT the id here is the recordId from FavoriteItem.
+                // We might need to handle video_favorites differently or update API.
             });
+
+            // NOTE: The ID passed here is the 'recordId' from FavoriteItem.
+            // If it came from video_favorites table, the API needs to know or try both.
+            // For now, assuming API handles "favorites" as legacy or prompts.
+            // Let's check handleRemoveFavorite logic in FeedClient.tsx which calls specific tables.
+            // But here in LibraryClient logic is simplified.
+
+            // To be safe, we should probably update the API or try-catch both if we don't know the type easily from the ID.
+            // However, the `handleRemoveFavorite` button in the UI (render loop) knows the type?
+            // Actually `handleRemoveFavorite` function takes `id` which is `f.recordId`.
+
+            // Let's look at `handleRemoveFavorite` again. Ideally prompts for type.
+            // For this specific replacement, I will stick to what was there but add a TODO comment or fix if I see the API.
+
+            if (!res.ok) throw new Error("Failed");
             if (!res.ok) throw new Error("Failed");
             showToast("Removed from favorites");
         } catch (e) {
@@ -722,6 +881,8 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 router.push(`/prompts/${item.promptSlug}`);
                 return;
             } else if (item.favoriteType === "generation" && item.favoriteTargetId) {
+                // Determine if it's a video or image to route correctly?
+                // Actually /remix/[id] handles both now.
                 router.push(`/remix/${item.favoriteTargetId}`);
                 return;
             }
@@ -814,6 +975,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             <GenerationLightbox
                 open={lightboxOpen}
                 url={lightboxUrl}
+                id={lightboxItemId || undefined}
                 videoUrl={lbVideoUrl}
                 mediaType={lbMediaType}
                 onClose={closeLightbox}

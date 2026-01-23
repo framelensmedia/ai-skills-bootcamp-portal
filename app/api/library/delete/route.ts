@@ -28,18 +28,41 @@ export async function POST(req: Request) {
 
         // 2. Perform Delete with Admin Client (bypassing potential RLS issues)
         // CRITICAL: We MUST enforce user_id check manually since we are admin
-        const targetTable = table === "favorites" ? "prompt_favorites" : "prompt_generations";
 
-        const { error } = await supabaseAdmin
-            .from(targetTable)
-            .delete()
-            .in("id", ids)
-            .eq("user_id", user.id); // Enforce ownership
+        if (table === "favorites") {
+            // Try deleting from prompt_favorites
+            const { error: err1 } = await supabaseAdmin
+                .from("prompt_favorites")
+                .delete()
+                .in("id", ids)
+                .eq("user_id", user.id);
 
-        if (error) {
-            console.error("Delete Error:", error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            // Try deleting from video_favorites
+            const { error: err2 } = await supabaseAdmin
+                .from("video_favorites")
+                .delete()
+                .in("id", ids)
+                .eq("user_id", user.id);
+
+            if (err1 && err2) {
+                return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+            }
+        } else {
+            const targetTable = table === "video_generations" ? "video_generations" : (table === "prompt_generations" ? "prompt_generations" : "prompt_generations");
+
+            const { error } = await supabaseAdmin
+                .from(targetTable)
+                .delete()
+                .in("id", ids)
+                .eq("user_id", user.id); // Enforce ownership
+
+            if (error) {
+                console.error("Delete Error:", error);
+                return NextResponse.json({ error: error.message }, { status: 500 });
+            }
         }
+
+
 
         return NextResponse.json({ success: true, count: ids.length });
     } catch (err: any) {
