@@ -549,82 +549,6 @@ function CreatorContent() {
                         <div className="text-xs font-bold text-[#B7FF00] uppercase tracking-wider">AI Studio</div>
                     </div>
 
-                    {/* Prompt Tool Card */}
-                    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
-                        {/* Choice Overlay Removed as requested */}
-
-                        <RemixChatWizard
-                            isOpen={wizardOpen}
-                            onClose={() => {
-                                setWizardOpen(false);
-                            }}
-                            onComplete={handleWizardComplete}
-                            templatePreviewUrl={previewImage}
-                            initialValues={remixAnswers}
-                            uploads={uploads}
-                            onUploadsChange={setUploads}
-                            logo={logo}
-                            onLogoChange={setLogo}
-                            businessName={businessName}
-                            onBusinessNameChange={setBusinessName}
-                            templateConfig={templateConfig}
-                            isGuest={!user}
-                            onGuestInteraction={() => handleAuthGate()}
-                        />
-
-                        {/* AUTO MODE */}
-                        {mode === "auto" && (
-                            <div>
-                                <AutoModeChat
-                                    onComplete={handleAutoModeComplete}
-                                    disabled={generating}
-                                    initialReferenceImage={uploads[0] || null}
-                                />
-                            </div>
-                        )}
-
-                        {/* MANUAL MODE */}
-                        <div className={`relative transition-all duration-500`}>
-                            <textarea
-                                onChange={(e) => setManualPrompt(e.target.value)}
-                                className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
-                                rows={8}
-                                placeholder="Describe your image..."
-                                value={manualPrompt}
-                                onClick={handleAuthGate}
-                                onFocus={handleAuthGate}
-                            />
-
-                            {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
-                                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
-                                        {mediaType === "video" ? "Start Frame" : "Reference Images"}
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setLibraryModalOpen(true)}
-                                        className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
-                                    >
-                                        <Library size={18} className="transition-transform group-hover:scale-110" />
-                                        <span>PICK FROM YOUR LIBRARY</span>
-                                    </button>
-
-                                    <div className="relative">
-                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                            <div className="w-full border-t border-white/5"></div>
-                                        </div>
-                                        <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
-                                            <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
-                                        </div>
-                                    </div>
-
-                                    <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Settings Card */}
                     <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
                         <div className="flex items-center justify-between gap-3 mb-4">
@@ -707,6 +631,85 @@ function CreatorContent() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Prompt Tool Card */
+                    }
+                    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
+                        {/* Choice Overlay Removed as requested */}
+
+                        <RemixChatWizard
+                            isOpen={wizardOpen}
+                            onClose={() => {
+                                setWizardOpen(false);
+                            }}
+                            onComplete={handleWizardComplete}
+                            templatePreviewUrl={previewImage}
+                            initialValues={remixAnswers}
+                            uploads={uploads}
+                            onUploadsChange={setUploads}
+                            logo={logo}
+                            onLogoChange={setLogo}
+                            businessName={businessName}
+                            onBusinessNameChange={setBusinessName}
+                            templateConfig={templateConfig}
+                            isGuest={!user}
+                            onGuestInteraction={() => handleAuthGate()}
+                        />
+
+                        {/* AUTO MODE */}
+                        {mode === "auto" && (
+                            <div>
+                                <AutoModeChat
+                                    onComplete={handleAutoModeComplete}
+                                    disabled={generating}
+                                    initialReferenceImage={uploads[0] || null}
+                                />
+                            </div>
+                        )}
+
+                        {/* MANUAL MODE */}
+                        <div className={`relative transition-all duration-500`}>
+                            {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
+                                <div className="mb-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
+                                        {mediaType === "video" ? "Start Frame" : "Reference Images"}
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setLibraryModalOpen(true)}
+                                        className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                                    >
+                                        <Library size={18} className="transition-transform group-hover:scale-110" />
+                                        <span>PICK FROM YOUR LIBRARY</span>
+                                    </button>
+
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                            <div className="w-full border-t border-white/5"></div>
+                                        </div>
+                                        <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                                            <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                                        </div>
+                                    </div>
+
+                                    <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
+                                </div>
+                            )}
+
+                            <textarea
+                                onChange={(e) => setManualPrompt(e.target.value)}
+                                className="w-full rounded-2xl border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                                rows={8}
+                                placeholder="Describe your image..."
+                                value={manualPrompt}
+                                onClick={handleAuthGate}
+                                onFocus={handleAuthGate}
+                            />
+                        </div>
+                    </div>
+
+
 
                     {/* Generate Button */}
                     {error && (
