@@ -13,11 +13,12 @@ import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboa
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Library } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -59,7 +60,7 @@ function CreatorContent() {
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     // Mode state
-    const [mode, setMode] = useState<"auto" | "manual" | "wizard" | null>(null);
+    const [mode, setMode] = useState<"auto" | "manual" | "wizard">("manual");
 
     // Wizard State
     const [wizardOpen, setWizardOpen] = useState(false);
@@ -81,6 +82,8 @@ function CreatorContent() {
     const [animating, setAnimating] = useState(false);
     const [videoResult, setVideoResult] = useState<string | null>(null);
     const [videoModalOpen, setVideoModalOpen] = useState(false);
+    const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
+    const [libraryModalOpen, setLibraryModalOpen] = useState(false);
 
     // Intent check
     useEffect(() => {
@@ -241,6 +244,15 @@ function CreatorContent() {
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
     }, [supabase]);
+
+    // Update preview when user uploads an image manually
+    useEffect(() => {
+        if (mode === "manual" && uploads.length > 0 && previewImage === "/orb-neon.gif") {
+            const url = URL.createObjectURL(uploads[0]);
+            setPreviewImage(url);
+            return () => URL.revokeObjectURL(url);
+        }
+    }, [uploads, mode, previewImage]);
 
     // Handle Remix Params
     useEffect(() => {
@@ -440,8 +452,81 @@ function CreatorContent() {
     };
 
     const handleAnimate = async () => {
-        if (!previewImage || previewImage === "/orb-neon.gif") return;
-        setVideoModalOpen(true);
+        if (!handleAuthGate()) return;
+        if (animating) return;
+
+        const promptText = manualPrompt.trim();
+        if (!promptText) {
+            setError("Please describe the motion or scene you want to create.");
+            return;
+        }
+
+        setAnimating(true);
+        setError(null);
+        setVideoResult(null);
+
+        // Scroll to preview
+        if (typeof window !== "undefined" && previewRef.current) {
+            previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        try {
+            let sourceImage: string | undefined;
+            let subjectImageBase64: string | undefined;
+
+            if (videoSubMode === "image_to_video") {
+                sourceImage = (previewImage && previewImage !== "/orb-neon.gif") ? previewImage : undefined;
+
+                if (uploads.length > 0) {
+                    const file = uploads[0];
+                    const reader = new FileReader();
+                    const base64 = await new Promise<string>((resolve) => {
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(file);
+                    });
+                    subjectImageBase64 = base64;
+                    if (!sourceImage || sourceImage.startsWith("blob:")) {
+                        sourceImage = base64;
+                    }
+                }
+
+                if (!sourceImage) {
+                    setError("Please generate or upload an image first for Image-to-Video.");
+                    setAnimating(false);
+                    return;
+                }
+            } else {
+                sourceImage = undefined;
+                // For Text to Video, we skip images
+            }
+
+            const res = await fetch("/api/generate-video", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    image: sourceImage,
+                    mainSubjectBase64: subjectImageBase64,
+                    prompt: promptText,
+                    userId: user?.id,
+                    aspectRatio: aspectRatio,
+                    sourceImageId: searchParams?.get("promptId") || undefined
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Video generation failed");
+
+            if (data.videoUrl) {
+                setVideoResult(data.videoUrl);
+            } else {
+                throw new Error("No video URL returned from server");
+            }
+        } catch (err: any) {
+            console.error("Video Generation Error:", err);
+            setError(err.message || "Failed to animate");
+        } finally {
+            setAnimating(false);
+        }
     };
 
     return (
@@ -457,53 +542,17 @@ function CreatorContent() {
                 <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-bold text-white">Prompt Tool</h2>
-                        {mode !== null ? (
-                            <button
-                                onClick={() => setMode(null)}
-                                className="text-xs font-bold text-white/40 hover:text-white uppercase tracking-wider transition-colors flex items-center gap-1 group"
-                            >
-                                <ChevronLeft size={12} className="group-hover:-translate-x-0.5 transition-transform" />
-                                Back to Menu
-                            </button>
-                        ) : (
-                            <div className="text-xs font-bold text-[#B7FF00] uppercase tracking-wider">AI Studio</div>
-                        )}
+                        <div className="text-xs font-bold text-[#B7FF00] uppercase tracking-wider">AI Studio</div>
                     </div>
 
                     {/* Prompt Tool Card */}
                     <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
-                        {/* Overlay for AUTO vs MANUAL choice */}
-                        {mode === null && !generating && (
-                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 backdrop-blur-md transition-all duration-300">
-                                <TypeWriter text="How do you want to start?" />
-                                <div className="flex gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={handleAutoModeStart}
-                                        className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
-                                    >
-                                        <span>Auto</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">
-                                            <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813a3.75 3.75 0 002.576-2.576l.813-2.846A.75.75 0 019 4.5zM9 15a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5A.75.75 0 019 15z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setMode("manual")}
-                                        className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
-                                    >
-                                        <span>Manual</span>
-                                        <span className="text-xs opacity-50 group-hover:opacity-100">✎</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                        {/* Choice Overlay Removed as requested */}
 
                         <RemixChatWizard
                             isOpen={wizardOpen}
                             onClose={() => {
                                 setWizardOpen(false);
-                                if (mode === "wizard") setMode(null); // Cancel back to menu if pure wizard
                             }}
                             onComplete={handleWizardComplete}
                             templatePreviewUrl={previewImage}
@@ -531,24 +580,41 @@ function CreatorContent() {
                         )}
 
                         {/* MANUAL MODE */}
-                        {mode === "manual" && (
-                            <div className={`relative transition-all duration-500 ${mode === null ? 'blur-sm opacity-40 scale-[0.98]' : ''}`}>
-                                <textarea
-                                    onChange={(e) => setManualPrompt(e.target.value)}
-                                    className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
-                                    rows={8}
-                                    placeholder="Describe your image..."
-                                    value={manualPrompt}
-                                    onClick={handleAuthGate}
-                                    onFocus={handleAuthGate}
-                                />
+                        <div className={`relative transition-all duration-500`}>
+                            <textarea
+                                onChange={(e) => setManualPrompt(e.target.value)}
+                                className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                                rows={8}
+                                placeholder="Describe your image..."
+                                value={manualPrompt}
+                                onClick={handleAuthGate}
+                                onFocus={handleAuthGate}
+                            />
 
-                                <div className="mt-4">
-                                    <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
-                                    <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
+                            <div className="mt-4 space-y-3">
+                                <div className="text-xs font-bold text-white/50 uppercase tracking-wide">Reference Images</div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setLibraryModalOpen(true)}
+                                    className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                                >
+                                    <Library size={18} className="transition-transform group-hover:scale-110" />
+                                    <span>PICK FROM YOUR LIBRARY</span>
+                                </button>
+
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                        <div className="w-full border-t border-white/5"></div>
+                                    </div>
+                                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                                        <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                                    </div>
                                 </div>
+
+                                <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* Settings Card */}
@@ -576,6 +642,25 @@ function CreatorContent() {
                                 disabled={generating || animating}
                             />
                         </div>
+
+                        {mediaType === "video" && (
+                            <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <SelectPill
+                                    label="Image to Video"
+                                    description="Start Frame"
+                                    selected={videoSubMode === "image_to_video"}
+                                    onClick={() => setVideoSubMode("image_to_video")}
+                                    disabled={generating || animating}
+                                />
+                                <SelectPill
+                                    label="Text to Video"
+                                    description="Words only"
+                                    selected={videoSubMode === "text_to_video"}
+                                    onClick={() => setVideoSubMode("text_to_video")}
+                                    disabled={generating || animating}
+                                />
+                            </div>
+                        )}
 
                         <div className="mt-4 pt-4 border-t border-white/5">
                             <div className="grid grid-cols-4 gap-2">
@@ -639,7 +724,7 @@ function CreatorContent() {
                             ) : (
                                 <span className="flex items-center gap-2">
                                     <Clapperboard size={20} />
-                                    <span>Animate</span>
+                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"}</span>
                                 </span>
                             )}
                         </button>
@@ -780,10 +865,31 @@ function CreatorContent() {
                     </div>
                 </div>
             </div >
+            {/* Video Modal is only used for Remix Cards / Library items now, 
+                Studio handles its own inline generation */}
             <VideoGeneratorModal
                 isOpen={videoModalOpen}
                 onClose={() => setVideoModalOpen(false)}
                 sourceImage={previewImage}
+                initialPrompt={manualPrompt}
+            />
+            <LibraryImagePickerModal
+                isOpen={libraryModalOpen}
+                onClose={() => setLibraryModalOpen(false)}
+                onSelect={async (url) => {
+                    setPreviewImage(url);
+                    try {
+                        const res = await fetch(url);
+                        const blob = await res.blob();
+                        let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
+                        try {
+                            file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+                        } catch (e) { console.warn(e); }
+                        setUploads((prev) => [...prev, file]);
+                    } catch (err) {
+                        console.error("Failed to fetch library img:", err);
+                    }
+                }}
             />
         </main >
     );

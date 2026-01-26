@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { compressImage } from "@/lib/compressImage";
 import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
 import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
@@ -13,6 +14,8 @@ import SelectPill from "@/components/SelectPill";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
+import { Library } from "lucide-react";
 
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 
@@ -50,6 +53,8 @@ function StudioContent() {
   const preIntent = normalize(sp?.get("intent")); // "video" or undefined
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
+  const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
+  const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
   const previewRef = useRef<HTMLElement>(null);
 
@@ -435,8 +440,86 @@ function StudioContent() {
   }
 
   async function handleAnimate() {
-    if (!lastImageUrl) return;
-    setVideoModalOpen(true);
+    if (!handleAuthGate()) return;
+    if (animating) return;
+
+    const promptText = editSummary.trim();
+    if (!promptText) {
+      setGenError("Please describe the motion or scene you want to create.");
+      return;
+    }
+
+    setAnimating(true);
+    setGenError(null);
+    setVideoResult(null);
+
+    // Scroll to preview
+    if (typeof window !== "undefined" && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    try {
+      let sourceImage: string | undefined;
+      let subjectImageBase64: string | undefined;
+
+      if (videoSubMode === "image_to_video") {
+        sourceImage = (lastImageUrl && lastImageUrl !== "/orb-neon.gif")
+          ? lastImageUrl
+          : (previewImageUrl !== "/orb-neon.gif" ? previewImageUrl : undefined);
+
+        // Use first upload as either start frame OR subject reference
+        if (uploads.length > 0) {
+          const file = uploads[0];
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+          subjectImageBase64 = base64;
+
+          // If no generated image yet, use this as the start frame
+          if (!sourceImage || sourceImage.startsWith("blob:")) {
+            sourceImage = base64;
+          }
+        }
+
+        if (!sourceImage) {
+          setGenError("Please generate or upload an image first for Image-to-Video.");
+          setAnimating(false);
+          return;
+        }
+      } else {
+        // Text to Video
+        sourceImage = undefined;
+      }
+
+      const res = await fetch("/api/generate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: sourceImage,
+          mainSubjectBase64: subjectImageBase64,
+          prompt: promptText,
+          userId: user?.id,
+          aspectRatio: aspectRatio,
+          sourceImageId: prePromptId || undefined
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Video generation failed");
+
+      if (data.videoUrl) {
+        setVideoResult(data.videoUrl);
+      } else {
+        throw new Error("No video URL returned from server");
+      }
+    } catch (err: any) {
+      console.error("Video Generation Error:", err);
+      setGenError(err.message || "Failed to animate");
+    } finally {
+      setAnimating(false);
+    }
   }
 
   // Deprecated inline animation function
@@ -537,8 +620,27 @@ function StudioContent() {
                 value={editSummary}
               />
 
-              <div className="mt-4">
-                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
+              <div className="mt-4 space-y-3">
+                <div className="text-xs font-bold text-white/50 uppercase tracking-wide">Reference Images</div>
+
+                <button
+                  type="button"
+                  onClick={() => setLibraryModalOpen(true)}
+                  className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                >
+                  <Library size={18} className="transition-transform group-hover:scale-110" />
+                  <span>PICK FROM YOUR LIBRARY</span>
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-white/5"></div>
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                    <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                  </div>
+                </div>
+
                 <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
               </div>
             </div>
@@ -569,6 +671,25 @@ function StudioContent() {
                 disabled={generating || animating}
               />
             </div>
+
+            {mediaType === "video" && (
+              <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <SelectPill
+                  label="Image to Video"
+                  description="Start Frame"
+                  selected={videoSubMode === "image_to_video"}
+                  onClick={() => setVideoSubMode("image_to_video")}
+                  disabled={generating || animating}
+                />
+                <SelectPill
+                  label="Text to Video"
+                  description="Words only"
+                  selected={videoSubMode === "text_to_video"}
+                  onClick={() => setVideoSubMode("text_to_video")}
+                  disabled={generating || animating}
+                />
+              </div>
+            )}
 
             <div className="mt-4 pt-4 border-t border-white/5">
               <div className="grid grid-cols-4 gap-2">
@@ -658,10 +779,10 @@ function StudioContent() {
               <button
                 type="button"
                 onClick={handleAnimate}
-                disabled={animating || !lastImageUrl}
+                disabled={animating}
                 className={[
                   "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                  (animating || !lastImageUrl) ? "cursor-not-allowed bg-zinc-700" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
+                  animating ? "cursor-not-allowed bg-zinc-700" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
                 ].join(" ")}
               >
                 {animating ? (
@@ -672,7 +793,7 @@ function StudioContent() {
                 ) : (
                   <span className="flex items-center gap-2">
                     <Clapperboard size={20} />
-                    <span>{lastImageUrl ? "Animate" : "Generate Image First"}</span>
+                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"}</span>
                   </span>
                 )}
               </button>
@@ -778,10 +899,30 @@ function StudioContent() {
 
         </div >
       </section >
+      {/* Video Modal remains for other flows, but Studio uses inline generation */}
       <VideoGeneratorModal
         isOpen={videoModalOpen}
         onClose={() => setVideoModalOpen(false)}
         sourceImage={lastImageUrl || ""}
+        initialPrompt={editSummary}
+      />
+      <LibraryImagePickerModal
+        isOpen={libraryModalOpen}
+        onClose={() => setLibraryModalOpen(false)}
+        onSelect={async (url) => {
+          setPreviewImageUrl(url);
+          try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
+            try {
+              file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+            } catch (e) { console.warn(e); }
+            setUploads((prev) => [...prev, file]);
+          } catch (err) {
+            console.error("Failed to fetch library img:", err);
+          }
+        }}
       />
     </main>
   );

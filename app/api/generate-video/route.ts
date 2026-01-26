@@ -125,8 +125,8 @@ export async function POST(req: Request) {
         const userId = user.id;
 
         // Validate
-        if ((!image && !inputVideo) || !prompt) {
-            return NextResponse.json({ error: "Missing required fields (image/video and prompt required)" }, { status: 400 });
+        if (!prompt) {
+            return NextResponse.json({ error: "Missing required field (prompt is required)" }, { status: 400 });
         }
 
         // 2. Setup Env & Auth
@@ -263,13 +263,14 @@ export async function POST(req: Request) {
                     bytesBase64Encoded: videoBase64,
                     mimeType: videoMime
                 };
-            } else {
-                // Fallback to Image (Text-to-Video / Image-to-Video)
+            } else if (imageBase64) {
+                // Image-to-Video
                 instancePayload.image = {
                     bytesBase64Encoded: imageBase64,
                     mimeType: mimeType
                 };
             }
+            // If neither video nor image, it's Text-to-Video
         }
 
         // NATIVE INGREDIENTS (Veo 3.1)
