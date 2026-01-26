@@ -117,9 +117,23 @@ export default async function RemixPage({ params }: Props) {
                 .eq("user_id", videoData.user_id)
                 .maybeSingle();
 
+            let finalImageUrl = (videoData as any).thumbnail_url || "";
+
+            // Fallback: If no thumbnail, try to get the source image
+            if (!finalImageUrl && videoData.source_image_id) {
+                const { data: sourceImage } = await supabase
+                    .from("prompt_generations")
+                    .select("image_url")
+                    .eq("id", videoData.source_image_id)
+                    .maybeSingle();
+                if (sourceImage) {
+                    finalImageUrl = sourceImage.image_url;
+                }
+            }
+
             fullRemixData = {
                 id: videoData.id,
-                image_url: "", // No thumbnail
+                image_url: finalImageUrl, // ✅ Now correctly populated
                 video_url: videoData.video_url,
                 mediaType: "video",
                 created_at: videoData.created_at,

@@ -162,6 +162,9 @@ function StudioContent() {
     return true;
   }
 
+  // ✅ Prevent double-fetch in Strict Mode
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
     // apply prefill once on mount
     if (preImg) {
@@ -172,9 +175,32 @@ function StudioContent() {
     // The feed passes 'remix' param with the prompt text usually.
     if (preImg || sp?.get("remix")) {
       setWizardOpen(true);
+
+      // ✅ Ported Logic: If preImg exists, fetch it and add to uploads so Wizard shows it
+      if (preImg && uploads.length === 0 && !hasFetchedRef.current) {
+        hasFetchedRef.current = true;
+        const fetchImage = async () => {
+          try {
+            // Avoid double-fetch if already present (basic check)
+            const res = await fetch(preImg);
+            const blob = await res.blob();
+            // Sanitize name
+            let file = new File([blob], "remix_reference.jpg", { type: "image/jpeg" });
+            try {
+              file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+            } catch (e) {
+              console.warn("Failed to compress remix ref", e);
+            }
+            setUploads((prev) => [...prev, file]);
+          } catch (err) {
+            console.error("Failed to load remix image as file:", err);
+            hasFetchedRef.current = false; // Reset on failure so retry is possible if needed?
+          }
+        };
+        fetchImage();
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [preImg, sp]);
 
   // ✅ Manage preview URLs for uploads
   useEffect(() => {

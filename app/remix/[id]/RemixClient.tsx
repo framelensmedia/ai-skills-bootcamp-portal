@@ -34,6 +34,8 @@ type Props = {
 
 import { cleanPrompt } from "@/lib/stringUtils";
 
+import VideoRemixOnboardingModal from "@/components/VideoRemixOnboardingModal";
+
 export default function RemixClient({ initialRemix }: Props) {
     const params = useParams();
     const router = useRouter();
@@ -48,6 +50,7 @@ export default function RemixClient({ initialRemix }: Props) {
     const [isFavorited, setIsFavorited] = useState(false);
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     // Upvote State
     const [likesCount, setLikesCount] = useState(0);
@@ -423,11 +426,32 @@ export default function RemixClient({ initialRemix }: Props) {
 
     const handleRemix = () => {
         if (!remix) return;
+
+        if (remix.mediaType === "video") {
+            setShowOnboarding(true);
+            return;
+        }
+
+        executeRemixRedirect();
+    };
+
+    const executeRemixRedirect = () => {
+        if (!remix) return;
+
+        let urlParams = `?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`;
+        const pidParam = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
+
+        if (remix.mediaType === "video") {
+            urlParams += "&intent=video";
+            // V1 Video Remix: Always go to Studio for direct generation
+            router.push(`/studio${urlParams}${pidParam}`);
+            return;
+        }
+
         if (remix.prompt_slug) {
-            router.push(`/prompts/${remix.prompt_slug}?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}`);
+            router.push(`/prompts/${remix.prompt_slug}${urlParams}`);
         } else {
-            const pid = remix.prompt_id ? `&promptId=${remix.prompt_id}` : "";
-            router.push(`/studio?remix=${encodeURIComponent(remix.combined_prompt_text || "")}&img=${encodeURIComponent(remix.image_url)}${pid}`);
+            router.push(`/studio${urlParams}${pidParam}`);
         }
     };
 
@@ -520,6 +544,14 @@ export default function RemixClient({ initialRemix }: Props) {
 
     return (
         <main className="min-h-screen pb-20 pt-10 px-4 md:pt-16">
+            <VideoRemixOnboardingModal
+                isOpen={showOnboarding}
+                onClose={() => setShowOnboarding(false)}
+                onStart={() => {
+                    setShowOnboarding(false);
+                    executeRemixRedirect();
+                }}
+            />
             <div className="mx-auto max-w-5xl">
                 {/* Nav */}
                 <div className="mb-6 flex items-center justify-between gap-4">
