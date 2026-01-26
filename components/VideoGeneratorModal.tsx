@@ -191,6 +191,13 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
                 {/* Right (Desktop) / Top (Mobile): Preview */}
                 <div className="relative w-full md:w-[60%] lg:w-[65%] bg-black flex flex-col">
+                    {/* Mobile Close Button */}
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 z-50 md:hidden h-10 w-10 flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md border border-white/10 hover:bg-black/70 transition-all"
+                    >
+                        <X size={20} />
+                    </button>
                     <div className="flex-1 relative w-full h-full flex items-center justify-center p-4 md:p-8">
                         {resultUrl ? (
                             <div className="relative w-full h-full flex items-center justify-center bg-black">
