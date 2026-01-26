@@ -21,7 +21,7 @@ export default async function FeedPage() {
     // 2. Fetch Video Generations
     const { data: videoGenerations } = await supabase
         .from("video_generations")
-        .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id`)
+        .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id, thumbnail_url, prompt_generations!source_image_id(image_url)`)
         .eq("is_public", true)
         .eq("status", "completed")
         .order("created_at", { ascending: false })
@@ -97,12 +97,22 @@ export default async function FeedPage() {
     });
 
     // 6. Map Videos to FeedItem
-    const videoItems: FeedItem[] = (videoGenerations || []).map(d => {
+    const videoItems: FeedItem[] = (videoGenerations || []).map((d: any) => {
         const profile = profileMap.get(d.user_id) || {};
+
+        let img = d.thumbnail_url;
+        if (!img && d.prompt_generations) {
+            if (Array.isArray(d.prompt_generations)) {
+                img = d.prompt_generations[0]?.image_url;
+            } else {
+                img = d.prompt_generations.image_url;
+            }
+        }
+        if (!img) img = "/orb-neon.gif";
 
         return {
             id: d.id,
-            imageUrl: "", // Videos don't have a separate thumbnail (could use source_image_id later)
+            imageUrl: img,
             videoUrl: d.video_url,
             mediaType: "video" as const,
             createdAt: d.created_at,

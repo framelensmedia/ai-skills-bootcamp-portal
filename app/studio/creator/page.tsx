@@ -9,9 +9,10 @@ import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
@@ -75,6 +76,18 @@ function CreatorContent() {
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:5");
     const [mediaType, setMediaType] = useState<"image" | "video">("image");
+
+    // Video State
+    const [animating, setAnimating] = useState(false);
+    const [videoResult, setVideoResult] = useState<string | null>(null);
+    const [videoModalOpen, setVideoModalOpen] = useState(false);
+
+    // Intent check
+    useEffect(() => {
+        if (searchParams?.get("intent") === "video") {
+            setMediaType("video");
+        }
+    }, [searchParams]);
 
     // Generation state
     const [generating, setGenerating] = useState(false);
@@ -402,8 +415,21 @@ function CreatorContent() {
                 throw new Error(msg || "Generation failed");
             }
 
-            // Navigate to library to see result
-            router.push("/library");
+            // Navigate to library to see result ... OR stay if Video Intent
+            const intent = searchParams?.get("intent");
+            if (intent === "video") {
+                // Auto-switch to video tab & Open Modal
+                setMediaType("video");
+
+                const data = json;
+                if (data && data.imageUrl) {
+                    setPreviewImage(data.full_quality_url || data.imageUrl);
+                    // Ensure state updates before opening
+                    setTimeout(() => setVideoModalOpen(true), 100);
+                }
+            } else {
+                router.push("/library");
+            }
 
         } catch (err: any) {
             console.error("Generate Error:", err);
@@ -411,6 +437,11 @@ function CreatorContent() {
         } finally {
             setGenerating(false);
         }
+    };
+
+    const handleAnimate = async () => {
+        if (!previewImage || previewImage === "/orb-neon.gif") return;
+        setVideoModalOpen(true);
     };
 
     return (
@@ -536,9 +567,14 @@ function CreatorContent() {
                                 label="Image"
                                 selected={mediaType === "image"}
                                 onClick={() => setMediaType("image")}
-                                disabled={generating}
+                                disabled={generating || animating}
                             />
-                            <SelectPill label="Video" disabled />
+                            <SelectPill
+                                label="Video"
+                                selected={mediaType === "video"}
+                                onClick={() => setMediaType("video")}
+                                disabled={generating || animating}
+                            />
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-white/5">
@@ -586,21 +622,44 @@ function CreatorContent() {
                         </div>
                     )}
 
-                    <button
-                        className={[
-                            "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                            generating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
-                        ].join(" ")}
-                        onClick={mode === "auto" ? undefined : handleManualGenerate}
-                        disabled={generating}
-                    >
-                        {generating ? (
-                            <span className="flex items-center gap-2">
-                                <LoadingHourglass className="w-5 h-5 text-black" />
-                                <span>Generating...</span>
-                            </span>
-                        ) : "Generate Artwork"}
-                    </button>
+                    {mediaType === "video" ? (
+                        <button
+                            className={[
+                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                animating ? "bg-zinc-700 cursor-not-allowed" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
+                            ].join(" ")}
+                            onClick={handleAnimate}
+                            disabled={animating}
+                        >
+                            {animating ? (
+                                <span className="flex items-center gap-2">
+                                    <LoadingHourglass className="w-5 h-5 text-white" />
+                                    <span>Creating Video...</span>
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                    <Clapperboard size={20} />
+                                    <span>Animate</span>
+                                </span>
+                            )}
+                        </button>
+                    ) : (
+                        <button
+                            className={[
+                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                generating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
+                            ].join(" ")}
+                            onClick={mode === "auto" ? undefined : handleManualGenerate}
+                            disabled={generating}
+                        >
+                            {generating ? (
+                                <span className="flex items-center gap-2">
+                                    <LoadingHourglass className="w-5 h-5 text-black" />
+                                    <span>Generating...</span>
+                                </span>
+                            ) : "Generate Artwork"}
+                        </button>
+                    )}
 
 
 
@@ -676,25 +735,56 @@ function CreatorContent() {
                             </div>
                         )}
 
-                        <Image
-                            src={previewImage}
-                            alt="Preview"
-                            fill
-                            className="object-cover opacity-80"
-                            unoptimized
-                        />
+                        {videoResult ? (
+                            <video
+                                src={videoResult}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                autoPlay
+                                loop
+                                controls
+                                playsInline
+                            />
+                        ) : (
+                            <Image
+                                src={previewImage}
+                                alt="Preview"
+                                fill
+                                className="object-cover opacity-80"
+                                unoptimized
+                            />
+                        )}
 
                         <div className="absolute inset-0 bg-black/35 pointer-events-none" />
 
-                        <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                            <h3 className="text-2xl font-bold text-white mb-2">Your Artwork</h3>
-                            <p className="text-sm text-white/50">
-                                Generated images will appear here. You can then edit, download, or share them.
-                            </p>
-                        </div>
+                        {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                                <h3 className="text-2xl font-bold text-white mb-2">Your Artwork</h3>
+                                <p className="text-sm text-white/50">
+                                    Generated images will appear here. You can then edit, download, or share them.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Download Button for Video */}
+                        {videoResult && (
+                            <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30">
+                                <a
+                                    href={videoResult}
+                                    download="video.mp4"
+                                    className="bg-white text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-zinc-200 transition-colors"
+                                >
+                                    <Download size={18} /> Download
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div >
+            <VideoGeneratorModal
+                isOpen={videoModalOpen}
+                onClose={() => setVideoModalOpen(false)}
+                sourceImage={previewImage}
+            />
         </main >
     );
 }

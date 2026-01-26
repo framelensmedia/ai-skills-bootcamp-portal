@@ -4,21 +4,32 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { X, Play, Wand2, Film } from "lucide-react";
 
+
+
 type Props = {
     isOpen: boolean;
     onClose: () => void;
     sourceImage: string; // URL
     sourceImageId?: string; // DB ID
     userId?: string;
+    initialPrompt?: string;
 };
 
-export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, userId }: Props) {
-    const [prompt, setPrompt] = useState("");
+export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, userId, initialPrompt }: Props) {
+    const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
+
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [timer, setTimer] = useState(0);
+
+    useEffect(() => {
+        if (isOpen && initialPrompt) {
+            setPrompt(initialPrompt);
+        }
+    }, [isOpen, initialPrompt]);
 
     /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
@@ -66,92 +77,93 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-[#121212] flex flex-col md:flex-row shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+            <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#09090b] flex flex-col-reverse md:flex-row shadow-2xl h-[90vh] md:h-[800px]">
 
-                {/* Visual Preview Side */}
-                <div className="relative h-64 md:h-auto md:w-1/2 bg-black flex items-center justify-center border-b md:border-b-0 md:border-r border-white/10">
-                    {resultUrl ? (
-                        <div className="relative w-full h-full flex items-center justify-center bg-black">
-                            <video
-                                src={resultUrl}
-                                controls
-                                autoPlay
-                                loop
-                                className="max-h-full max-w-full object-contain"
-                            />
-                        </div>
-                    ) : (
-                        <div className="relative w-full h-full p-8 flex items-center justify-center">
-                            <Image
-                                src={sourceImage}
-                                alt="Source"
-                                fill
-                                className={`object-contain transition-opacity duration-700 ${isGenerating ? "opacity-50 animate-pulse" : "opacity-100"}`}
-                                unoptimized
-                            />
-                            {isGenerating && (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <div className="h-12 w-12 rounded-full border-4 border-lime-400 border-t-transparent animate-spin mb-4 shadow-[0_0_20px_rgba(183,255,0,0.4)]" />
-                                    <div className="text-lime-400 font-mono text-sm tracking-widest animate-pulse">RENDERING SCENE...</div>
-                                    <div className="text-lime-400/60 font-mono text-xs mt-2">{timer}s</div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Controls Side */}
-                <div className="flex flex-col p-6 md:p-8 md:w-1/2 relative">
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
-                    >
-                        <X size={24} />
-                    </button>
-
-                    <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
-                        <Film className="text-lime-400" size={24} />
-                        Animate Scene
-                    </h2>
-                    <p className="text-sm text-white/50 mb-8">Bring this image to life with AI video generation.</p>
-
-                    <div className="space-y-6 flex-1">
+                {/* Left (Desktop) / Bottom (Mobile): Controls */}
+                <div className="w-full md:w-[40%] lg:w-[35%] flex flex-col bg-[#121212] border-t md:border-t-0 md:border-r border-white/10 overflow-y-auto">
+                    {/* Header */}
+                    <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#121212]/95 backdrop-blur z-20">
                         <div>
-                            <label className="block text-xs font-bold text-white/70 uppercase tracking-wider mb-2">
-                                WHAT HAPPENS?
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Film className="text-lime-400" size={20} />
+                                Video Remix
+                            </h2>
+                            <p className="text-xs text-white/40">Using Veo 3.1 & Ingredients</p>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="h-8 w-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    <div className="p-6 space-y-8 flex-1">
+                        {/* 1. Context / Prompt */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
+                                <Wand2 size={12} />
+                                What happens?
                             </label>
                             <textarea
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="Describe the motion (e.g., 'The camera pans slowly, the subject smiles and waves')..."
-                                className="w-full h-24 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20 resize-none"
+                                placeholder="Describe the motion and action (e.g. 'A cinematic slow motion shot of the character walking forward...')"
+                                className="w-full h-32 rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20 resize-none leading-relaxed"
                                 disabled={isGenerating}
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-white/70 uppercase tracking-wider mb-2">
-                                AUDIO / DIALOGUE (Optional)
-                            </label>
+                        {/* 2. Ingredients */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Cast & Ingredients</label>
+                                <span className="text-[10px] text-lime-400/80 bg-lime-400/10 px-2 py-0.5 rounded-full">New</span>
+                            </div>
+
+                            {/* Start Frame (Read Only Context) */}
+                            <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3">
+                                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black shrink-0 border border-white/10">
+                                    {sourceImage ? (
+                                        <Image src={sourceImage} alt="Context" fill className="object-cover" unoptimized />
+                                    ) : (
+                                        <div className="w-full h-full bg-white/10" />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-bold text-white truncate">Start Frame</div>
+                                    <div className="text-[10px] text-white/40 truncate">Context from original video</div>
+                                </div>
+                            </div>
+
+                            {/* Uploads */}
+
+
+
+                        </div>
+
+                        {/* 3. Audio */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Dialogue</label>
                             <input
                                 type="text"
                                 value={dialogue}
                                 onChange={(e) => setDialogue(e.target.value)}
-                                placeholder="What do we hear? (e.g. 'Hello there!')"
-                                className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20"
+                                placeholder="Optional spoken dialogue..."
+                                className="w-full rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20"
                                 disabled={isGenerating}
                             />
                         </div>
                     </div>
 
-                    {error && (
-                        <div className="mt-4 rounded-lg bg-red-950/50 border border-red-500/30 p-3 text-xs text-red-200">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="mt-8 pt-6 border-t border-white/10">
+                    {/* Footer Actions */}
+                    <div className="p-6 border-t border-white/10 bg-[#121212] sticky bottom-0 z-20">
+                        {error && (
+                            <div className="mb-4 text-xs text-red-400 bg-red-950/30 border border-red-500/20 p-3 rounded-lg">
+                                {error}
+                            </div>
+                        )}
                         <button
                             onClick={handleGenerate}
                             disabled={!prompt.trim() || isGenerating}
@@ -165,13 +177,58 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             ) : (
                                 <>
                                     <Wand2 size={18} />
-                                    Generate Video
+                                    Generate Remix
                                 </>
                             )}
                         </button>
                     </div>
-
                 </div>
+
+                {/* Right (Desktop) / Top (Mobile): Preview */}
+                <div className="relative w-full md:w-[60%] lg:w-[65%] bg-black flex flex-col">
+                    <div className="flex-1 relative w-full h-full flex items-center justify-center p-4 md:p-8">
+                        {resultUrl ? (
+                            <div className="relative w-full h-full flex items-center justify-center bg-black">
+                                <video
+                                    src={resultUrl}
+                                    controls
+                                    autoPlay
+                                    loop
+                                    className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                                />
+                            </div>
+                        ) : (
+                            <div className="relative w-full h-full p-4 md:p-8 flex items-center justify-center">
+                                <div className="relative w-full h-full max-h-[600px] aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-900/50 flex items-center justify-center">
+                                    {sourceImage ? (
+                                        <Image
+                                            src={sourceImage}
+                                            alt="Start Frame"
+                                            fill
+                                            className={`object-contain transition-opacity duration-700 ${isGenerating ? "opacity-30 blur-sm" : "opacity-100"}`}
+                                            unoptimized
+                                        />
+                                    ) : (
+                                        <div className="text-white/20 font-mono text-sm">No Start Frame</div>
+                                    )}
+
+                                    {/* Loading Overlay */}
+                                    {isGenerating && (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                                            <div className="relative">
+                                                <div className="absolute inset-0 bg-lime-400/20 blur-xl rounded-full" />
+                                                <div className="relative h-16 w-16 rounded-full border-4 border-lime-400 border-t-transparent animate-spin shadow-[0_0_30px_rgba(183,255,0,0.4)]" />
+                                            </div>
+                                            <div className="mt-6 text-lime-400 font-bold tracking-widest animate-pulse">GENERATING VIDEO</div>
+                                            <div className="text-lime-400/60 font-mono text-xs mt-2">{timer}s</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
             </div>
         </div>
     );

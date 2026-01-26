@@ -21,8 +21,9 @@ async function pollOperation(
     maxAttempts: number = 60,
     intervalMs: number = 5000
 ): Promise<any> {
-    // Veo uses fetchPredictOperation endpoint (POST with operationName in body)
     const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelId}:fetchPredictOperation`;
+
+    console.log("Polling via fetchPredictOperation:", url);
 
     for (let i = 0; i < maxAttempts; i++) {
         const res = await fetch(url, {
@@ -37,7 +38,6 @@ async function pollOperation(
         if (!res.ok) {
             const errText = await res.text();
             console.error(`Poll error (attempt ${i + 1}): ${res.status} - ${errText.slice(0, 200)}`);
-            // On 404, the operation might still be initializing, continue polling
             if (res.status === 404 && i < 5) {
                 await new Promise(r => setTimeout(r, intervalMs));
                 continue;
@@ -46,11 +46,16 @@ async function pollOperation(
         }
 
         const data = await res.json();
-        console.log(`Poll attempt ${i + 1}: done=${data.done}`);
+        // console.log(`Poll attempt ${i + 1}: done=${data.done}`);
 
         if (data.done) {
             if (data.error) {
                 throw new Error(`Operation failed: ${JSON.stringify(data.error)}`);
+            }
+            // Log the raw response to debug "No video" issues
+            console.log("Operation Done. Raw Response keys:", Object.keys(data.response || {}));
+            if (!data.response?.videos && !data.response?.predictions) {
+                console.error("FULL RAW RESPONSE:", JSON.stringify(data.response, null, 2));
             }
             return data.response;
         }
@@ -61,10 +66,54 @@ async function pollOperation(
     throw new Error("Operation timed out");
 }
 
+async function describeImage(
+    projectId: string,
+    location: string,
+    token: string,
+    imageBase64: string
+): Promise<string> {
+    try {
+        const model = "gemini-3-pro-image-preview";
+        // Use Global Endpoint for Preview Models
+        const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+
+        const payload = {
+            contents: [{
+                role: "user",
+                parts: [
+                    { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+                    { text: "Describe the environment, lighting, camera angle, and style of this image in detail. Output ONLY the visual description as a single paragraph. Do NOT use headers, markdown or conversational filler. Do NOT describe the characters. Focus on the scene." }
+                ]
+            }],
+            generationConfig: { maxOutputTokens: 150 }
+        };
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            console.error(`Captioning Failed (${res.status}):`, err);
+            return "";
+        }
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    } catch (e) {
+        console.error("Caption error:", e);
+        return "";
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { image, prompt, dialogue, sourceImageId, inputVideo } = body;
+        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64 } = body;
 
         // 1. Auth via Session
         const supabase = await createSupabaseServerClient();
@@ -75,15 +124,16 @@ export async function POST(req: Request) {
         }
         const userId = user.id;
 
-        // Validate: must have either image or inputVideo, and must have prompt
+        // Validate
         if ((!image && !inputVideo) || !prompt) {
             return NextResponse.json({ error: "Missing required fields (image/video and prompt required)" }, { status: 400 });
         }
 
         // 2. Setup Env & Auth
         const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
-        const location = "us-central1"; // Veo only available here
+        const location = "us-central1";
 
+        // Use FAST model for Semantic Remix (Text-to-Video + Subject is cheaper/faster)
         const modelId = process.env.VEO_MODEL_ID || "veo-3.1-fast-generate-001";
 
         const credsJson = mustEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
@@ -96,12 +146,11 @@ export async function POST(req: Request) {
         const client = await auth.getClient();
         const token = await client.getAccessToken();
 
-        // 3. Prepare Image (only if not extending a video)
+        // 3. Prepare Image (Start Frame)
         let imageBase64: string = "";
         let mimeType = "image/jpeg";
-        let detectedAspectRatio = "16:9"; // Default fallback
+        let detectedAspectRatio = "16:9";
 
-        // Only process image if provided (not video extension)
         if (image) {
             if (image.startsWith("http://") || image.startsWith("https://")) {
                 console.log("Fetching image from URL...");
@@ -125,7 +174,6 @@ export async function POST(req: Request) {
                 imageBase64 = image;
             }
 
-            // Detect aspect ratio and resize while preserving it
             try {
                 const sharp = (await import("sharp")).default;
                 const imageBuffer = Buffer.from(imageBase64, "base64");
@@ -133,22 +181,16 @@ export async function POST(req: Request) {
 
                 if (metadata.width && metadata.height) {
                     const ratio = metadata.width / metadata.height;
-                    // Map to Veo supported aspect ratios
-                    if (ratio >= 1.7) { // ~16:9 (1.77)
-                        detectedAspectRatio = "16:9";
-                    } else if (ratio >= 1.3) { // ~4:3 (1.33)
-                        detectedAspectRatio = "16:9"; // Veo may not support 4:3, use closest
-                    } else if (ratio <= 0.6) { // ~9:16 (0.56)
-                        detectedAspectRatio = "9:16";
-                    } else if (ratio <= 0.8) { // ~3:4 (0.75)
-                        detectedAspectRatio = "9:16"; // Veo may not support 3:4, use closest
-                    } else {
-                        detectedAspectRatio = "1:1"; // Square-ish
-                    }
+                    // Veo Aspect Ratios
+                    if (ratio >= 1.7) detectedAspectRatio = "16:9";
+                    else if (ratio >= 1.3) detectedAspectRatio = "16:9";
+                    else if (ratio <= 0.6) detectedAspectRatio = "9:16";
+                    else if (ratio <= 0.8) detectedAspectRatio = "9:16";
+                    else detectedAspectRatio = "1:1";
+
                     console.log(`Detected aspect ratio: ${metadata.width}x${metadata.height} -> ${detectedAspectRatio}`);
                 }
 
-                // Resize while maintaining aspect ratio
                 const maxDim = 1280;
                 const resizedBuffer = await sharp(imageBuffer)
                     .resize(maxDim, maxDim, { fit: "inside", withoutEnlargement: true })
@@ -156,7 +198,7 @@ export async function POST(req: Request) {
                     .toBuffer();
                 imageBase64 = resizedBuffer.toString("base64");
                 mimeType = "image/jpeg";
-                console.log("Image optimized:", imageBase64.length, "chars");
+                console.log("Start Frame optimized:", imageBase64.length, "chars");
             } catch (e) {
                 console.warn("Sharp optimization skipped:", e);
             }
@@ -165,57 +207,119 @@ export async function POST(req: Request) {
         }
 
         // 4. Build Request
+        // Veo uses regional endpoint
         const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelId}:predictLongRunning`;
 
-        let instancePayload: any = {
-            prompt: prompt + (dialogue ? ` Audio: "${dialogue}"` : "")
-        };
+        let finalPrompt = prompt + (dialogue ? ` Audio: "${dialogue}"` : "");
+        let instancePayload: any = {};
 
-        // inputVideo already extracted at top, use it here
-        if (inputVideo) {
-            // Handle Video Input (Extension/Edit)
-            let videoBase64: string = "";
-            let videoMime = "video/mp4";
+        // SEMANTIC REMIX LOGIC:
+        // If we have a Subject AND a Start Frame, we trigger Semantic Remix (Text-to-Video + Subject).
+        const isSemanticRemix = !!image && !!mainSubjectBase64;
 
-            if (inputVideo.startsWith("http")) {
-                console.log("Fetching input video from URL...");
-                const vRes = await fetch(inputVideo);
-                if (!vRes.ok) throw new Error("Failed to fetch input video");
-                const vBuf = await vRes.arrayBuffer();
-                videoBase64 = Buffer.from(vBuf).toString("base64");
-                // verify mime? default to mp4
-                const ct = vRes.headers.get("content-type");
-                if (ct) videoMime = ct;
-            } else if (inputVideo.startsWith("data:")) {
-                const match = inputVideo.match(/^data:(video\/\w+);base64,(.+)$/);
-                if (match) {
-                    videoMime = match[1];
-                    videoBase64 = match[2];
-                } else {
-                    videoBase64 = inputVideo.split(",")[1] || inputVideo;
-                }
-            } else {
-                videoBase64 = inputVideo;
-            }
+        if (isSemanticRemix) {
+            console.log("Triggering Semantic Remix (Text-to-Video + Subject)...");
 
-            instancePayload.video = {
-                bytesBase64Encoded: videoBase64,
-                mimeType: videoMime
-            };
+            // 1. Caption the Start Frame (Environment only)
+            const sceneDescription = await describeImage(projectId, location, token.token!, imageBase64);
+            console.log("Scene Context:", sceneDescription);
+
+            // 2. Combine Prompts
+            finalPrompt = `${finalPrompt}. Scene matching this description: ${sceneDescription}`;
+
+            // 3. Set Payload (Text Only + Subject)
+            instancePayload.prompt = finalPrompt;
+            // Note: We deliberately OMIT instancePayload.image to force Text-to-Video mode
         } else {
-            // Fallback to Image (Text-to-Video / Image-to-Video)
-            instancePayload.image = {
-                bytesBase64Encoded: imageBase64,
-                mimeType: mimeType
-            };
+            // Standard Flow (Image-to-Video or Video-to-Video)
+            instancePayload.prompt = finalPrompt;
+
+            if (inputVideo) {
+                // Handle Video Input
+                let videoBase64: string = "";
+                let videoMime = "video/mp4";
+
+                if (inputVideo.startsWith("http")) {
+                    console.log("Fetching input video from URL...");
+                    const vRes = await fetch(inputVideo);
+                    if (!vRes.ok) throw new Error("Failed to fetch input video");
+                    const vBuf = await vRes.arrayBuffer();
+                    videoBase64 = Buffer.from(vBuf).toString("base64");
+                    const ct = vRes.headers.get("content-type");
+                    if (ct) videoMime = ct;
+                } else if (inputVideo.startsWith("data:")) {
+                    const match = inputVideo.match(/^data:(video\/\w+);base64,(.+)$/);
+                    if (match) {
+                        videoMime = match[1];
+                        videoBase64 = match[2];
+                    } else {
+                        videoBase64 = inputVideo.split(",")[1] || inputVideo;
+                    }
+                } else {
+                    videoBase64 = inputVideo;
+                }
+
+                instancePayload.video = {
+                    bytesBase64Encoded: videoBase64,
+                    mimeType: videoMime
+                };
+            } else {
+                // Fallback to Image (Text-to-Video / Image-to-Video)
+                instancePayload.image = {
+                    bytesBase64Encoded: imageBase64,
+                    mimeType: mimeType
+                };
+            }
         }
 
-        // Build parameters - add storageUri for large outputs
+        // NATIVE INGREDIENTS (Veo 3.1)
+        if (mainSubjectBase64) {
+            console.log("Adding Main Subject to payload (Native Veo Ingredients)...");
+
+            let subjectBytes = "";
+            let subjectMime = "image/jpeg";
+
+            if (mainSubjectBase64.startsWith("data:")) {
+                const match = mainSubjectBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+                if (match) {
+                    // subjectMime = match[1];
+                    subjectBytes = match[2];
+                } else {
+                    subjectBytes = mainSubjectBase64.split(",")[1] || mainSubjectBase64;
+                }
+            } else {
+                subjectBytes = mainSubjectBase64;
+            }
+
+            // Optimize Subject Image
+            try {
+                const sharp = (await import("sharp")).default;
+                const subjectBuffer = Buffer.from(subjectBytes, "base64");
+                const resizedSubject = await sharp(subjectBuffer)
+                    .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+                    .jpeg({ quality: 90 })
+                    .toBuffer();
+                subjectBytes = resizedSubject.toString("base64");
+                subjectMime = "image/jpeg"; // Sharp outputs jpeg
+                console.log("Subject Image optimized:", subjectBytes.length, "chars");
+            } catch (e) {
+                console.warn("Subject optimization skipped:", e);
+            }
+
+            instancePayload.subjectReference = {
+                bytesBase64Encoded: subjectBytes,
+                mimeType: subjectMime
+            };
+
+            // Force prompt attention
+            instancePayload.prompt += " (render the character from the subject reference)";
+        }
+
+        // Build parameters
         const gcsBucket = process.env.GCS_VIDEO_BUCKET || `${projectId}-veo-output`;
         const outputPath = `veo-output/${userId}/${Date.now()}.mp4`;
         const storageUri = `gs://${gcsBucket}/${outputPath}`;
 
-        // Video extension only supports 7s duration; new videos can be 8s
         const durationSeconds = inputVideo ? 7 : 8;
 
         const parameters: any = {
@@ -229,11 +333,9 @@ export async function POST(req: Request) {
                 { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
                 { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
             ],
-            storageUri: storageUri  // Required for large video outputs
+            storageUri: storageUri
         };
 
-        // Only set aspectRatio for new video generation (not extensions)
-        // For extensions, Veo auto-detects from the input video
         if (!inputVideo) {
             parameters.aspectRatio = detectedAspectRatio;
         }
@@ -245,8 +347,14 @@ export async function POST(req: Request) {
             parameters
         };
 
-        console.log("Starting Veo generation:", { modelId, promptLength: prompt.length, imageSize: imageBase64.length, storageUri });
-        console.log("Full payload:", JSON.stringify(payload, null, 2).slice(0, 1000));
+        console.log("Starting Veo generation:", {
+            modelId,
+            promptLength: prompt.length,
+            imageSize: imageBase64.length,
+            storageUri,
+            hasMainSubject: !!mainSubjectBase64,
+            hasSecondarySubject: !!secondarySubjectBase64
+        });
 
         // 5. Start Operation
         const res = await fetch(url, {
@@ -268,34 +376,32 @@ export async function POST(req: Request) {
         const operationName = operationData.name;
         console.log("Operation started:", operationName);
 
-        // 6. Poll for Completion using fetchPredictOperation
+        // 6. Poll for Completion
         const response = await pollOperation(projectId, location, modelId, operationName, token.token!, 60, 5000);
         console.log("Operation complete");
 
         // 7. Extract Video
-        // Response can have videos array with gcsUri OR bytesBase64Encoded
         const videos = response?.videos || [];
         const predictions = response?.predictions || [];
 
         let videoData: { gcsUri?: string; bytesBase64Encoded?: string } | null = null;
-
-        if (videos.length > 0) {
-            videoData = videos[0];
-        } else if (predictions.length > 0) {
-            videoData = predictions[0];
-        }
+        if (videos.length > 0) videoData = videos[0];
+        else if (predictions.length > 0) videoData = predictions[0];
 
         if (!videoData) {
-            console.error("No video in response:", JSON.stringify(response).slice(0, 500));
-            return NextResponse.json({ error: "No video returned from model" }, { status: 502 });
+            const safeResponse = JSON.stringify(response).slice(0, 1000); // Limit length
+            console.error("No video in response:", safeResponse);
+            return NextResponse.json({
+                error: `No video returned. Backend Response: ${safeResponse}`
+            }, { status: 502 });
         }
 
-        let videoBuffer: Buffer;
+        // 8. Prepare Upload Body
+        let uploadBody: Buffer | Blob;
 
         if (videoData.bytesBase64Encoded) {
-            videoBuffer = Buffer.from(videoData.bytesBase64Encoded, "base64");
+            uploadBody = Buffer.from(videoData.bytesBase64Encoded, "base64");
         } else if (videoData.gcsUri) {
-            // Fetch from GCS with authentication
             console.log("Fetching video from GCS:", videoData.gcsUri);
             const gcsUrl = videoData.gcsUri.replace("gs://", "https://storage.googleapis.com/");
             const gcsRes = await fetch(gcsUrl, {
@@ -305,11 +411,9 @@ export async function POST(req: Request) {
             });
             if (!gcsRes.ok) {
                 const gcsErr = await gcsRes.text();
-                console.error("GCS fetch error:", gcsRes.status, gcsErr);
                 throw new Error(`Failed to fetch video from GCS: ${gcsRes.status}`);
             }
-            const gcsBuffer = await gcsRes.arrayBuffer();
-            videoBuffer = Buffer.from(gcsBuffer);
+            uploadBody = await gcsRes.blob();
         } else {
             throw new Error("No video bytes or GCS URI in response");
         }
@@ -317,13 +421,19 @@ export async function POST(req: Request) {
         // 8. Upload to Supabase
         const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
         const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
-        const admin = createClient(supabaseUrl, serviceRole);
+        const admin = createClient(supabaseUrl, serviceRole, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+            }
+        });
 
         const filePath = `videos/${userId}/${Date.now()}.mp4`;
 
         const { error: uploadError } = await admin.storage
             .from("generations")
-            .upload(filePath, videoBuffer, { contentType: "video/mp4", upsert: false });
+            .upload(filePath, uploadBody as any, { contentType: "video/mp4", upsert: false, duplex: "half" });
 
         if (uploadError) {
             console.error("Upload error", uploadError);
@@ -334,12 +444,10 @@ export async function POST(req: Request) {
         const videoUrl = pubUrl.publicUrl;
 
         // 9. Save DB Record
-        // Use source image as thumbnail for faster library loading
         let thumbnailUrl: string | null = null;
         if (image && image.startsWith("http")) {
             thumbnailUrl = image;
         } else if (sourceImageId) {
-            // Try to get source image URL from DB
             const { data: sourceImg } = await admin
                 .from("prompt_generations")
                 .select("image_url")

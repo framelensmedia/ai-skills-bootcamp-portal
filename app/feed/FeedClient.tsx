@@ -7,8 +7,10 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { ArrowBigUp, Heart, RefreshCw, Clock, TrendingUp, User } from "lucide-react";
 import Loading from "@/components/Loading";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { useToast } from "@/context/ToastContext";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
+import VideoRemixOnboardingModal from "@/components/VideoRemixOnboardingModal";
 
 export type FeedItem = {
     id: string; // generation id
@@ -53,6 +55,14 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null);
 
+    // Video Remix State
+    const [videoRemixOpen, setVideoRemixOpen] = useState(false);
+    const [selectedVideoRemix, setSelectedVideoRemix] = useState<FeedItem | null>(null);
+
+
+    // V1 Video Onboarding State
+    const [showVideoOnboarding, setShowVideoOnboarding] = useState(false);
+    const [pendingVideoRemix, setPendingVideoRemix] = useState<FeedItem | null>(null);
     const observer = useRef<IntersectionObserver | null>(null);
     const lastElementRef = useCallback((node: HTMLDivElement | null) => {
         if (loading) return;
@@ -111,7 +121,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
             let qVideos = supabase
                 .from("video_generations")
-                .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id`)
+                .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id, thumbnail_url, prompt_generations!source_image_id(image_url)`)
                 .eq("is_public", true)
                 .eq("status", "completed")
                 .range(page * 12, (page + 1) * 12 - 1);
@@ -126,10 +136,12 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
             const [resImages, resVideos] = await Promise.all([qImages, qVideos]);
 
-            if (resImages.error) {
-                console.error(resImages.error);
-                setLoading(false);
-                return;
+            if (resImages.error) console.error("Images Error:", resImages.error);
+            if (resVideos.error) console.error("Videos Error:", resVideos.error);
+
+            if (resImages.error || resVideos.error) {
+                // setLoading(false);
+                // return;
             }
 
             // Merge Data
@@ -154,16 +166,28 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             }));
 
             // Map Videos
-            const mappedVideos = videos.map((d: any) => ({
-                ...d,
-                mediaType: "video",
-                timestamp: new Date(d.created_at).getTime(),
-                image_url: "", // Need to resolve this later if possible? Or just use video
-                settings: { headline: d.prompt?.slice(0, 50) || "Video" },
-                original_prompt_text: d.prompt,
-                remix_prompt_text: "",
-                combined_prompt_text: d.prompt
-            }));
+            const mappedVideos = videos.map((d: any) => {
+                let img = d.thumbnail_url;
+                if (!img && d.prompt_generations) {
+                    if (Array.isArray(d.prompt_generations)) {
+                        img = d.prompt_generations[0]?.image_url;
+                    } else {
+                        img = d.prompt_generations.image_url;
+                    }
+                }
+                if (!img) img = "/orb-neon.gif"; // Fallback
+
+                return {
+                    ...d,
+                    mediaType: "video",
+                    timestamp: new Date(d.created_at).getTime(),
+                    image_url: img,
+                    settings: { headline: d.prompt?.slice(0, 50) || "Video" },
+                    original_prompt_text: d.prompt,
+                    remix_prompt_text: "",
+                    combined_prompt_text: d.prompt
+                };
+            });
 
             combinedData = [...mappedImages, ...mappedVideos].sort((a, b) => {
                 if (sort === "newest") {
@@ -355,14 +379,56 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     const handleRemix = (payload: any) => {
+        // Check for Video Type directly from payload (if extended) or we need to pass the whole item?
+        // Since we are calling this from the button where we have 'item', let's update the call site.
+        // OR we can try to detect from the payload if we pass mediaType.
+
         let href = `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
             `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
 
         if (payload.promptId) {
             href += `&promptId=${encodeURIComponent(payload.promptId)}`;
         }
+        if (payload.intent) {
+            href += `&intent=${encodeURIComponent(payload.intent)}`;
+        }
 
         router.push(href);
+    };
+
+    const handleRemixClick = (item: FeedItem) => {
+        if (item.mediaType === "video") {
+            // Intercept for Onboarding Modal
+            setPendingVideoRemix(item);
+            setShowVideoOnboarding(true);
+            return;
+        }
+        // V1 Video Remix Flow:
+        // Everything goes to Studio (Image Lab).
+        // For video, we pass the video thumbnail (or imageURL) as the source image.
+
+        handleRemix({
+            imgUrl: item.imageUrl, // For video items, this is already mapped to thumbnail/frame
+            remixPromptText: item.remixPromptText,
+            originalPromptText: item.originalPromptText,
+            combinedPromptText: item.combinedPromptText,
+            promptId: item.promptId
+        });
+    };
+
+    const handleVideoRemixStart = () => {
+        if (!pendingVideoRemix) return;
+
+        setShowVideoOnboarding(false);
+        handleRemix({
+            imgUrl: pendingVideoRemix.imageUrl,
+            remixPromptText: pendingVideoRemix.remixPromptText,
+            originalPromptText: pendingVideoRemix.originalPromptText,
+            combinedPromptText: pendingVideoRemix.combinedPromptText,
+            promptId: pendingVideoRemix.promptId,
+            intent: "video"
+        });
+        setPendingVideoRemix(null);
     };
 
     return (
@@ -482,15 +548,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                             </div>
 
                             <button
-                                onClick={() => {
-                                    handleRemix({
-                                        imgUrl: item.imageUrl,
-                                        remixPromptText: item.remixPromptText,
-                                        originalPromptText: item.originalPromptText,
-                                        combinedPromptText: item.combinedPromptText,
-                                        promptId: item.promptId
-                                    })
-                                }}
+                                onClick={() => handleRemixClick(item)}
                                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#B7FF00] text-black hover:bg-[#a3e600] transition active:scale-95"
                                 title="Remix this"
                             >
@@ -534,6 +592,21 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                     fullQualityUrl={selectedItem.fullQualityUrl}
                 />
             )}
+
+            <VideoGeneratorModal
+                isOpen={videoRemixOpen}
+                onClose={() => setVideoRemixOpen(false)}
+                sourceImage={selectedVideoRemix?.imageUrl || ""}
+                sourceImageId={selectedVideoRemix?.id}
+                userId={selectedVideoRemix?.userId || undefined}
+
+            />
+
+            <VideoRemixOnboardingModal
+                isOpen={showVideoOnboarding}
+                onClose={() => setShowVideoOnboarding(false)}
+                onStart={handleVideoRemixStart}
+            />
         </main>
     );
 }

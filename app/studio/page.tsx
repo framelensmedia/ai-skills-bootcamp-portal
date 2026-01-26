@@ -8,10 +8,12 @@ import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@
 import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 
 type MediaType = "image" | "video";
@@ -45,6 +47,7 @@ function StudioContent() {
   // Optional context
   const prePromptId = normalize(sp?.get("promptId"));
   const prePromptSlug = normalize(sp?.get("promptSlug"));
+  const preIntent = normalize(sp?.get("intent")); // "video" or undefined
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
@@ -64,6 +67,9 @@ function StudioContent() {
 
   // Edit Mode State
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Video Generator Modal State
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
 
   // Fetch Template Config if promptId is present
   useEffect(() => {
@@ -116,7 +122,11 @@ function StudioContent() {
   const [genError, setGenError] = useState<string | null>(null);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
   const [lastFullQualityUrl, setLastFullQualityUrl] = useState<string | null>(null);
+  // Video State
+  const [animating, setAnimating] = useState(false);
+  const [videoResult, setVideoResult] = useState<string | null>(null);
 
+  // Lightbox
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -323,6 +333,14 @@ function StudioContent() {
       setLastImageUrl(imageUrl);
       setLastFullQualityUrl(fullQualityUrl);
       setLightboxOpen(true);
+
+      setLightboxOpen(true);
+
+      // Auto-Switch for Video Intent -> Open Modal
+      if (preIntent === "video") {
+        setMediaType("video");
+        setVideoModalOpen(true);
+      }
     } catch (e: any) {
       console.error("Generation error:", e);
       const msg = e?.message || "";
@@ -402,6 +420,12 @@ function StudioContent() {
       setLightboxOpen(true);
       setEditModalOpen(false);
 
+      // Auto-Switch for Video Intent
+      if (preIntent === "video") {
+        setMediaType("video");
+        setVideoModalOpen(true);
+      }
+
     } catch (e: any) {
       console.error("Edit Generation Error:", e);
       setGenError(e.message || "Failed to appply edits.");
@@ -410,8 +434,28 @@ function StudioContent() {
     }
   }
 
+  async function handleAnimate() {
+    if (!lastImageUrl) return;
+    setVideoModalOpen(true);
+  }
+
+  // Deprecated inline animation function
+
+
   function handleRemixFromLightbox() {
     if (!handleAuthGate()) return;
+
+    // Check if the current generation result is a video
+    if (mediaType === "video" || (lastImageUrl && lastImageUrl.startsWith("http") && lastImageUrl.includes("video"))) { // Weak check
+      // Actually, if we just generated a video, we might want to extend it.
+      // But here we are "Remixing".
+      // If mediaType is video, open Video Modal?
+      // Current UI has "Video" pill but disabled. We only generate Images in Studio for now.
+      // So Lightbox in Studio is ONLY for images.
+
+      // Wait, the user said "remix video option". This refers to the Community Remixes grid.
+      // Those don't open lightbox. They have hover buttons.
+    }
     setWizardOpen(true);
     setLightboxOpen(false);
   }
@@ -516,9 +560,14 @@ function StudioContent() {
                 label="Image"
                 selected={mediaType === "image"}
                 onClick={() => setMediaType("image")}
-                disabled={generating}
+                disabled={generating || animating}
               />
-              <SelectPill label="Video" disabled />
+              <SelectPill
+                label="Video"
+                selected={mediaType === "video"}
+                onClick={() => setMediaType("video")}
+                disabled={generating || animating}
+              />
             </div>
 
             <div className="mt-4 pt-4 border-t border-white/5">
@@ -594,23 +643,58 @@ function StudioContent() {
           {/* ACTION BUTTONS */}
           <div className="space-y-4 pt-4 border-t border-white/5">
 
-            {/* Primary Action */}
-            <button
-              type="button"
-              onClick={() => handleGenerate()}
-              disabled={generating}
-              className={[
-                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
-              ].join(" ")}
-            >
-              {generating ? (
-                <span className="flex items-center gap-2">
-                  <LoadingHourglass className="w-5 h-5 text-black" />
-                  <span>Generating...</span>
-                </span>
-              ) : "Generate Artwork"}
-            </button>
+            {/* VIDEO RESULT ACTION */}
+            {videoResult ? (
+              <a
+                href={videoResult}
+                download={`video-${Date.now()}.mp4`}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-5 text-base font-bold tracking-tight bg-white text-black hover:bg-white/90 transition-all shadow-lg shadow-white/10"
+              >
+                <Download size={20} />
+                Download Video
+              </a>
+            ) : mediaType === "video" ? (
+              /* ANIMATE BUTTON */
+              <button
+                type="button"
+                onClick={handleAnimate}
+                disabled={animating || !lastImageUrl}
+                className={[
+                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                  (animating || !lastImageUrl) ? "cursor-not-allowed bg-zinc-700" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
+                ].join(" ")}
+              >
+                {animating ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingHourglass className="w-5 h-5 text-white" />
+                    <span>Animating...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Clapperboard size={20} />
+                    <span>{lastImageUrl ? "Animate" : "Generate Image First"}</span>
+                  </span>
+                )}
+              </button>
+            ) : (
+              /* GENERATE BUTTON */
+              <button
+                type="button"
+                onClick={() => handleGenerate()}
+                disabled={generating}
+                className={[
+                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                  generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
+                ].join(" ")}
+              >
+                {generating ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingHourglass className="w-5 h-5 text-black" />
+                    <span>Generating...</span>
+                  </span>
+                ) : "Generate Artwork"}
+              </button>
+            )}
 
             {/* Secondary Actions Row */}
             <div className="grid grid-cols-2 gap-3">
@@ -633,24 +717,38 @@ function StudioContent() {
           </div>
         </div>
 
+
+
         {/* RIGHT: Preview */}
-        <div className="order-1 lg:order-2 space-y-4">
+        < div className="order-1 lg:order-2 space-y-4" >
           <div className="group relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]">
             {/* Generating Overlay */}
-            {generating && (
+            {(generating || animating) && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
                 <LoadingOrb />
+                {animating && <p className="mt-4 text-sm font-bold text-white/50 animate-pulse">Creating Video...</p>}
               </div>
             )}
             <div className="relative aspect-[9/16] w-full">
-              <Image
-                src={lastImageUrl || previewImageUrl}
-                alt="Preview"
-                fill
-                className="object-contain"
-                priority={false}
-                unoptimized
-              />
+              {videoResult ? (
+                <video
+                  src={videoResult}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  autoPlay
+                  loop
+                  controls
+                  playsInline
+                />
+              ) : (
+                <Image
+                  src={lastImageUrl || previewImageUrl}
+                  alt="Preview"
+                  fill
+                  className="object-contain"
+                  priority={false}
+                  unoptimized
+                />
+              )}
             </div>
             {/* Expand Icon Overlay - Subtle */}
             <button
@@ -678,9 +776,14 @@ function StudioContent() {
           </div>
 
 
-        </div>
-      </section>
-    </main >
+        </div >
+      </section >
+      <VideoGeneratorModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        sourceImage={lastImageUrl || ""}
+      />
+    </main>
   );
 }
 
