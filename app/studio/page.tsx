@@ -144,6 +144,22 @@ function StudioContent() {
   // ✅ Auth State
   const [user, setUser] = useState<any>(null);
 
+  // Video Edit State
+  const [inputVideoUrl, setInputVideoUrl] = useState<string | undefined>(undefined);
+
+  // Parse Edit Mode
+  const modeParam = normalize(sp?.get("mode"));
+  const videoUrlParam = normalize(sp?.get("videoUrl"));
+  const promptParam = normalize(sp?.get("prompt"));
+
+  useEffect(() => {
+    if (modeParam === "edit" && videoUrlParam) {
+      setInputVideoUrl(videoUrlParam);
+      setVideoModalOpen(true);
+      if (promptParam) setEditSummary(promptParam);
+    }
+  }, [modeParam, videoUrlParam, promptParam]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
   }, [supabase]);
@@ -267,6 +283,9 @@ function StudioContent() {
     if (!handleAuthGate()) return;
 
     setGenError(null);
+
+    // If video modal is open, we handle it there
+    if (videoModalOpen) return;
 
     if (mediaType === "video") {
       setGenError("Video generation is not wired yet. Switch to Image for now.");
@@ -414,7 +433,7 @@ function StudioContent() {
 
       // 2. Build Form Data
       const supabase = createSupabaseBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } = {} } = await supabase.auth.getUser(); // Destructure with default empty object
       if (!user) throw new Error("Please log in to edit.");
 
       const form = new FormData();
@@ -598,16 +617,24 @@ function StudioContent() {
       <GenerationLightbox
         open={lightboxOpen}
         url={lastImageUrl}
+        videoUrl={mediaType === "video" ? videoResult : undefined}
+        mediaType={mediaType}
         onClose={closeLightbox}
-        // Legacy props might be empty now, using editSummary
-        combinedPromptText={editSummary}
         onShare={handleShare}
-        onRemix={handleRemixFromLightbox}
-        onEdit={() => {
-          setLightboxOpen(false); // Close lightbox to show Edit Modal clearly
-          setEditModalOpen(true);
-        }}
-        fullQualityUrl={lastFullQualityUrl}
+        onRemix={handleRemix}
+        originalPromptText={editSummary}
+        remixPromptText={remixAnswers ? JSON.stringify(remixAnswers) : ""}
+        combinedPromptText={editSummary}
+        onAnimate={handleAnimate} // Uses inline animation for fresh generation
+      />
+
+      {/* Video Modal remains for other flows, but Studio uses inline generation */}
+      <VideoGeneratorModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        sourceImage={lastImageUrl || ""}
+        sourceVideo={inputVideoUrl} // ✅ Pass Video
+        initialPrompt={editSummary}
       />
 
       <div className="mb-6">
@@ -935,6 +962,7 @@ function StudioContent() {
         isOpen={videoModalOpen}
         onClose={() => setVideoModalOpen(false)}
         sourceImage={lastImageUrl || ""}
+        sourceVideo={inputVideoUrl}
         initialPrompt={editSummary}
       />
       <LibraryImagePickerModal

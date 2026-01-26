@@ -987,9 +987,14 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 combinedPromptText={lbCombined}
                 onShare={handleShare}
                 onRemix={handleRemix}
-                onEdit={isOwnedByCurrentUser && lbMediaType === "image" ? () => {
-                    setLightboxOpen(false);
-                    setEditModalOpen(true);
+                onEdit={isOwnedByCurrentUser ? () => {
+                    if (lbMediaType === "video") {
+                        const targetUrl = `/studio?mode=edit&intent=video&videoUrl=${encodeURIComponent(lbVideoUrl || lightboxUrl || "")}&prompt=${encodeURIComponent(lbCombined || lbOriginal || "")}`;
+                        router.push(targetUrl);
+                    } else {
+                        setLightboxOpen(false);
+                        setEditModalOpen(true);
+                    }
                 } : undefined}
                 onDelete={isOwnedByCurrentUser ? () => {
                     if (lightboxItemId) {
@@ -1216,8 +1221,14 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                                     muted
                                                     loop
                                                     playsInline
-                                                    onMouseEnter={(e) => e.currentTarget.play()}
-                                                    onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                                    onMouseEnter={(e) => {
+                                                        const p = e.currentTarget.play();
+                                                        if (p !== undefined) { p.catch(() => { }); }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.pause();
+                                                        e.currentTarget.currentTime = 0;
+                                                    }}
                                                 />
                                                 <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full flex items-center gap-1">
                                                     <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />

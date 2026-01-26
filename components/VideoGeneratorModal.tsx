@@ -9,13 +9,14 @@ import { X, Play, Wand2, Film } from "lucide-react";
 type Props = {
     isOpen: boolean;
     onClose: () => void;
-    sourceImage: string; // URL
+    sourceImage?: string; // URL
     sourceImageId?: string; // DB ID
+    sourceVideo?: string; // URL for Video-to-Video
     userId?: string;
     initialPrompt?: string;
 };
 
-export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, userId, initialPrompt }: Props) {
+export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt }: Props) {
     const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
 
@@ -57,6 +58,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     image: sourceImage,
+                    inputVideo: sourceVideo, // Pass video for V2V
                     prompt,
                     dialogue,
                     userId,
@@ -87,7 +89,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         <div>
                             <h2 className="text-lg font-bold text-white flex items-center gap-2">
                                 <Film className="text-lime-400" size={20} />
-                                Video Remix
+                                {sourceVideo ? "Edit Video" : "Video Remix"}
                             </h2>
                             <p className="text-xs text-white/40">Using Veo 3.1 & Ingredients</p>
                         </div>
@@ -104,12 +106,12 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         <div className="space-y-3">
                             <label className="text-xs font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
                                 <Wand2 size={12} />
-                                What happens?
+                                {sourceVideo ? "Edit Instructions" : "What happens?"}
                             </label>
                             <textarea
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="Describe the motion and action (e.g. 'A cinematic slow motion shot of the character walking forward...')"
+                                placeholder={sourceVideo ? "Describe how to change the video (e.g. 'Make it look like a 1980s film', 'Change the background to a cyberpunk city')..." : "Describe the motion and action (e.g. 'A cinematic slow motion shot of the character walking forward...')..."}
                                 className="w-full h-32 rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20 resize-none leading-relaxed"
                                 disabled={isGenerating}
                             />
@@ -122,20 +124,23 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 <span className="text-[10px] text-lime-400/80 bg-lime-400/10 px-2 py-0.5 rounded-full">New</span>
                             </div>
 
-                            {/* Start Frame (Read Only Context) */}
+                            {/* Start Frame (Read Only Context) - OR Input Video */}
                             <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3">
-                                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-black shrink-0 border border-white/10">
-                                    {sourceImage ? (
+                                <div className="relative h-12 w-16 rounded-lg overflow-hidden bg-black shrink-0 border border-white/10 flex items-center justify-center">
+                                    {sourceVideo ? (
+                                        <video src={sourceVideo} className="w-full h-full object-cover" muted />
+                                    ) : sourceImage ? (
                                         <Image src={sourceImage} alt="Context" fill className="object-cover" unoptimized />
                                     ) : (
                                         <div className="w-full h-full bg-white/10" />
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-bold text-white truncate">Start Frame</div>
-                                    <div className="text-[10px] text-white/40 truncate">Context from original video</div>
+                                    <div className="text-xs font-bold text-white truncate">{sourceVideo ? "Input Video" : "Start Frame"}</div>
+                                    <div className="text-[10px] text-white/40 truncate">Context from original {sourceVideo ? "video" : "image"}</div>
                                 </div>
                             </div>
+
 
                             {/* Uploads */}
 
@@ -177,7 +182,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             ) : (
                                 <>
                                     <Wand2 size={18} />
-                                    Generate Remix
+                                    {sourceVideo ? "Generate Edit" : "Generate Remix"}
                                 </>
                             )}
                         </button>
@@ -200,7 +205,16 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         ) : (
                             <div className="relative w-full h-full p-4 md:p-8 flex items-center justify-center">
                                 <div className="relative w-full h-full max-h-[600px] aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-900/50 flex items-center justify-center">
-                                    {sourceImage ? (
+                                    {sourceVideo ? (
+                                        <video
+                                            src={sourceVideo}
+                                            className={`w-full h-full object-contain ${isGenerating ? "opacity-30 blur-sm" : "opacity-100"}`}
+                                            muted
+                                            loop
+                                            autoPlay
+                                            playsInline
+                                        />
+                                    ) : sourceImage ? (
                                         <Image
                                             src={sourceImage}
                                             alt="Start Frame"
