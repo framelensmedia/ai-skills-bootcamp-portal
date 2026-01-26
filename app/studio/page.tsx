@@ -475,7 +475,8 @@ function StudioContent() {
             reader.onload = () => resolve(reader.result as string);
             reader.readAsDataURL(file);
           });
-          subjectImageBase64 = base64;
+
+          subjectImageBase64 = undefined; // Force Start Frame (no Subject)
 
           // If no generated image yet, use this as the start frame
           if (!sourceImage || sourceImage.startsWith("blob:")) {
@@ -620,29 +621,33 @@ function StudioContent() {
                 value={editSummary}
               />
 
-              <div className="mt-4 space-y-3">
-                <div className="text-xs font-bold text-white/50 uppercase tracking-wide">Reference Images</div>
-
-                <button
-                  type="button"
-                  onClick={() => setLibraryModalOpen(true)}
-                  className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
-                >
-                  <Library size={18} className="transition-transform group-hover:scale-110" />
-                  <span>PICK FROM YOUR LIBRARY</span>
-                </button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <div className="w-full border-t border-white/5"></div>
+              {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
+                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
+                    {mediaType === "video" ? "Start Frame" : "Reference Images"}
                   </div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
-                    <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+
+                  <button
+                    type="button"
+                    onClick={() => setLibraryModalOpen(true)}
+                    className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                  >
+                    <Library size={18} className="transition-transform group-hover:scale-110" />
+                    <span>PICK FROM YOUR LIBRARY</span>
+                  </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-white/5"></div>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                      <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                    </div>
                   </div>
+
+                  <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
                 </div>
-
-                <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
-              </div>
+              )}
             </div>
           </div>
 
