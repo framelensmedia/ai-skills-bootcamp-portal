@@ -961,7 +961,7 @@ function StudioContent() {
       <VideoGeneratorModal
         isOpen={videoModalOpen}
         onClose={() => setVideoModalOpen(false)}
-        sourceImage={lastImageUrl || ""}
+        sourceImage={lastImageUrl || previewImageUrl || ""}
         sourceVideo={inputVideoUrl}
         initialPrompt={editSummary}
       />

@@ -989,7 +989,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 onRemix={handleRemix}
                 onEdit={isOwnedByCurrentUser ? () => {
                     if (lbMediaType === "video") {
-                        const targetUrl = `/studio?mode=edit&intent=video&videoUrl=${encodeURIComponent(lbVideoUrl || lightboxUrl || "")}&prompt=${encodeURIComponent(lbCombined || lbOriginal || "")}`;
+                        const targetUrl = `/studio?mode=edit&intent=video&videoUrl=${encodeURIComponent(lbVideoUrl || lightboxUrl || "")}&img=${encodeURIComponent(lightboxUrl || "")}&prompt=${encodeURIComponent(lbCombined || lbOriginal || "")}`;
                         router.push(targetUrl);
                     } else {
                         setLightboxOpen(false);
