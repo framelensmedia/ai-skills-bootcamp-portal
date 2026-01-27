@@ -68,11 +68,10 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 const FORCE_CUTOUT_INSTRUCTIONS = `
 [HARD FORCE: PHOTOSHOP CUTOUT MODE (EXTREME)]
 - **ACTION**: You must perform a digital "Scissors Cut" of the subject from the Reference Image and paste them into the Template.
-- **ABSOLUTE IDENTITY LOCK**: You are FORBIDDEN from generating a new face. You MUST perform a direct valid pixel copy/paste of the reference face/body.
-- **NO GENERATIVE FILL ON FACE**: Do not let the AI "dream" or "hallucinate" new facial features. Use the source pixels exactly.
+- **ABSOLUTE IDENTITY LOCK**: You are FORBIDDEN from generating a new face. You MUST preserve the source facial structure, eyes, nose, and mouth shape 100%.
+- **STYLE INTEGRATION**: You MUST adjust the subject's lighting, color grading, and texture to MATCH the scene's Global Style (e.g. Cinematic, Cartoon, etc.). The subject must not look like a "sticker" - they must be integrated.
 - **ZERO HALLUCINATION**: Do not change the outfit, hair, or accessories unless explicitly told.
-- **TEXTURE PRESERVATION**: Maintain the original skin texture, imperfections, and lighting of the source face.
-- **CAMERA LENS**: Apply a "Canon 5D Mk IV + 85mm Lens" blur/bokeh profile to the background, but keep the subject sharp.
+- **IDENTITY vs STYLE**: Prioritize Identity for the Face Geometry, but prioritize the Global Style for the Rendering (Lighting, Color, Shading).
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
