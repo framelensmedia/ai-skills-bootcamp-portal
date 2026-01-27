@@ -67,10 +67,12 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 
 const FORCE_CUTOUT_INSTRUCTIONS = `
 [HARD FORCE: PHOTOSHOP CUTOUT MODE (EXTREME)]
-1. **ABSOLUTE IDENTITY LOCK**: You are FORBIDDEN from generating a new face. You MUST perform a direct valid pixel copy/paste of the reference face onto the target body.
-2. **NO GENERATIVE FILL ON FACE**: Do not let the AI "dream" or "hallucinate" new facial features. Use the source pixels.
-3. **TEXTURE PRESERVATION**: Maintain the original skin texture, imperfections, and lighting of the source face if possible, only adjusting color temperature to match the scene.
-4. **CAMERA LENS**: Apply a "Canon 5D Mk IV + 85mm Lens" blur/bokeh profile to the background, but keep the subject sharp.
+- **ACTION**: You must perform a digital "Scissors Cut" of the subject from the Reference Image and paste them into the Template.
+- **ABSOLUTE IDENTITY LOCK**: You are FORBIDDEN from generating a new face. You MUST perform a direct valid pixel copy/paste of the reference face/body.
+- **NO GENERATIVE FILL ON FACE**: Do not let the AI "dream" or "hallucinate" new facial features. Use the source pixels exactly.
+- **ZERO HALLUCINATION**: Do not change the outfit, hair, or accessories unless explicitly told.
+- **TEXTURE PRESERVATION**: Maintain the original skin texture, imperfections, and lighting of the source face.
+- **CAMERA LENS**: Apply a "Canon 5D Mk IV + 85mm Lens" blur/bokeh profile to the background, but keep the subject sharp.
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
@@ -563,9 +565,12 @@ Execute the user's instruction precisely.
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
             subjectRules,
             (subjectLock && totalInputImages > 0)
-                ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
+                ? (
+                    (forceCutout)
+                        ? FORCE_CUTOUT_INSTRUCTIONS
+                        : (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
+                )
                 : "",
-            (subjectLock && forceCutout) ? FORCE_CUTOUT_INSTRUCTIONS : "",
             (!subjectLock && totalInputImages > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,

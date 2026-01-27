@@ -116,10 +116,22 @@ function CreatorContent() {
     // Community Feed Data
     const [communityPrompts, setCommunityPrompts] = useState<any[]>([]);
     const [communityRemixes, setCommunityRemixes] = useState<any[]>([]);
+    const [feedTab, setFeedTab] = useState<"latest" | "trending">("latest");
+    // We reset page/data when tab changes, so keep track of current tab for fetch consistency
+    const [fetchingTab, setFetchingTab] = useState<"latest" | "trending">("latest");
+
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loadingRemixes, setLoadingRemixes] = useState(false);
     const observer = useRef<IntersectionObserver | null>(null);
+
+    // Reset feed when tab switches
+    useEffect(() => {
+        setCommunityRemixes([]);
+        setPage(0);
+        setHasMore(true);
+        setFetchingTab(feedTab);
+    }, [feedTab]);
 
     const lastRemixRef = useCallback((node: HTMLDivElement | null) => {
         if (loadingRemixes) return;
@@ -156,104 +168,92 @@ function CreatorContent() {
     // Fetch Remixes (Paginated)
     useEffect(() => {
         const fetchRemixes = async () => {
-            if (!hasMore) return;
+            if (!hasMore && page > 0) return; // Allow initial load even if hasMore is theoretically false to verify
             setLoadingRemixes(true);
 
             const LIMIT = 6;
+            const from = page * LIMIT;
+            const to = from + LIMIT - 1;
 
-            // Initial Fetch & Shuffle (Client-side)
-            if (page === 0 && shuffledRemixIds.current.length === 0) {
-                try {
-                    const { data: allIds } = await supabase
-                        .from("prompt_generations")
-                        .select("id")
-                        .eq("is_public", true)
-                        .order("created_at", { ascending: false })
-                        .limit(500); // Fetch recent 500
+            try {
+                let query = supabase
+                    .from("prompt_generations")
+                    .select(`
+                         id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
+                         user_id, prompt_id
+                      `)
+                    .eq("is_public", true)
+                    .range(from, to);
 
-                    if (allIds && allIds.length > 0) {
-                        const ids = allIds.map((x: any) => x.id);
-                        // Fisher-Yates Shuffle
-                        for (let i = ids.length - 1; i > 0; i--) {
-                            const j = Math.floor(Math.random() * (i + 1));
-                            [ids[i], ids[j]] = [ids[j], ids[i]];
-                        }
-                        shuffledRemixIds.current = ids;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch ids", e);
-                }
-            }
-
-            const start = page * LIMIT;
-            const end = start + LIMIT;
-            const pageIds = shuffledRemixIds.current.slice(start, end);
-
-            if (pageIds.length === 0) {
-                if (shuffledRemixIds.current.length > 0) {
-                    setHasMore(false);
+                if (fetchingTab === "trending") {
+                    query = query.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
                 } else {
-                    setHasMore(false);
+                    query = query.order("created_at", { ascending: false });
                 }
+
+                const { data: remixesData, error } = await query;
+
+                if (error) {
+                    console.error("Fetch error:", error);
+                    setLoadingRemixes(false);
+                    return;
+                }
+
+                if (remixesData) {
+                    if (remixesData.length < LIMIT) {
+                        setHasMore(false);
+                    }
+
+                    if (remixesData.length === 0) {
+                        setLoadingRemixes(false);
+                        return;
+                    }
+
+                    // Fetch profiles for remixes
+                    const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id)));
+                    let profileMap = new Map();
+                    if (userIds.length > 0) {
+                        const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
+                        profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
+                    }
+
+                    const processedRemixes = remixesData.map((r: any) => {
+                        const profile = profileMap.get(r.user_id) || {};
+                        const settings = r.settings || {};
+                        return {
+                            id: r.id,
+                            imageUrl: r.image_url,
+                            title: settings.headline || "Untitled Remix",
+                            username: profile.full_name || "Anonymous Creator",
+                            userAvatar: profile.profile_image || null,
+                            upvotesCount: r.upvotes_count || 0,
+                            originalPromptText: r.original_prompt_text,
+                            remixPromptText: r.remix_prompt_text,
+                            combinedPromptText: r.combined_prompt_text,
+                            createdAt: r.created_at,
+                            promptId: r.prompt_id || null
+                        };
+                    });
+
+                    setCommunityRemixes((prev) => {
+                        // If page 0, replace. Else append.
+                        if (page === 0) return processedRemixes;
+
+                        // Avoid duplicates
+                        const newIds = new Set(processedRemixes.map((r: any) => r.id));
+                        const filteredPrev = prev.filter(p => !newIds.has(p.id));
+                        return [...filteredPrev, ...processedRemixes];
+                    });
+                }
+            } catch (e) {
+                console.error("Feed Error", e);
+            } finally {
                 setLoadingRemixes(false);
-                return;
             }
-
-            const { data: remixesData } = await supabase
-                .from("prompt_generations")
-                .select(`
-                     id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
-                     user_id, prompt_id
-                  `)
-                .in("id", pageIds);
-
-            if (remixesData) {
-                if (remixesData.length < LIMIT) {
-                    setHasMore(false);
-                }
-
-                // Fetch profiles for remixes
-                const userIds = Array.from(new Set(remixesData.map((r: any) => r.user_id)));
-                let profileMap = new Map();
-                if (userIds.length > 0) {
-                    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
-                    profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
-                }
-
-                const processedRemixes = remixesData.map((r: any) => {
-                    const profile = profileMap.get(r.user_id) || {};
-                    const settings = r.settings || {};
-                    return {
-                        id: r.id,
-                        imageUrl: r.image_url,
-                        title: settings.headline || "Untitled Remix",
-                        username: profile.full_name || "Anonymous Creator",
-                        userAvatar: profile.profile_image || null,
-                        upvotesCount: r.upvotes_count || 0,
-                        originalPromptText: r.original_prompt_text,
-                        remixPromptText: r.remix_prompt_text,
-                        combinedPromptText: r.combined_prompt_text,
-                        createdAt: r.created_at,
-                        promptId: r.prompt_id || null
-                    };
-                });
-
-                setCommunityRemixes((prev) => {
-                    // Sort processedRemixes to match pageIds (random order)
-                    const sortedNew = pageIds.map(pid => processedRemixes.find((r: any) => r.id === pid)).filter(Boolean);
-
-                    // Avoid duplicates just in case
-                    const newIds = new Set(sortedNew.map((r: any) => r.id));
-                    const filteredPrev = prev.filter(p => !newIds.has(p.id));
-                    return [...filteredPrev, ...sortedNew];
-                });
-            } else {
-                setHasMore(false);
-            }
-            setLoadingRemixes(false);
         };
+
         fetchRemixes();
-    }, [page, supabase]);
+    }, [page, fetchingTab, supabase]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -907,7 +907,25 @@ function CreatorContent() {
                     {/* Community Remixes */}
                     {communityRemixes.length > 0 && (
                         <div className="pt-6 border-t border-white/10">
-                            <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-wider opacity-60">Community Remixes</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider opacity-60">Community Remixes</h3>
+                                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                                    <button
+                                        onClick={() => setFeedTab("latest")}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "latest" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
+                                            }`}
+                                    >
+                                        Latest
+                                    </button>
+                                    <button
+                                        onClick={() => setFeedTab("trending")}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "trending" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
+                                            }`}
+                                    >
+                                        Trending
+                                    </button>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 {communityRemixes.map((r, index) => (
                                     <div key={r.id} ref={index === communityRemixes.length - 1 ? lastRemixRef : null}>
