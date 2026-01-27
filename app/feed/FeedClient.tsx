@@ -468,6 +468,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                                 poster={item.imageUrl}
                                 alt={item.promptTitle}
                                 className="absolute inset-0 w-full h-full"
+                                unoptimized
                             />
 
                             {/* Video Badge */}
