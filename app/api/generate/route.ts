@@ -65,6 +65,14 @@ const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
 - **OUTFIT**: Keep the subject's exact outfit unless asked to change.
 `;
 
+const FORCE_CUTOUT_INSTRUCTIONS = `
+[HARD FORCE: PHOTOSHOP CUTOUT MODE (EXTREME)]
+1. **ABSOLUTE IDENTITY LOCK**: You are FORBIDDEN from generating a new face. You MUST perform a direct valid pixel copy/paste of the reference face onto the target body.
+2. **NO GENERATIVE FILL ON FACE**: Do not let the AI "dream" or "hallucinate" new facial features. Use the source pixels.
+3. **TEXTURE PRESERVATION**: Maintain the original skin texture, imperfections, and lighting of the source face if possible, only adjusting color temperature to match the scene.
+4. **CAMERA LENS**: Apply a "Canon 5D Mk IV + 85mm Lens" blur/bokeh profile to the background, but keep the subject sharp.
+`;
+
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
 [OBJECT LOCK: ACTIVE]
 - STRICTLY PRESERVE the Uploaded Object's appearance, shape, texture, packing, and branding.
@@ -200,6 +208,7 @@ export async function POST(req: Request) {
         let imageUrls: string[] = [];
         let logoUrl: string | null = null;
         let canvasUrl: string | null = null; // New
+        let forceCutout = false; // New
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -257,6 +266,7 @@ export async function POST(req: Request) {
 
             imageFiles = form.getAll("images") as File[];
             subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
+            forceCutout = String(form.get("forceCutout") ?? "false").trim() === "true";
         } else {
             // JSON Handling
             const body = await req.json();
@@ -290,6 +300,9 @@ export async function POST(req: Request) {
             if (Array.isArray(body.imageUrls)) {
                 imageUrls = body.imageUrls.map(String);
             }
+            // Parse Force Cutout
+            forceCutout = String(body.forceCutout ?? "false").trim() === "true";
+
             logoUrl = body.logo_image ? String(body.logo_image).trim() : null;
             template_reference_image = body.template_reference_image ? String(body.template_reference_image).trim() : null;
 
@@ -552,6 +565,7 @@ Execute the user's instruction precisely.
             (subjectLock && totalInputImages > 0)
                 ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
                 : "",
+            (subjectLock && forceCutout) ? FORCE_CUTOUT_INSTRUCTIONS : "",
             (!subjectLock && totalInputImages > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,

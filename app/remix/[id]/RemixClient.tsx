@@ -503,9 +503,11 @@ export default function RemixClient({ initialRemix }: Props) {
 
     const handleDownload = async () => {
         try {
-            const res = await fetch(remix.image_url, { mode: "cors" });
+            const downloadUrl = (remix.mediaType === "video" && remix.video_url) ? remix.video_url : remix.image_url;
+            const res = await fetch(downloadUrl, { mode: "cors" });
             const blob = await res.blob();
-            const filename = `remix-${remix.id}.png`;
+            const ext = (remix.mediaType === "video") ? "mp4" : "png";
+            const filename = `remix-${remix.id}.${ext}`;
 
             // Try Web Share API Level 2 (Mobile "Save to Photos" support)
             // We explicitly check for mobile UA because some desktop browsers support share

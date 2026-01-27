@@ -102,6 +102,10 @@ function CreatorContent() {
         { id: "cartoon", label: "Cartoon", icon: "🎨", prompt: "3D Animation style by Pixar. Vibrant colors, expressive lighting, soft shading, cute characters." }
     ];
 
+    // Subject Settings
+    const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
+    const [subjectLock, setSubjectLock] = useState(true);
+
     // Generation state
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -377,9 +381,24 @@ function CreatorContent() {
             form.append("aspectRatio", aspectRatio);
             form.append("combined_prompt_text", prompt);
 
-            if (options.subjectLock) {
+            // Subject Settings Logic
+            const effectiveSubjectLock = options.subjectLock !== undefined ? options.subjectLock : subjectLock;
+
+            if (effectiveSubjectLock) {
                 form.append("subjectLock", "true");
+
+                // Force Cutout should only apply if we are in Human mode and Locked
+                // User Request: "make sure we are using the photoshop cut out method by default when the strcit lock human is on"
+                if (subjectMode === "human") {
+                    form.append("forceCutout", "true");
+                }
+            } else {
+                form.append("subjectLock", "false");
             }
+
+            // Pass Subject Mode so API knows which instructions to use
+            // (Human = Subject Reference, Object = Object Reference)
+            form.append("subjectMode", subjectMode === "human" ? "human" : "object");
 
             if (options.logoFile) {
                 let logoToSend = options.logoFile;
@@ -644,42 +663,45 @@ function CreatorContent() {
                                 />
                             </div>
                         </div>
+                    </div>
 
-                        {/* Style Presets */}
-                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-                            <label className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
-                                Style Preset <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/60">Optional</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {STYLE_PRESETS.map((preset) => (
-                                    <button
-                                        key={preset.id}
-                                        onClick={() => setStylePreset(stylePreset === preset.id ? null : preset.id)}
-                                        className={`
+
+
+                    {/* Style Presets */}
+                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
+                            Style Preset <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/60">Optional</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {STYLE_PRESETS.map((preset) => (
+                                <button
+                                    key={preset.id}
+                                    onClick={() => setStylePreset(stylePreset === preset.id ? null : preset.id)}
+                                    className={`
                                             relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all group overflow-hidden
                                             ${stylePreset === preset.id
-                                                ? "bg-lime-400 border-lime-400 text-black shadow-[0_0_20px_-5px_rgba(183,255,0,0.4)]"
-                                                : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:text-white hover:border-white/10"
-                                            }
+                                            ? "bg-lime-400 border-lime-400 text-black shadow-[0_0_20px_-5px_rgba(183,255,0,0.4)]"
+                                            : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:text-white hover:border-white/10"
+                                        }
                                         `}
-                                    >
-                                        <div className={`text-2xl transition-transform duration-300 ${stylePreset === preset.id ? "scale-110" : "group-hover:scale-110"}`}>{preset.icon}</div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-xs font-bold uppercase tracking-wide truncate">{preset.label}</span>
-                                            <span className={`text-[9px] leading-tight truncate opacity-70 ${stylePreset === preset.id ? "text-black" : "text-white"}`}>
-                                                {preset.prompt.split("with")[0].replace("Shot on ", "")}
-                                            </span>
-                                        </div>
+                                >
+                                    <div className={`text-2xl transition-transform duration-300 ${stylePreset === preset.id ? "scale-110" : "group-hover:scale-110"}`}>{preset.icon}</div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-xs font-bold uppercase tracking-wide truncate">{preset.label}</span>
+                                        <span className={`text-[9px] leading-tight truncate opacity-70 ${stylePreset === preset.id ? "text-black" : "text-white"}`}>
+                                            {preset.prompt.split("with")[0].replace("Shot on ", "")}
+                                        </span>
+                                    </div>
 
-                                        {/* Selection Ring */}
-                                        {stylePreset === preset.id && (
-                                            <div className="absolute inset-0 border-2 border-black/10 rounded-xl" />
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
+                                    {/* Selection Ring */}
+                                    {stylePreset === preset.id && (
+                                        <div className="absolute inset-0 border-2 border-black/10 rounded-xl" />
+                                    )}
+                                </button>
+                            ))}
                         </div>
                     </div>
+
 
                     {/* Prompt Tool Card */
                     }
@@ -743,6 +765,43 @@ function CreatorContent() {
                                     </div>
 
                                     <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
+
+                                    {/* Subject Settings (Only if uploads exist) */}
+                                    {uploads.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-white/5 space-y-3">
+                                            <div className="flex flex-col gap-2">
+                                                {/* Mode Selector */}
+                                                <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-1">
+                                                    <button
+                                                        onClick={() => setSubjectMode("human")}
+                                                        className={`flex-1 rounded-lg px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition ${subjectMode === "human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
+                                                    >
+                                                        Human
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSubjectMode("non_human")}
+                                                        className={`flex-1 rounded-lg px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition ${subjectMode === "non_human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
+                                                    >
+                                                        Object
+                                                    </button>
+                                                </div>
+
+                                                {/* Strict Lock Toggle */}
+                                                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={subjectLock}
+                                                        onChange={(e) => setSubjectLock(e.target.checked)}
+                                                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
+                                                        id="studio-subject-lock-inline"
+                                                    />
+                                                    <label htmlFor="studio-subject-lock-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
+                                                        <span className="font-bold">Strict Lock</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -770,15 +829,15 @@ function CreatorContent() {
                     {mediaType === "video" ? (
                         <button
                             className={[
-                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                                animating ? "bg-zinc-700 cursor-not-allowed" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
+                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                animating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={handleAnimate}
                             disabled={animating}
                         >
                             {animating ? (
                                 <span className="flex items-center gap-2">
-                                    <LoadingHourglass className="w-5 h-5 text-white" />
+                                    <LoadingHourglass className="w-5 h-5 text-black" />
                                     <span>Creating Video...</span>
                                 </span>
                             ) : (
@@ -903,9 +962,9 @@ function CreatorContent() {
 
                         {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                                <h3 className="text-2xl font-bold text-white mb-2">Your Artwork</h3>
+                                <h3 className="text-2xl font-bold text-white mb-2">{mediaType === "video" ? "Your Video" : "Your Artwork"}</h3>
                                 <p className="text-sm text-white/50">
-                                    Generated images will appear here. You can then edit, download, or share them.
+                                    Generated {mediaType === "video" ? "videos" : "images"} will appear here. You can then edit, download, or share them.
                                 </p>
                             </div>
                         )}
@@ -924,7 +983,8 @@ function CreatorContent() {
                         )}
                     </div>
                 </div>
-            </div >
+            </div>
+
             {/* Video Modal is only used for Remix Cards / Library items now, 
                 Studio handles its own inline generation */}
             <VideoGeneratorModal
@@ -972,7 +1032,7 @@ function CreatorContent() {
                 }}
                 fullQualityUrl={resultData?.full_quality_url}
             />
-        </main>
+        </main >
     );
 }
 

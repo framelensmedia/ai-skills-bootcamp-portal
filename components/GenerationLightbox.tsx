@@ -49,7 +49,10 @@ function safeFilenameFromUrl(url: string, fallbackBase = "generation") {
     // ignore
   }
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  return `${fallbackBase}-${ts}.png`;
+  // Heuristic: check if url contains mp4 (common in our structure)
+  const isVideo = url.includes(".mp4");
+  const ext = isVideo ? "mp4" : "png";
+  return `${fallbackBase}-${ts}.${ext}`;
 }
 
 async function downloadImageToDevice(url: string) {
@@ -159,7 +162,7 @@ export default function GenerationLightbox({
   async function handleDownload(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    const downloadUrl = fullQualityUrl || safeUrl;
+    const downloadUrl = (mediaType === "video" && videoUrl) ? videoUrl : (fullQualityUrl || safeUrl);
     if (!downloadUrl || downloading) return;
 
     setDownloading(true);
