@@ -110,14 +110,56 @@ async function fileToBase64(file: File) {
 }
 
 // Helper to convert URL to base64
+// Helper to convert URL to base64
 async function urlToBase64(url: string) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
-    const ab = await res.arrayBuffer();
-    return {
-        data: Buffer.from(ab).toString("base64"),
-        mimeType: res.headers.get("content-type") || "image/png"
-    };
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const ab = await res.arrayBuffer();
+            return {
+                data: Buffer.from(ab).toString("base64"),
+                mimeType: res.headers.get("content-type") || "image/png"
+            };
+        }
+    } catch (e) {
+        console.warn(`Public fetch failed for ${url}, trying admin storage...`);
+    }
+
+    // Fallback: Try downloading via Supabase Admin (for private buckets)
+    // Attempt to extract path from URL
+    try {
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        // Extract path: .../storage/v1/object/public/generations/path/to/file
+        // or .../storage/v1/object/sign/generations/path/to/file
+        const urlObj = new URL(url);
+        const parts = urlObj.pathname.split("/generations/");
+        if (parts.length > 1) {
+            const path = parts[1]; // "scratch/userid/file.png"
+            // Decode URI component (spaces etc)
+            const decodedPath = decodeURIComponent(path);
+
+            const { data, error } = await supabaseAdmin
+                .storage
+                .from("generations")
+                .download(decodedPath);
+
+            if (error || !data) throw error || new Error("Download failed");
+
+            const arrayBuffer = await data.arrayBuffer();
+            return {
+                data: Buffer.from(arrayBuffer).toString("base64"),
+                mimeType: data.type || "image/png"
+            };
+        }
+    } catch (adminErr) {
+        console.error("Admin storage download failed:", adminErr);
+    }
+
+    throw new Error(`Failed to fetch image: ${url}`);
 }
 
 export async function POST(req: Request) {

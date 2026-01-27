@@ -43,18 +43,17 @@ export async function POST(req: Request) {
             throw error;
         }
 
-        // 5. Get Signed GET URL (for referencing by API)
-        // We use createSignedUrl so the API can read it even if the bucket is private.
-        const { data: accessData, error: accessError } = await supabaseAdmin
+        // 5. Get Public URL (for referencing later)
+        // Note: For private buckets, this URL is 403 Forbidden to the public.
+        // The API must handle this by using the 'path' or detecting the URL pattern.
+        const { data: publicData } = supabaseAdmin
             .storage
             .from("generations")
-            .createSignedUrl(path, 60 * 60); // 1 hour
-
-        if (accessError) throw accessError;
+            .getPublicUrl(path);
 
         return NextResponse.json({
             signedUrl: data.signedUrl,
-            publicUrl: accessData.signedUrl, // naming kept for frontend compatibility
+            publicUrl: publicData.publicUrl,
             path: path
         });
 
