@@ -321,7 +321,10 @@ function StudioContent() {
               })
             });
 
-            if (!signRes.ok) throw new Error("Failed to initialize upload");
+            if (!signRes.ok) {
+              const errText = await signRes.text();
+              throw new Error(`Failed to initialize upload: ${signRes.status} ${errText}`);
+            }
             const { signedUrl, publicUrl } = await signRes.json();
 
             // 2. Direct Upload to Storage (Bypass Vercel)
@@ -493,7 +496,10 @@ function StudioContent() {
               method: "POST",
               body: JSON.stringify({ filename: compressed.name, fileType: compressed.type })
             });
-            if (!sRes.ok) throw new Error("Sign failed");
+            if (!sRes.ok) {
+              const errText = await sRes.text();
+              throw new Error(`Sign failed: ${sRes.status} ${errText}`);
+            }
             const { signedUrl, publicUrl } = await sRes.json();
 
             // Upload
