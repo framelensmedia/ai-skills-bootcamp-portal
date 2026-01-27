@@ -373,16 +373,11 @@ export async function POST(req: Request) {
                 imageParts.push({ inlineData: { mimeType: canvasFile.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
             } else if (canvasUrl) {
                 try {
-                    const res = await fetch(canvasUrl);
-                    if (res.ok) {
-                        const ab = await res.arrayBuffer();
-                        const mimeType = res.headers.get("content-type") || "image/jpeg";
-                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
-                    } else {
-                        console.error("Failed to fetch canvas url:", canvasUrl, res.status);
-                    }
+                    const { data, mimeType } = await urlToBase64(canvasUrl);
+                    imageParts.push({ inlineData: { mimeType, data } });
                 } catch (e) {
                     console.error("Failed to fetch canvas url:", canvasUrl, e);
+                    return NextResponse.json({ error: "Failed to load Canvas Image" }, { status: 400 });
                 }
             }
 
@@ -394,12 +389,8 @@ export async function POST(req: Request) {
             // Attach URLs
             for (const url of imageUrls) {
                 try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        const ab = await res.arrayBuffer();
-                        const mimeType = res.headers.get("content-type") || "image/jpeg";
-                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
-                    }
+                    const { data, mimeType } = await urlToBase64(url);
+                    imageParts.push({ inlineData: { mimeType, data } });
                 } catch (e) {
                     console.error("Failed to download input url:", url, e);
                 }
@@ -414,13 +405,8 @@ export async function POST(req: Request) {
                 imageParts.push({ inlineData: { mimeType: templateFile.type || "image/jpeg", data } });
             } else if (template_reference_image) {
                 try {
-                    const res = await fetch(template_reference_image);
-                    if (res.ok) {
-                        const arrayBuffer = await res.arrayBuffer();
-                        const data = Buffer.from(arrayBuffer).toString("base64");
-                        const mimeType = res.headers.get("content-type") || "image/jpeg";
-                        imageParts.push({ inlineData: { mimeType, data } });
-                    }
+                    const { data, mimeType } = await urlToBase64(template_reference_image);
+                    imageParts.push({ inlineData: { mimeType, data } });
                 } catch (e: any) {
                     console.error("Failed to fetch template_reference_image", e);
                 }
@@ -433,12 +419,8 @@ export async function POST(req: Request) {
             }
             for (const url of imageUrls) {
                 try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        const ab = await res.arrayBuffer();
-                        const mimeType = res.headers.get("content-type") || "image/jpeg";
-                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
-                    }
+                    const { data, mimeType } = await urlToBase64(url);
+                    imageParts.push({ inlineData: { mimeType, data } });
                 } catch (e) {
                     console.error("Failed to download remix input url:", url, e);
                 }
