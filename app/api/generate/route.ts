@@ -578,7 +578,10 @@ Execute the user's instruction precisely.
             "---",
             "USER INSTRUCTIONS:",
             (subjectLock && totalInputImages > 0 && subjectMode === "human")
-                ? "[CRITICAL: The FIRST image is the Template. The SECOND image is the SUBJECT REFERENCE. You must perform a Face Swap/Composite using the SECOND image face onto the FIRST image body/scene.] " + rawPrompt
+                ? (forceCutout
+                    ? "[CRITICAL: FULL BODY REPLACEMENT. The FIRST image is the Template. The SECOND image is the SUBJECT REFERENCE. You must CUT OUT the subject (Face + Body) from the SECOND image and paste them into the FIRST image, completely replacing the original subject or main element while matching the scene's composition.] " + rawPrompt
+                    : "[CRITICAL: The FIRST image is the Template. The SECOND image is the SUBJECT REFERENCE. You must perform a Face Swap/Composite using the SECOND image face onto the FIRST image body/scene.] " + rawPrompt
+                )
                 : rawPrompt,
             "---",
             "TEXT CONTENT TO INCLUDE:",
