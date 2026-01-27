@@ -462,16 +462,20 @@ function StudioContent() {
       if (uploads.length > 0) {
         for (const file of uploads) {
           try {
-            const compressed = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+            // Mobile: 1280px max for safety
+            const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
             const form = new FormData();
             form.append("file", compressed);
             const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
             if (upRes.ok) {
               const upData = await upRes.json();
               if (upData.url) uploadedImageUrls.push(upData.url);
+            } else {
+              throw new Error(await upRes.text());
             }
-          } catch (e) {
-            console.error("Failed to stage upload in edit mode", e);
+          } catch (e: any) {
+            console.error("Failed to stage upload in edit mode:", e);
+            throw new Error(`Upload failed: ${e.message}`);
           }
         }
       }
