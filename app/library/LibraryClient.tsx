@@ -14,6 +14,7 @@ import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
 import EditModeModal from "@/components/EditModeModal";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import LazyMedia from "@/components/LazyMedia";
 
 type SortMode = "newest" | "oldest";
 
@@ -1212,41 +1213,14 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                 {displayedItems.map(it => (
                                     <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => handleItemClick(it)}>
                                         {/* Render Video or Image */}
-                                        {it.mediaType === "video" && it.videoUrl ? (
-                                            <>
-                                                <video
-                                                    poster={it.thumbnailUrl || undefined}
-                                                    src={it.videoUrl}
-                                                    className="absolute inset-0 w-full h-full object-cover"
-                                                    muted
-                                                    loop
-                                                    playsInline
-                                                    onMouseEnter={(e) => {
-                                                        const p = e.currentTarget.play();
-                                                        if (p !== undefined) { p.catch(() => { }); }
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.pause();
-                                                        e.currentTarget.currentTime = 0;
-                                                    }}
-                                                />
-                                                <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                                                    <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
-                                                    Video
-                                                </div>
-                                            </>
-                                        ) : it.imageUrl ? (
-                                            <Image
-                                                src={it.imageUrl}
-                                                alt={it.promptTitle}
-                                                fill
-                                                className="object-cover transition group-hover:scale-105"
-                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
-                                                unoptimized
-                                            />
-                                        ) : (
-                                            <div className="absolute inset-0 bg-white/5 animate-pulse" />
-                                        )}
+                                        <LazyMedia
+                                            type={it.mediaType}
+                                            src={it.mediaType === "video" ? (it.videoUrl || "") : it.imageUrl}
+                                            poster={it.thumbnailUrl || it.imageUrl}
+                                            alt={it.promptTitle}
+                                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            unoptimized // Keep unoptimized for now in Library if we suspect domain issues, or remove if confident. Let's remove to test optimization.
+                                        />
 
                                         {activeTab === "remixes" && (
                                             <div

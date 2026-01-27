@@ -8,6 +8,7 @@ import { ArrowBigUp, Heart, RefreshCw, Clock, TrendingUp, User } from "lucide-re
 import Loading from "@/components/Loading";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import LazyMedia from "@/components/LazyMedia";
 import { useToast } from "@/context/ToastContext";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import VideoRemixOnboardingModal from "@/components/VideoRemixOnboardingModal";
@@ -461,38 +462,13 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                     <article ref={index === items.length - 1 ? lastElementRef : null} key={`${item.id}-${index}`} className="bg-zinc-900/50 border border-white/5 rounded-2xl overflow-hidden">
                         <div className="relative aspect-[9/16] w-full bg-black cursor-pointer group" onClick={() => openLightbox(item)}>
                             {/* Render Video or Image */}
-                            {item.mediaType === "video" && item.videoUrl ? (
-                                <>
-                                    <video
-                                        src={item.videoUrl}
-                                        className="absolute inset-0 w-full h-full object-cover"
-                                        autoPlay
-                                        muted
-                                        loop
-                                        playsInline
-                                    />
-                                    {/* Play Button Overlay */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="w-16 h-16 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-                                            <svg className="w-8 h-8 text-white/90 ml-1 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M8 5v14l11-7z" />
-                                            </svg>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : item.imageUrl ? (
-                                <Image
-                                    src={item.imageUrl}
-                                    alt={item.promptTitle}
-                                    fill
-                                    className="object-contain"
-                                    sizes="(max-width: 768px) 50vw, 33vw"
-                                    loading={index < 2 ? "eager" : "lazy"}
-                                    unoptimized
-                                />
-                            ) : (
-                                <div className="h-full w-full bg-zinc-900 flex items-center justify-center text-white/20">Processing...</div>
-                            )}
+                            <LazyMedia
+                                type={item.mediaType}
+                                src={item.mediaType === "video" ? (item.videoUrl || "") : item.imageUrl}
+                                poster={item.imageUrl}
+                                alt={item.promptTitle}
+                                className="absolute inset-0 w-full h-full"
+                            />
 
                             {/* Video Badge */}
                             {item.mediaType === "video" && (
