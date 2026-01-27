@@ -271,7 +271,13 @@ export async function POST(req: Request) {
             remix_prompt_text = String(body.remix ?? "").trim() || null;
             combined_prompt_text = rawPrompt;
             // We don't get original_prompt_text explicitly in the current JSON payload from prompt page,
-            subjectLock = String(body.subjectLock ?? "false").trim() === "true";
+            // If not provided, default to TRUE if potential subject images exist and we are in human mode (Safe Default)
+            if (body.subjectLock !== undefined) {
+                subjectLock = String(body.subjectLock).trim() === "true";
+            } else {
+                // Auto-detect: If we have images and human mode, assume lock.
+                subjectLock = (body.imageUrls?.length > 0 || String(body.subjectMode) === "human");
+            }
             if (body.subjectMode) subjectMode = String(body.subjectMode).trim();
             industryIntent = String(body.industry_intent ?? "").trim() || null;
 
@@ -554,7 +560,7 @@ Execute the user's instruction precisely.
             "---",
             "USER INSTRUCTIONS:",
             (subjectLock && totalInputImages > 0 && subjectMode === "human")
-                ? "[ACTION: REPLACE THE MAIN SUBJECT. USE THE REFERENCE FACE.] " + rawPrompt
+                ? "[CRITICAL: The FIRST image is the Template. The SECOND image is the SUBJECT REFERENCE. You must perform a Face Swap/Composite using the SECOND image face onto the FIRST image body/scene.] " + rawPrompt
                 : rawPrompt,
             "---",
             "TEXT CONTENT TO INCLUDE:",
