@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { X, Play, Wand2, Film } from "lucide-react";
+import { X, Play, Wand2, Film, Maximize2 } from "lucide-react";
 
 
 
@@ -25,6 +25,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [timer, setTimer] = useState(0);
+
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && initialPrompt) {
@@ -80,6 +82,31 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+            {/* Zoom Overlay */}
+            {zoomedImage && (
+                <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-200"
+                    onClick={() => setZoomedImage(null)}
+                >
+                    <button
+                        onClick={() => setZoomedImage(null)}
+                        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition z-50"
+                    >
+                        <X size={24} />
+                    </button>
+                    <div className="relative w-full h-full max-w-5xl max-h-[90vh] p-4 flex items-center justify-center">
+                        <Image
+                            src={zoomedImage}
+                            alt="Full Screen Start Frame"
+                            fill
+                            className="object-contain"
+                            unoptimized
+                            quality={100}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#09090b] flex flex-col-reverse md:flex-row shadow-2xl h-[90vh] md:h-[800px]">
 
                 {/* Left (Desktop) / Bottom (Mobile): Controls */}
@@ -125,12 +152,20 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             </div>
 
                             {/* Start Frame (Read Only Context) - OR Input Video */}
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3">
+                            <div
+                                onClick={() => sourceImage && !sourceVideo && setZoomedImage(sourceImage)}
+                                className={`rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3 transition-colors ${sourceImage && !sourceVideo ? "cursor-pointer hover:bg-white/10 group" : ""}`}
+                            >
                                 <div className="relative h-12 w-16 rounded-lg overflow-hidden bg-black shrink-0 border border-white/10 flex items-center justify-center">
                                     {sourceVideo ? (
                                         <video src={sourceVideo} className="w-full h-full object-cover" muted />
                                     ) : sourceImage ? (
-                                        <Image src={sourceImage} alt="Context" fill className="object-cover" unoptimized />
+                                        <>
+                                            <Image src={sourceImage} alt="Context" fill className="object-cover" unoptimized />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                <Maximize2 size={12} className="text-white" />
+                                            </div>
+                                        </>
                                     ) : (
                                         <div className="w-full h-full bg-white/10" />
                                     )}

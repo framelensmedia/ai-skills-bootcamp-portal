@@ -14,6 +14,7 @@ import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
+import GenerationLightbox from "@/components/GenerationLightbox";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
@@ -91,6 +92,15 @@ function CreatorContent() {
             setMediaType("video");
         }
     }, [searchParams]);
+
+    const [stylePreset, setStylePreset] = useState<string | null>(null);
+
+    const STYLE_PRESETS = [
+        { id: "cinematic", label: "Cinematic", icon: "🎬", prompt: "Shot on RED Weapon 8K with Panavision Primo 70mm lens. Cinematic lighting, color graded." },
+        { id: "commercial", label: "TV Ad", icon: "📺", prompt: "Shot on ARRI Alexa Mini with Zeiss Master Prime 50mm. High key lighting, crisp, clean, premium advertisement look." },
+        { id: "documentary", label: "Docu", icon: "📹", prompt: "Shot on Canon 5D Mk IV with Sigma 24-70mm f/2.8 lens. Natural lighting, handheld feel, authentic texture." },
+        { id: "cartoon", label: "Cartoon", icon: "🎨", prompt: "3D Animation style by Pixar. Vibrant colors, expressive lighting, soft shading, cute characters." }
+    ];
 
     // Generation state
     const [generating, setGenerating] = useState(false);
@@ -262,27 +272,9 @@ function CreatorContent() {
 
         if (remixPrompt || imgUrl) {
 
-            // If image is present, set as preview and fetch file
+            // If image is present, set as preview (but don't auto-upload as file to avoid huge payloads/security errors)
             if (imgUrl) {
                 setPreviewImage(imgUrl);
-
-                const fetchImage = async () => {
-                    try {
-                        const res = await fetch(imgUrl);
-                        const blob = await res.blob();
-                        // Sanitize and Compress the reference image to prevent upload timeouts
-                        let file = new File([blob], "remix_reference.jpg", { type: "image/jpeg" });
-                        try {
-                            file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
-                        } catch (e) {
-                            console.warn("Failed to compress remix ref", e);
-                        }
-                        setUploads((prev) => [...prev, file]);
-                    } catch (err) {
-                        console.error("Failed to load remix image as file:", err);
-                    }
-                };
-                fetchImage();
             }
 
             if (promptId) {
@@ -346,6 +338,9 @@ function CreatorContent() {
         await generateImage(prompt, autoUploads, { subjectLock: hasSubject, logoFile: data.assets?.logo });
     };
 
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [resultData, setResultData] = useState<any>(null);
+
     const handleManualGenerate = async () => {
         if (!handleAuthGate()) return;
 
@@ -374,7 +369,10 @@ function CreatorContent() {
             }
 
             const form = new FormData();
-            form.append("prompt", prompt);
+            form.append("prompt", stylePreset
+                ? `${prompt} --style ${STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt}`
+                : prompt
+            );
             form.append("userId", user.id);
             form.append("aspectRatio", aspectRatio);
             form.append("combined_prompt_text", prompt);
@@ -406,6 +404,10 @@ function CreatorContent() {
 
             // Note: If we need template reference or remix details, append them here.
             // For now, matching previous logic which only used prompt + uploads.
+            const remixImg = searchParams?.get("img");
+            if (remixImg) {
+                form.append("template_reference_image", remixImg);
+            }
 
             const res = await fetch("/api/generate", {
                 method: "POST",
@@ -440,7 +442,16 @@ function CreatorContent() {
                     setTimeout(() => setVideoModalOpen(true), 100);
                 }
             } else {
-                router.push("/library");
+                // Inline Display for Creator Studio
+                const data = json;
+                if (data && data.imageUrl) {
+                    const finalUrl = data.full_quality_url || data.imageUrl;
+                    setPreviewImage(finalUrl);
+                    setResultData(data);
+
+                    // Open Lightbox
+                    setLightboxOpen(true);
+                }
             }
 
         } catch (err: any) {
@@ -537,7 +548,10 @@ function CreatorContent() {
         <main className="mx-auto w-full max-w-7xl px-4 py-8">
             {/* Page Header */}
             <div className="mb-8">
-                <h1 className="text-4xl font-bold text-white">Creator Studio</h1>
+                <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+                    <Clapperboard className="w-8 h-8 md:w-10 md:h-10 text-lime-400" />
+                    Creator Studio
+                </h1>
                 <p className="mt-2 text-white/60">Generate stunning visuals in minutes</p>
             </div>
 
@@ -628,6 +642,41 @@ function CreatorContent() {
                                     onClick={() => setAspectRatio("4:5")}
                                     disabled={generating}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Style Presets */}
+                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
+                                Style Preset <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/60">Optional</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {STYLE_PRESETS.map((preset) => (
+                                    <button
+                                        key={preset.id}
+                                        onClick={() => setStylePreset(stylePreset === preset.id ? null : preset.id)}
+                                        className={`
+                                            relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all group overflow-hidden
+                                            ${stylePreset === preset.id
+                                                ? "bg-lime-400 border-lime-400 text-black shadow-[0_0_20px_-5px_rgba(183,255,0,0.4)]"
+                                                : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:text-white hover:border-white/10"
+                                            }
+                                        `}
+                                    >
+                                        <div className={`text-2xl transition-transform duration-300 ${stylePreset === preset.id ? "scale-110" : "group-hover:scale-110"}`}>{preset.icon}</div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-xs font-bold uppercase tracking-wide truncate">{preset.label}</span>
+                                            <span className={`text-[9px] leading-tight truncate opacity-70 ${stylePreset === preset.id ? "text-black" : "text-white"}`}>
+                                                {preset.prompt.split("with")[0].replace("Shot on ", "")}
+                                            </span>
+                                        </div>
+
+                                        {/* Selection Ring */}
+                                        {stylePreset === preset.id && (
+                                            <div className="absolute inset-0 border-2 border-black/10 rounded-xl" />
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -902,7 +951,28 @@ function CreatorContent() {
                     }
                 }}
             />
-        </main >
+
+            {/* Lightbox for Inline Preview */}
+            <GenerationLightbox
+                open={lightboxOpen}
+                url={previewImage}
+                videoUrl={null}
+                mediaType="image"
+                onClose={() => setLightboxOpen(false)}
+                title={manualPrompt || "Generated Image"}
+                originalPromptText={manualPrompt}
+                combinedPromptText={manualPrompt}
+                onAnimate={() => {
+                    setLightboxOpen(false);
+                    setMediaType("video");
+                    setVideoSubMode("image_to_video");
+                    // previewImage is already set to the result, so it will be used as source
+                    // Scroll to preview/settings
+                    previewRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                fullQualityUrl={resultData?.full_quality_url}
+            />
+        </main>
     );
 }
 

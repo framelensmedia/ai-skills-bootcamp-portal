@@ -9,7 +9,10 @@ export const maxDuration = 60;
 const SYSTEM_CORE = `
 [GLOBAL SYSTEM INSTRUCTIONS]
 1. Reference-First Behavior: The first image provided (the Template) is the COMPOSITION BLUEPRINT. Maintain its framing/layout. Apply user instructions as edits to this blueprint. YOU ARE ALLOWED to change subject clothing, appearance, or background if explicitly requested.
-2. Photorealism Default: Generate photorealistic, studio-quality results. Enhance texture, lighting, and detail. Avoid cartoonish or plastic looks unless requested.
+2. Photorealism Default: Generate photorealistic, studio-quality results. 
+   - **CAMERA SPEC**: Render with valid texture matching a "Canon 5D Mk IV with Sigma 85mm Art Lens". Sharp, high-resolution, creamy bokeh if depth is needed.
+   - **METHOD**: Use a "Photoshop Cutout & Composite" approach. Subjects should look like they were photographed on location with perfect edge blending.
+   - Avoid cartoonish or plastic looks unless requested.
 3. Safe Rules: You may change clothing, background, lighting, and style. You must NOT change face geometry or distort the subject.
 4. FRAMING ADAPTATION: If the Subject Reference pose differs significantly from the Template, you may adapt the composition/framing to fit the subject naturally.
 
@@ -49,19 +52,17 @@ const SYSTEM_NON_HUMAN_RULES = `
 `;
 
 const SUBJECT_LOCK_HUMAN_INSTRUCTIONS = `
-[SUBJECT LOCK: ACTIVE]
-- **STRUCTURAL RULE**: The FIRST image provided is the TEMPLATE (Layout/Style). The LAST image provided is the SUBJECT REFERENCE (Target Face).
-- **ACTION**: You MUST replace the main subject in the TEMPLATE with the person from the SUBJECT REFERENCE.
-- **COMPOSITING LOGIC**: Perform a "Professional High-End Composite". The subject must look like they were photographed ON LOCATION in the scene.
-- **MANDATORY BLENDING (CRITICAL)**:
-  1. **ANCHOR BLACK LEVELS**: You MUST ensure the subject has deep, rich blacks that match the darkest point of the scene. DO NOT lift the blacks or make the subject look washed out/faded.
-  2. **MATCH SATURATION**: Adjust the subject's color saturation to match the film stock/grading of the template.
-  3. **MATCH CONTRAST**: The subject should have "POP". Match the contrast of the template. If the template is high-contrast, the subject MUST be high-contrast.
-- **LIGHTING**: Apply "Subtle Studio Lighting" to the subject's face to model it dimensionally. Ensure it looks PREMIUM and HIGH-QUALITY.
-- **GLOBAL ILLUMINATION**: The subject must reflect the environment's colors (e.g., green bounce from grass, blue kill from sky).
-- **IDENTITY PRESERVATION**: Keep the facial structure and features 100% accurate.
-- **NO "CUTOUT" LOOK**: The edges must wrap naturally.
-- **OUTFIT PRESERVATION**: Keep the subject's exact upload attire unless explicitly asked to change.
+[SUBJECT LOCK: ACTIVE - STRICT MASKING MODE]
+- **ACTION**: You act as a professional retoucher using Photoshop. You must CUT OUT the subject from the Subject Reference and COMPOSITE them into the Template.
+- **CAMERA SPEC**: Render the subject with valid texture matching a "Canon 5D Mk IV with Sigma 85mm Art Lens". Sharp, high-resolution, creamy bokeh if depth is needed.
+- **IDENTITY PRESERVATION (CRITICAL)**:
+  1. DO NOT MORPH THE FACE. The face must be an EXACT pixel-perfect match to the uploaded reference.
+  2. Do not "beautify", "cartoonify", or "AI-fy" the skin texture. Keep pores and natural skin details.
+- **COMPOSITING & LIGHTING**:
+  1. **Photoshop Cutout**: The subject should look like a clean extraction placed into the scene.
+  2. **Subtle Studio Lighting**: Apply a soft "Beauty Dish" or "Rembrandt" lighting setup to the face to make it pop, but match the hue of the environment.
+  3. **Edge Blending**: Ensure no white halos/fringing. Wrap the scene's light around the subject's edges (Rim Light).
+- **OUTFIT**: Keep the subject's exact outfit unless asked to change.
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
@@ -496,7 +497,9 @@ Execute the user's instruction precisely.
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
-            rawPrompt,
+            (subjectLock && imageFiles.length > 0 && subjectMode === "human")
+                ? "[ACTION: REPLACE THE MAIN SUBJECT. USE THE REFERENCE FACE.] " + rawPrompt
+                : rawPrompt,
             "---",
             "TEXT CONTENT TO INCLUDE:",
             headline ? `HEADLINE: "${headline}"` : "",

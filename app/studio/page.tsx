@@ -192,28 +192,10 @@ function StudioContent() {
     if (preImg || sp?.get("remix")) {
       setWizardOpen(true);
 
-      // ✅ Ported Logic: If preImg exists, fetch it and add to uploads so Wizard shows it
-      if (preImg && uploads.length === 0 && !hasFetchedRef.current) {
-        hasFetchedRef.current = true;
-        const fetchImage = async () => {
-          try {
-            // Avoid double-fetch if already present (basic check)
-            const res = await fetch(preImg);
-            const blob = await res.blob();
-            // Sanitize name
-            let file = new File([blob], "remix_reference.jpg", { type: "image/jpeg" });
-            try {
-              file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
-            } catch (e) {
-              console.warn("Failed to compress remix ref", e);
-            }
-            setUploads((prev) => [...prev, file]);
-          } catch (err) {
-            console.error("Failed to load remix image as file:", err);
-            hasFetchedRef.current = false; // Reset on failure so retry is possible if needed?
-          }
-        };
-        fetchImage();
+      // ✅ Ported Logic: If preImg exists, Wizard shows it via templatePreviewUrl
+      // We DO NOT auto-fetch into uploads to avoid massive payloads / security errors.
+      if (preImg && uploads.length === 0) {
+        // verifying that previewImageUrl is set above is enough
       }
     }
   }, [preImg, sp]);
@@ -610,13 +592,13 @@ function StudioContent() {
       <EditModeModal
         isOpen={editModalOpen}
         onClose={() => !generating && setEditModalOpen(false)}
-        sourceImageUrl={lastFullQualityUrl || lastImageUrl || ""}
+        sourceImageUrl={lastFullQualityUrl || lastImageUrl || previewImageUrl || ""}
         onGenerate={handleEditGenerate}
         isGenerating={generating}
       />
       <GenerationLightbox
         open={lightboxOpen}
-        url={lastImageUrl}
+        url={lastImageUrl || previewImageUrl}
         videoUrl={mediaType === "video" ? videoResult : undefined}
         mediaType={mediaType}
         onClose={closeLightbox}
@@ -626,6 +608,10 @@ function StudioContent() {
         remixPromptText={remixAnswers ? JSON.stringify(remixAnswers) : ""}
         combinedPromptText={editSummary}
         onAnimate={handleAnimate} // Uses inline animation for fresh generation
+        onEdit={() => {
+          setLightboxOpen(false);
+          setEditModalOpen(true);
+        }}
       />
 
       {/* Video Modal remains for other flows, but Studio uses inline generation */}
@@ -908,7 +894,10 @@ function StudioContent() {
                 {animating && <p className="mt-4 text-sm font-bold text-white/50 animate-pulse">Creating Video...</p>}
               </div>
             )}
-            <div className="relative aspect-[9/16] w-full">
+            <div
+              className="relative aspect-[9/16] w-full cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
+            >
               {videoResult ? (
                 <video
                   src={videoResult}
