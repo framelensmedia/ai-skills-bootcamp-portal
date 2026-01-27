@@ -309,23 +309,36 @@ function StudioContent() {
         for (const file of uploads) {
           try {
             // Compress
-            const compressed = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+            const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
 
             // Upload to Temp
             const form = new FormData();
             form.append("file", compressed);
 
             const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
-            if (!upRes.ok) throw new Error("Failed to upload image stage");
+            if (!upRes.ok) {
+              let errorMessage = `Upload failed (${upRes.status})`;
+              try {
+                const text = await upRes.text();
+                if (upRes.status === 413 || text.includes("Entity Too Large")) {
+                  errorMessage = "File too large (Server Limit). Try a smaller image.";
+                } else if (text.startsWith("<")) {
+                  errorMessage = `Server Error (${upRes.status})`;
+                } else {
+                  errorMessage = text.slice(0, 100);
+                }
+              } catch { }
+              throw new Error(errorMessage);
+            }
 
             const upData = await upRes.json();
             if (upData.url) {
               uploadedImageUrls.push(upData.url);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error("Failed to stage image:", err);
             // Continue? Or fail? Let's fail for now to ensure consistency
-            throw new Error("Failed to upload one of the images. Please try again.");
+            throw new Error(err.message || "Failed to upload one of the images. Please try again.");
           }
         }
       }

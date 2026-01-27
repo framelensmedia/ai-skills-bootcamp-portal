@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs"; // FormData needs nodejs runtime usually or edge
+export const maxDuration = 60; // Allow 1 minute for uploads
 
 export async function POST(req: Request) {
     try {
