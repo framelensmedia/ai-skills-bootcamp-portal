@@ -126,40 +126,43 @@ async function urlToBase64(url: string) {
     }
 
     // Fallback: Try downloading via Supabase Admin (for private buckets)
-    // Attempt to extract path from URL
     try {
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // Extract path: .../storage/v1/object/public/generations/path/to/file
-        // or .../storage/v1/object/sign/generations/path/to/file
-        const urlObj = new URL(url);
-        const parts = urlObj.pathname.split("/generations/");
-        if (parts.length > 1) {
-            const path = parts[1]; // "scratch/userid/file.png"
-            // Decode URI component (spaces etc)
-            const decodedPath = decodeURIComponent(path);
+        // Extract path using generic regex to handle various URL structures
+        // Matches anything after /generations/
+        const match = url.match(/\/generations\/(.+)$/);
+        if (match && match[1]) {
+            const decodedPath = decodeURIComponent(match[1]);
+            console.log(`Fallback: Downloading private file from path: ${decodedPath}`);
 
             const { data, error } = await supabaseAdmin
                 .storage
                 .from("generations")
                 .download(decodedPath);
 
-            if (error || !data) throw error || new Error("Download failed");
+            if (error) {
+                console.error("Supabase Admin Download Error:", error);
+                throw error;
+            }
+            if (!data) throw new Error("No data returned from storage download");
 
             const arrayBuffer = await data.arrayBuffer();
             return {
                 data: Buffer.from(arrayBuffer).toString("base64"),
                 mimeType: data.type || "image/png"
             };
+        } else {
+            console.warn("Could not extract storage path from URL:", url);
         }
     } catch (adminErr) {
         console.error("Admin storage download failed:", adminErr);
     }
 
-    throw new Error(`Failed to fetch image: ${url}`);
+    throw new Error(`Failed to fetch image (Public & Admin failed): ${url}`);
 }
 
 export async function POST(req: Request) {
@@ -391,8 +394,12 @@ export async function POST(req: Request) {
                 try {
                     const { data, mimeType } = await urlToBase64(url);
                     imageParts.push({ inlineData: { mimeType, data } });
-                } catch (e) {
-                    console.error("Failed to download input url:", url, e);
+                } catch (e: any) {
+                    console.error("CRITICAL: Failed to download input url:", url, e);
+                    return NextResponse.json({
+                        error: "Failed to download subject image. Please try again.",
+                        details: e.message
+                    }, { status: 400 });
                 }
             }
 
