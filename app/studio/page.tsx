@@ -311,30 +311,33 @@ function StudioContent() {
             // Compress
             const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
 
-            // Upload to Temp
-            const form = new FormData();
-            form.append("file", compressed);
+            // 1. Get Signed URL
+            const signRes = await fetch("/api/sign-upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                filename: compressed.name,
+                fileType: compressed.type
+              })
+            });
 
-            const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
+            if (!signRes.ok) throw new Error("Failed to initialize upload");
+            const { signedUrl, publicUrl } = await signRes.json();
+
+            // 2. Direct Upload to Storage (Bypass Vercel)
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: compressed,
+              headers: {
+                "Content-Type": compressed.type
+              }
+            });
+
             if (!upRes.ok) {
-              let errorMessage = `Upload failed (${upRes.status})`;
-              try {
-                const text = await upRes.text();
-                if (upRes.status === 413 || text.includes("Entity Too Large")) {
-                  errorMessage = "File too large (Server Limit). Try a smaller image.";
-                } else if (text.startsWith("<")) {
-                  errorMessage = `Server Error (${upRes.status})`;
-                } else {
-                  errorMessage = text.slice(0, 100);
-                }
-              } catch { }
-              throw new Error(errorMessage);
+              throw new Error(`Storage upload failed: ${upRes.statusText}`);
             }
 
-            const upData = await upRes.json();
-            if (upData.url) {
-              uploadedImageUrls.push(upData.url);
-            }
+            uploadedImageUrls.push(publicUrl);
           } catch (err: any) {
             console.error("Failed to stage image:", err);
             // Continue? Or fail? Let's fail for now to ensure consistency
@@ -456,16 +459,23 @@ function StudioContent() {
         throw new Error(`Cannot load image for editing: ${fetchError.message}`);
       }
 
-      // 2. STAGE UPLOADS (Fix for Vercel 4.5MB limit)
-      // Upload the Canvas Image (Source) to Temp Storage
+      // 2. STAGE UPLOADS (Direct to Storage)
+      // Upload the Canvas Image (Source)
       let canvasUrl: string | null = null;
       try {
-        const cForm = new FormData();
-        cForm.append("file", srcFile);
-        const cRes = await fetch("/api/upload-temp", { method: "POST", body: cForm });
-        if (!cRes.ok) throw new Error("Failed to upload base image for editing");
-        const cData = await cRes.json();
-        canvasUrl = cData.url;
+        // Sign
+        const sRes = await fetch("/api/sign-upload", {
+          method: "POST",
+          body: JSON.stringify({ filename: "canvas_source.png", fileType: srcBlob.type || "image/png" })
+        });
+        if (!sRes.ok) throw new Error("Sign failed");
+        const { signedUrl, publicUrl } = await sRes.json();
+
+        // Upload
+        const cRes = await fetch(signedUrl, { method: "PUT", body: srcBlob, headers: { "Content-Type": srcBlob.type || "image/png" } });
+        if (!cRes.ok) throw new Error("Upload failed");
+
+        canvasUrl = publicUrl;
       } catch (err) {
         throw new Error("Failed to upload base image. Please try again.");
       }
@@ -475,19 +485,32 @@ function StudioContent() {
       if (uploads.length > 0) {
         for (const file of uploads) {
           try {
-            // Mobile: 1280px max for safety
+            // Compress
             const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
-            const form = new FormData();
-            form.append("file", compressed);
-            const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
+
+            // Sign
+            const sRes = await fetch("/api/sign-upload", {
+              method: "POST",
+              body: JSON.stringify({ filename: compressed.name, fileType: compressed.type })
+            });
+            if (!sRes.ok) throw new Error("Sign failed");
+            const { signedUrl, publicUrl } = await sRes.json();
+
+            // Upload
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: compressed,
+              headers: { "Content-Type": compressed.type }
+            });
+
             if (upRes.ok) {
-              const upData = await upRes.json();
-              if (upData.url) uploadedImageUrls.push(upData.url);
+              uploadedImageUrls.push(publicUrl);
             } else {
               throw new Error(await upRes.text());
             }
           } catch (e: any) {
-            console.error("Failed to stage upload in edit mode:", e);
+            console.error("Failed to stage upload in edit mode", e);
+            // Keep consistent error format
             throw new Error(`Upload failed: ${e.message}`);
           }
         }
