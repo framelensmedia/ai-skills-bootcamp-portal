@@ -286,63 +286,95 @@ function StudioContent() {
 
     setGenerating(true);
 
-    // Scroll to preview explicitly (ensure loading state is seen)
+    // Scroll to preview explicitly
     if (typeof window !== "undefined" && previewRef.current) {
       previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     try {
-      // User is guaranteed by handleAuthGate
       if (!user?.id) {
         setGenError("Please log in.");
         setGenerating(false);
         return;
       }
 
-      const form = new FormData();
+      // 1. Stage Uploads (Client-Side Compression + Temp Storage) manually
+      // This bypasses Vercel 4.5MB limit by uploading files individually first.
+      const uploadedImageUrls: string[] = [];
 
-      form.append("prompt", normalize(promptToUse));
-      form.append("userId", normalize(user.id));
-      form.append("aspectRatio", normalize(aspectRatio));
+      if (uploads.length > 0) {
+        // notify user of upload phase if needed, currently just showing "generating" spinner
+        // ideally we would show "Processing images..." 
 
-      // ✅ Standardized prompt columns
-      form.append("combined_prompt_text", normalize(promptToUse));
-      form.append("edit_instructions", normalize(promptToUse));
-      form.append("template_reference_image", normalize(previewImageUrl));
+        for (const file of uploads) {
+          try {
+            // Compress
+            const compressed = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
 
-      // ✅ Upload up to 10 images
-      uploads.slice(0, 10).forEach((file) => {
-        form.append("images", file, file.name || "upload");
-      });
+            // Upload to Temp
+            const form = new FormData();
+            form.append("file", compressed);
 
+            const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
+            if (!upRes.ok) throw new Error("Failed to upload image stage");
 
-      if (prePromptId) form.append("promptId", normalize(prePromptId));
-      if (prePromptSlug) form.append("promptSlug", normalize(prePromptSlug));
-
-      if (answersToUse?.headline) {
-        form.append("headline", answersToUse.headline);
-      }
-      if (answersToUse?.subjectLock) {
-        form.append("subjectLock", answersToUse.subjectLock);
-      }
-      if (answersToUse?.industry_intent) {
-        form.append("industry_intent", answersToUse.industry_intent);
-      }
-      if (answersToUse?.business_name) {
-        form.append("business_name", answersToUse.business_name);
-      }
-      if (answersToUse?.subject_mode) {
-        form.append("subjectMode", answersToUse.subject_mode);
+            const upData = await upRes.json();
+            if (upData.url) {
+              uploadedImageUrls.push(upData.url);
+            }
+          } catch (err) {
+            console.error("Failed to stage image:", err);
+            // Continue? Or fail? Let's fail for now to ensure consistency
+            throw new Error("Failed to upload one of the images. Please try again.");
+          }
+        }
       }
 
-      // Also append logo if present (override previous logic?)
-      // The API handles logo_image.
-      if (logo) form.append("logo_image", logo);
-      if (businessName) form.append("business_name", businessName); // Redundant if in answers, but safe.
+      // 2. Build JSON Payload (Not FormData)
+      const payload: any = {
+        prompt: normalize(promptToUse),
+        userId: normalize(user.id),
+        aspectRatio: normalize(aspectRatio),
+        combined_prompt_text: normalize(promptToUse), // Standardized 
+        edit_instructions: normalize(promptToUse),
+        template_reference_image: normalize(previewImageUrl),
+        imageUrls: uploadedImageUrls, // ✅ Pass URLs instead of Files
+        // Files are NOT passed here
+      };
+
+      if (prePromptId) payload.promptId = normalize(prePromptId);
+      if (prePromptSlug) payload.promptSlug = normalize(prePromptSlug);
+
+      if (answersToUse) {
+        if (answersToUse.headline) payload.headline = answersToUse.headline;
+        if (answersToUse.subjectLock) payload.subjectLock = answersToUse.subjectLock;
+        if (answersToUse.industry_intent) payload.industry_intent = answersToUse.industry_intent;
+        if (answersToUse.business_name) payload.business_name = answersToUse.business_name;
+        if (answersToUse.subject_mode) payload.subjectMode = answersToUse.subject_mode;
+      }
+
+      // Handle Logo Separately (Also Stage?)
+      // For now, let's keep logo simple or stage it too if it's large. 
+      // Usually logos are small. But let's stay safe and stage it if present.
+      if (logo) {
+        const logoCompressed = await compressImage(logo, { maxWidth: 1024, quality: 0.9 });
+        const lForm = new FormData();
+        lForm.append("file", logoCompressed);
+        const lRes = await fetch("/api/upload-temp", { method: "POST", body: lForm });
+        if (lRes.ok) {
+          const lData = await lRes.json();
+          payload.logo_image = lData.url; // API accepts `logo_image` string URL too
+        }
+      }
+      if (businessName) payload.business_name = businessName;
+
 
       const res = await fetch("/api/generate", {
         method: "POST",
-        body: form,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -364,8 +396,6 @@ function StudioContent() {
 
       setLastImageUrl(imageUrl);
       setLastFullQualityUrl(fullQualityUrl);
-      setLightboxOpen(true);
-
       setLightboxOpen(true);
 
       // Auto-Switch for Video Intent -> Open Modal
@@ -413,29 +443,64 @@ function StudioContent() {
         throw new Error(`Cannot load image for editing: ${fetchError.message}`);
       }
 
-      // 2. Build Form Data
+      // 2. STAGE UPLOADS (Fix for Vercel 4.5MB limit)
+      // Upload the Canvas Image (Source) to Temp Storage
+      let canvasUrl: string | null = null;
+      try {
+        const cForm = new FormData();
+        cForm.append("file", srcFile);
+        const cRes = await fetch("/api/upload-temp", { method: "POST", body: cForm });
+        if (!cRes.ok) throw new Error("Failed to upload base image for editing");
+        const cData = await cRes.json();
+        canvasUrl = cData.url;
+      } catch (err) {
+        throw new Error("Failed to upload base image. Please try again.");
+      }
+
+      // Upload Subject Refs (if any)
+      const uploadedImageUrls: string[] = [];
+      if (uploads.length > 0) {
+        for (const file of uploads) {
+          try {
+            const compressed = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+            const form = new FormData();
+            form.append("file", compressed);
+            const upRes = await fetch("/api/upload-temp", { method: "POST", body: form });
+            if (upRes.ok) {
+              const upData = await upRes.json();
+              if (upData.url) uploadedImageUrls.push(upData.url);
+            }
+          } catch (e) {
+            console.error("Failed to stage upload in edit mode", e);
+          }
+        }
+      }
+
+      // 3. Build JSON Payload
       const supabase = createSupabaseBrowserClient();
-      const { data: { user } = {} } = await supabase.auth.getUser(); // Destructure with default empty object
+      const { data: { user } = {} } = await supabase.auth.getUser();
       if (!user) throw new Error("Please log in to edit.");
 
-      const form = new FormData();
-      form.append("userId", user.id);
-      form.append("canvas_image", srcFile); // Explicitly Canvas Image
-      form.append("prompt", prompt); // Simple text instruction
-      form.append("edit_instructions", prompt); // Ensure backend sees strict edit instruction
+      const payload: any = {
+        userId: user.id,
+        prompt: prompt,
+        edit_instructions: prompt,
+        canvas_image: canvasUrl, // ✅ Send URL
+        imageUrls: uploadedImageUrls, // ✅ Send URLs
+        subjectLock: remixAnswers?.subjectLock ? "true" : "false", // Ensure boolean string or bool? API uses string check usually.
+        // subjectLock logic in API: String(form.get("subjectLock") ?? "false").trim() === "true"; OR body.subjectLock
+      };
 
-      // Append Uploads (Subject Lock)
-      uploads.forEach((f) => form.append("images", f));
+      // Add Meta
+      if (businessName) payload.business_name = businessName;
+      if (remixAnswers?.subjectLock) payload.subjectLock = remixAnswers.subjectLock;
 
-      // Append Meta (Optional but good context)
-      if (logo) form.append("logo_image", logo);
-      if (businessName) form.append("business_name", businessName);
-      if (remixAnswers?.subjectLock) form.append("subjectLock", remixAnswers.subjectLock);
 
-      // 3. Call API
+      // 4. Call API (JSON)
       const res = await fetch("/api/generate", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -544,7 +609,12 @@ function StudioContent() {
       }
     } catch (err: any) {
       console.error("Video Generation Error:", err);
-      setGenError(err.message || "Failed to animate");
+      const msg = err.message || "";
+      if (msg.includes("violates Vertex AI's usage guidelines")) {
+        setGenError("SAFETY_POLICY_VIOLATION"); // Special flag
+      } else {
+        setGenError(msg || "Failed to animate");
+      }
     } finally {
       setAnimating(false);
     }
@@ -798,6 +868,12 @@ function StudioContent() {
               >
                 Reset Session
               </button>
+            </div>
+          ) : genError === "SAFETY_POLICY_VIOLATION" ? (
+            <div className="rounded-2xl border border-orange-500/30 bg-orange-950/30 p-4 text-sm text-orange-200 shadow-lg border-l-4 border-l-orange-500">
+              <strong>Usage Prevention:</strong> This image triggered Google's Safety Filters (likely due to a detected face or public figure).
+              <br /><br />
+              Veo (the video model) is stricter than the image model. Try using a different subject or a non-human image.
             </div>
           ) : genError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg">

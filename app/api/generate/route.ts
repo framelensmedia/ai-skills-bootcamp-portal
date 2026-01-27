@@ -154,6 +154,7 @@ export async function POST(req: Request) {
 
         let imageUrls: string[] = [];
         let logoUrl: string | null = null;
+        let canvasUrl: string | null = null; // New
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -239,13 +240,20 @@ export async function POST(req: Request) {
                 imageUrls = body.imageUrls.map(String);
             }
             logoUrl = body.logo_image ? String(body.logo_image).trim() : null;
+            template_reference_image = body.template_reference_image ? String(body.template_reference_image).trim() : null;
+
+            // ✅ Allow canvas_image from JSON (for Staged Edit Mode)
+            if (body.canvas_image && typeof body.canvas_image === "string") {
+                canvasUrl = String(body.canvas_image).trim();
+            }
         }
 
         // 2. Validation
         if (!rawPrompt && (!Array.isArray(intentQueue) || intentQueue.length === 0)) return NextResponse.json({ error: "Missing prompt" }, { status: 400 });
 
         // Strict Edit Mode Validation
-        if (Array.isArray(intentQueue) && intentQueue.length > 0 && !canvasFile) {
+        // Strict Edit Mode Validation
+        if (Array.isArray(intentQueue) && intentQueue.length > 0 && !canvasFile && !canvasUrl) {
             return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image." }, { status: 400 });
         }
 
@@ -310,16 +318,31 @@ export async function POST(req: Request) {
 
         const imageParts: any[] = [];
 
-        const isEditMode = (Array.isArray(intentQueue) && intentQueue.length > 0) || !!canvasFile;
+        const isEditMode = (Array.isArray(intentQueue) && intentQueue.length > 0) || !!canvasFile || !!canvasUrl;
 
         if (isEditMode) {
             // --- EDIT MODE ---
-            if (!canvasFile) {
+            if (!canvasFile && !canvasUrl) {
                 return NextResponse.json({ error: "Edit Mode requires a valid Base Canvas Image (canvas_image)." }, { status: 400 });
             }
 
-            const ab = await canvasFile.arrayBuffer();
-            imageParts.push({ inlineData: { mimeType: canvasFile.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
+            if (canvasFile) {
+                const ab = await canvasFile.arrayBuffer();
+                imageParts.push({ inlineData: { mimeType: canvasFile.type || "image/jpeg", data: Buffer.from(ab).toString("base64") } });
+            } else if (canvasUrl) {
+                try {
+                    const res = await fetch(canvasUrl);
+                    if (res.ok) {
+                        const ab = await res.arrayBuffer();
+                        const mimeType = res.headers.get("content-type") || "image/jpeg";
+                        imageParts.push({ inlineData: { mimeType, data: Buffer.from(ab).toString("base64") } });
+                    } else {
+                        console.error("Failed to fetch canvas url:", canvasUrl, res.status);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch canvas url:", canvasUrl, e);
+                }
+            }
 
             // Attach user uploads (already compressed client-side)
             for (const f of imageFiles) {
@@ -437,7 +460,9 @@ export async function POST(req: Request) {
             }
         }
 
-        const subjectRules = imageFiles.length > 0
+        const totalInputImages = imageFiles.length + imageUrls.length;
+
+        const subjectRules = totalInputImages > 0
             ? (subjectMode === "human" ? SYSTEM_HUMAN_RULES : SYSTEM_NON_HUMAN_RULES)
             : "";
 
@@ -487,17 +512,17 @@ Execute the user's instruction precisely.
             SYSTEM_CORE,
             internalRules ? `[TEMPLATE SPECIFIC RULES]\n${internalRules} ` : "",
             subjectRules,
-            (subjectLock && imageFiles.length > 0)
+            (subjectLock && totalInputImages > 0)
                 ? (subjectMode === "human" ? SUBJECT_LOCK_HUMAN_INSTRUCTIONS : SUBJECT_LOCK_OBJECT_INSTRUCTIONS)
                 : "",
-            (!subjectLock && imageFiles.length > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
+            (!subjectLock && totalInputImages > 0 && subjectMode === "human") ? CREATIVE_FREEDOM_INSTRUCTIONS : "",
             bgSwapInstruction,
             editModeInstruction,
             editModeInstruction,
             logoInstruction,
             "---",
             "USER INSTRUCTIONS:",
-            (subjectLock && imageFiles.length > 0 && subjectMode === "human")
+            (subjectLock && totalInputImages > 0 && subjectMode === "human")
                 ? "[ACTION: REPLACE THE MAIN SUBJECT. USE THE REFERENCE FACE.] " + rawPrompt
                 : rawPrompt,
             "---",
