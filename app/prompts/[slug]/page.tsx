@@ -19,7 +19,7 @@ import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
-import AutoplayVideo from "@/components/AutoplayVideo";
+import LazyMedia from "@/components/LazyMedia";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { compressImage } from "@/lib/compressImage";
 
@@ -1078,10 +1078,10 @@ function PromptContent() {
                   ].join(" ")}
                 >
                   {mediaType === "video" && (generatedImageUrl || inputVideo) ? (
-                    <AutoplayVideo
+                    <LazyMedia
                       src={generatedImageUrl || inputVideo || ""}
+                      type="video"
                       className="absolute inset-0 w-full h-full object-cover"
-                      controls
                       poster={imageSrc}
                     />
                   ) : (
@@ -1463,8 +1463,9 @@ function PromptContent() {
                         <div className="relative aspect-square w-full">
                           {r.mediaType === "video" && r.videoUrl ? (
                             <>
-                              <AutoplayVideo
+                              <LazyMedia
                                 src={r.videoUrl || ""}
+                                type="video"
                                 className="absolute inset-0 w-full h-full object-cover"
                                 poster={r.imageUrl || undefined}
                               />

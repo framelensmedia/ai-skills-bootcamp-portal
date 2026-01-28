@@ -456,8 +456,22 @@ export async function POST(req: Request) {
 
         // 9. Save DB Record
         let thumbnailUrl: string | null = null;
-        if (image && image.startsWith("http")) {
+        if (image && (image.startsWith("http") || image.startsWith("https"))) {
             thumbnailUrl = image;
+        } else if (image && image.startsWith("data:image")) {
+            // Upload Thumbnail for Freestyle
+            const thumbPath = `thumbnails/${userId}/${Date.now()}.jpg`;
+            const base64Data = image.split(",")[1];
+            const buffer = Buffer.from(base64Data, "base64");
+
+            const { error: thumbErr } = await admin.storage
+                .from("generations")
+                .upload(thumbPath, buffer, { contentType: "image/jpeg", upsert: false });
+
+            if (!thumbErr) {
+                const { data: thumbPub } = admin.storage.from("generations").getPublicUrl(thumbPath);
+                thumbnailUrl = thumbPub.publicUrl;
+            }
         } else if (sourceImageId) {
             const { data: sourceImg } = await admin
                 .from("prompt_generations")
