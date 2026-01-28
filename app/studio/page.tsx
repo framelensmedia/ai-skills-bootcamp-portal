@@ -9,10 +9,10 @@ import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@
 import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download, Loader2 } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
-import LoadingHourglass from "@/components/LoadingHourglass";
-import LoadingOrb from "@/components/LoadingOrb";
+
+import GenerationOverlay from "@/components/GenerationOverlay";
 import { ArrowLeft } from "lucide-react";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
@@ -962,7 +962,7 @@ function StudioContent() {
               >
                 {animating ? (
                   <span className="flex items-center gap-2">
-                    <LoadingHourglass className="w-5 h-5 text-white" />
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
                     <span>Animating...</span>
                   </span>
                 ) : (
@@ -985,7 +985,7 @@ function StudioContent() {
               >
                 {generating ? (
                   <span className="flex items-center gap-2">
-                    <LoadingHourglass className="w-5 h-5 text-black" />
+                    <Loader2 className="w-5 h-5 text-black animate-spin" />
                     <span>Generating...</span>
                   </span>
                 ) : "Generate Artwork"}
@@ -1024,10 +1024,7 @@ function StudioContent() {
           <div className="group relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]">
             {/* Generating Overlay */}
             {(generating || animating) && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                <LoadingOrb />
-                {animating && <p className="mt-4 text-sm font-bold text-white/50 animate-pulse">Creating Video...</p>}
-              </div>
+              <GenerationOverlay label={animating ? "CREATING VIDEO" : "GENERATING ARTWORK"} />
             )}
             <div
               className="relative aspect-[9/16] w-full cursor-pointer"

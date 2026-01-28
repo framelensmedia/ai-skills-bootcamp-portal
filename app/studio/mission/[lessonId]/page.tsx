@@ -10,7 +10,7 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 import Loading from "@/components/Loading";
 import { ArrowLeft, Sparkles, AlertCircle, CheckCircle, Loader2, Play } from "lucide-react";
-import LoadingOrb from "@/components/LoadingOrb";
+import GenerationOverlay from "@/components/GenerationOverlay";
 import Link from "next/link";
 import { compressImage } from "@/lib/compressImage";
 
@@ -466,7 +466,7 @@ export default function MissionStudioPage({ params }: Props) {
                                 <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-black">
                                     {generating && (
                                         <div className="absolute inset-0 z-20">
-                                            <LoadingOrb />
+                                            <GenerationOverlay label="GENERATING ASSET" />
                                         </div>
                                     )}
                                     <Image

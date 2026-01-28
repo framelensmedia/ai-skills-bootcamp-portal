@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { Sparkles, Send, X, Paperclip, Trash2 } from "lucide-react";
 import LoadingHourglass from "./LoadingHourglass";
-import LoadingOrb from "./LoadingOrb";
+import GenerationOverlay from "./GenerationOverlay";
 
 export type QueueItem = any;
 
@@ -75,7 +75,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         {/* Loading Overlay */}
                         {isGenerating && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-all duration-500">
-                                <LoadingOrb />
+                                <GenerationOverlay label="GENERATING REMIX" />
                             </div>
                         )}
                     </div>

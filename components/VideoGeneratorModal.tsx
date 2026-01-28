@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { X, Play, Wand2, Film, Maximize2 } from "lucide-react";
-import VideoGenerationOverlay from "./VideoGenerationOverlay";
+import GenerationOverlay from "./GenerationOverlay";
 
 
 
@@ -271,7 +271,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
                                     {/* Loading Overlay */}
                                     {isGenerating && (
-                                        <VideoGenerationOverlay />
+                                        <GenerationOverlay />
                                     )}
                                 </div>
                             </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export default function VideoGenerationOverlay({ label = "GENERATING VIDEO" }: { label?: string }) {
+export default function GenerationOverlay({ label = "GENERATING VIDEO" }: { label?: string }) {
     const [timer, setTimer] = useState(0);
 
     useEffect(() => {

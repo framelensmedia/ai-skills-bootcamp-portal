@@ -13,7 +13,7 @@ import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboa
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
-import VideoGenerationOverlay from "@/components/VideoGenerationOverlay";
+import GenerationOverlay from "@/components/GenerationOverlay";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
@@ -775,7 +775,7 @@ function CreatorContent() {
                         {/* Generating Overlay */}
                         {generating && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                                <VideoGenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
+                                <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
                             </div>
                         )}
 

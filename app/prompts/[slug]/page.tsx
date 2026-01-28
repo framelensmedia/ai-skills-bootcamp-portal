@@ -20,7 +20,7 @@ import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import LazyMedia from "@/components/LazyMedia";
-import VideoGenerationOverlay from "@/components/VideoGenerationOverlay";
+import GenerationOverlay from "@/components/GenerationOverlay";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { compressImage } from "@/lib/compressImage";
 
@@ -1104,7 +1104,7 @@ function PromptContent() {
                   )}
                   {/* Generating Overlay */}
                   {generating && (
-                    <VideoGenerationOverlay />
+                    <GenerationOverlay />
                   )}
 
                   {/* Expand Icon Overlay - Subtle */}
