@@ -72,6 +72,7 @@ const FORCE_CUTOUT_INSTRUCTIONS = `
 - **STYLE INTEGRATION**: You MUST adjust the subject's lighting, color grading, and texture to MATCH the scene's Global Style (e.g. Cinematic, Cartoon, etc.). The subject must not look like a "sticker" - they must be integrated.
 - **ZERO HALLUCINATION**: Do not change the outfit, hair, or accessories unless explicitly told.
 - **IDENTITY vs STYLE**: Prioritize Identity for the Face Geometry, but prioritize the Global Style for the Rendering (Lighting, Color, Shading).
+- **HEAD ANGLE & GAZE LOCK**: You MUST preserve the exact head tilt, rotation, and eye-line of the subject. Build the scene around their gaze, do NOT rotate their face to match the scene.
 `;
 
 const SUBJECT_LOCK_OBJECT_INSTRUCTIONS = `
