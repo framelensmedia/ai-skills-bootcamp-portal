@@ -12,6 +12,7 @@ import Loading from "@/components/Loading";
 import { ArrowLeft, Sparkles, AlertCircle, CheckCircle, Loader2, Play } from "lucide-react";
 import LoadingOrb from "@/components/LoadingOrb";
 import Link from "next/link";
+import { compressImage } from "@/lib/compressImage";
 
 type MediaType = "image" | "video";
 const ASPECTS = ["9:16", "16:9", "1:1", "4:5", "3:4"] as const;
@@ -193,9 +194,21 @@ export default function MissionStudioPage({ params }: Props) {
             form.append("edit_instructions", promptToUse);
             form.append("template_reference_image", previewImageUrl);
 
-            // Include uploads
-            uploads.slice(0, 10).forEach((file) => {
-                form.append("images", file, file.name);
+            // Include uploads (Compressed)
+            const imagesToProcess = uploads.slice(0, 10);
+            const compressedImages = await Promise.all(
+                imagesToProcess.map(async (file) => {
+                    try {
+                        return await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+                    } catch (e) {
+                        return file;
+                    }
+                })
+            );
+
+            compressedImages.forEach((file) => {
+                const safeName = (file.name || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
+                form.append("images", file, safeName);
             });
 
             // Include template reference

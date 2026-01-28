@@ -20,6 +20,7 @@ import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import AutoplayVideo from "@/components/AutoplayVideo";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import { compressImage } from "@/lib/compressImage";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -719,12 +720,20 @@ function PromptContent() {
   }
 
   const uploadFile = async (file: File) => {
+    // Compress before upload to save bandwidth and storage
+    let fileToUpload = file;
+    try {
+      fileToUpload = await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+    } catch (e) {
+      console.warn("Compression failed for refine upload", e);
+    }
+
     const supabase = createSupabaseBrowserClient();
     const ext = file.name.split(".").pop() || "png";
     const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
     const { data, error } = await supabase.storage
       .from("remix-images")
-      .upload(fileName, file);
+      .upload(fileName, fileToUpload);
 
     if (error) throw error;
 

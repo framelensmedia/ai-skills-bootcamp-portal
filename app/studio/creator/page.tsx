@@ -414,9 +414,22 @@ function CreatorContent() {
             }
 
             // Upload images directly via FormData
-            imageUploads.slice(0, 10).forEach((file) => {
+            // FIX: Compress images before upload to prevent Mobile Data timeouts / Browser Security Errors (413)
+            const imagesToProcess = imageUploads.slice(0, 10);
+            const compressedImages = await Promise.all(
+                imagesToProcess.map(async (file) => {
+                    try {
+                        // 1536px is good balance for Subject details (Face) vs Size (<1MB)
+                        return await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+                    } catch (e) {
+                        console.warn("Image compression failed, using original", file.name);
+                        return file;
+                    }
+                })
+            );
+
+            compressedImages.forEach((file) => {
                 // DEFENSE IN DEPTH: Sanitize filename one last time before append
-                // This prevents "Browser Security" (InvalidCharacterError) if upstream sanitization failed
                 const safeName = (file.name || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
                 form.append("images", file, safeName);
             });

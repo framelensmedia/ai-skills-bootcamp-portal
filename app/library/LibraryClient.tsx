@@ -15,6 +15,8 @@ import { useToast } from "@/context/ToastContext";
 import EditModeModal from "@/components/EditModeModal";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LazyMedia from "@/components/LazyMedia";
+import { compressImage } from "@/lib/compressImage";
+import { compressImage } from "@/lib/compressImage";
 
 type SortMode = "newest" | "oldest";
 
@@ -273,9 +275,21 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             form.append("prompt", prompt);
             form.append("edit_instructions", prompt);
 
-            // Append additional user images
-            images.forEach((img) => {
-                form.append("images", img);
+            // Append additional user images (Compressed)
+            const imagesToProcess = images.slice(0, 10);
+            const compressedImages = await Promise.all(
+                imagesToProcess.map(async (file) => {
+                    try {
+                        return await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+                    } catch (e) {
+                        return file;
+                    }
+                })
+            );
+
+            compressedImages.forEach((img) => {
+                const safeName = (img.name || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
+                form.append("images", img, safeName);
             });
 
             const apiRes = await fetch("/api/generate", {
