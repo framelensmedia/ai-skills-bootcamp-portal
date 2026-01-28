@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { X, Play, Wand2, Film, Maximize2 } from "lucide-react";
+import VideoGenerationOverlay from "./VideoGenerationOverlay";
 
 
 
@@ -270,14 +271,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
                                     {/* Loading Overlay */}
                                     {isGenerating && (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                                            <div className="relative">
-                                                <div className="absolute inset-0 bg-lime-400/20 blur-xl rounded-full" />
-                                                <div className="relative h-16 w-16 rounded-full border-4 border-lime-400 border-t-transparent animate-spin shadow-[0_0_30px_rgba(183,255,0,0.4)]" />
-                                            </div>
-                                            <div className="mt-6 text-lime-400 font-bold tracking-widest animate-pulse">GENERATING VIDEO</div>
-                                            <div className="text-lime-400/60 font-mono text-xs mt-2">{timer}s</div>
-                                        </div>
+                                        <VideoGenerationOverlay />
                                     )}
                                 </div>
                             </div>
