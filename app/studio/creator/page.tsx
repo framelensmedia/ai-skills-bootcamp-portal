@@ -775,7 +775,7 @@ function CreatorContent() {
                         {/* Generating Overlay */}
                         {generating && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                                <VideoGenerationOverlay />
+                                <VideoGenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
                             </div>
                         )}
 

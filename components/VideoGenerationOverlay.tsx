@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export default function VideoGenerationOverlay() {
+export default function VideoGenerationOverlay({ label = "GENERATING VIDEO" }: { label?: string }) {
     const [timer, setTimer] = useState(0);
 
     useEffect(() => {
@@ -19,7 +19,7 @@ export default function VideoGenerationOverlay() {
                 <div className="absolute inset-0 bg-lime-400/20 blur-xl rounded-full" />
                 <div className="relative h-16 w-16 rounded-full border-4 border-lime-400 border-t-transparent animate-spin shadow-[0_0_30px_rgba(183,255,0,0.4)]" />
             </div>
-            <div className="mt-6 text-lime-400 font-bold tracking-widest animate-pulse">GENERATING VIDEO</div>
+            <div className="mt-6 text-lime-400 font-bold tracking-widest animate-pulse">{label}</div>
             <div className="text-lime-400/60 font-mono text-xs mt-2">{timer}s</div>
         </div>
     );

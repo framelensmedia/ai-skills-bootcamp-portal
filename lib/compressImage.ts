@@ -34,12 +34,15 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
 
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Use WebP for best compression + transparency support
+                    // Prefer JPEG for photos (smaller, compatible). Use PNG/WebP only if source was PNG (transparency).
+                    const isPng = file.type === "image/png";
+                    const outType = isPng ? "image/webp" : "image/jpeg";
+
                     canvas.toBlob(
                         (blob) => {
                             if (blob) {
-                                const newFile = new File([blob], safeName, {
-                                    type: "image/webp",
+                                const newFile = new File([blob], safeName.replace(".webp", isPng ? ".webp" : ".jpg"), {
+                                    type: outType,
                                     lastModified: Date.now(),
                                 });
                                 resolve(newFile);
@@ -47,8 +50,8 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
                                 reject(new Error("Canvas to Blob failed"));
                             }
                         },
-                        "image/webp",
-                        quality
+                        outType,
+                        quality // JPEG uses quality param effectively
                     );
                 };
                 img.onerror = (err) => reject(err);
