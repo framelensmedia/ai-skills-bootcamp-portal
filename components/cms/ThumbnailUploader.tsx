@@ -4,6 +4,7 @@ import { useState, useRef, useMemo } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
+import { compressImage } from "@/lib/compressImage";
 
 type Props = {
     currentUrl?: string | null;
@@ -50,15 +51,24 @@ export default function ThumbnailUploader({
 
         try {
             // Create unique filename
-            const ext = file.name.split(".").pop() || "jpg";
+            const ext = "webp"; // We compress to webp
             const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+            // Compress
+            let fileToUpload = file;
+            try {
+                fileToUpload = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+            } catch (e) {
+                console.warn("Thumbnail compression failed", e);
+            }
 
             // Upload to Supabase Storage
             const { data, error: uploadError } = await supabase.storage
                 .from(bucket)
-                .upload(filename, file, {
+                .upload(filename, fileToUpload, {
                     cacheControl: "3600",
                     upsert: false,
+                    contentType: "image/webp"
                 });
 
             if (uploadError) {
