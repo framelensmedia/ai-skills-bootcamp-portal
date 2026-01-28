@@ -16,7 +16,6 @@ import EditModeModal from "@/components/EditModeModal";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LazyMedia from "@/components/LazyMedia";
 import { compressImage } from "@/lib/compressImage";
-import { compressImage } from "@/lib/compressImage";
 
 type SortMode = "newest" | "oldest";
 
