@@ -596,7 +596,7 @@ function PromptContent() {
     // Compress before upload to save bandwidth and storage
     let fileToUpload = file;
     try {
-      fileToUpload = await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+      fileToUpload = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
     } catch (e) {
       console.warn("Compression failed for refine upload", e);
     }
@@ -794,7 +794,14 @@ function PromptContent() {
         // This matches Studio behavior handling
         if (uploadsToUse.length > 0) {
           try {
-            const file = uploadsToUse[0];
+            let file = uploadsToUse[0];
+            // Compress before base64 conversion (Fixes Payload Too Large)
+            try {
+              file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+            } catch (ce) {
+              console.warn("Video compression skipped", ce);
+            }
+
             const reader = new FileReader();
             const base64 = await new Promise<string>((resolve) => {
               reader.onload = () => resolve(reader.result as string);

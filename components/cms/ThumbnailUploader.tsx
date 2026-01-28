@@ -57,7 +57,7 @@ export default function ThumbnailUploader({
             // Compress
             let fileToUpload = file;
             try {
-                fileToUpload = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                fileToUpload = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
             } catch (e) {
                 console.warn("Thumbnail compression failed", e);
             }

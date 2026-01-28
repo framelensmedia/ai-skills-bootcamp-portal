@@ -288,7 +288,7 @@ function CreatorContent() {
                 imagesToProcess.map(async (file) => {
                     try {
                         // 1536px is good balance for Subject details (Face) vs Size (<1MB)
-                        return await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+                        return await compressImage(file, { maxWidth: 1280, quality: 0.8 });
                     } catch (e) {
                         console.warn("Image compression failed, using original", file.name);
                         return file;
@@ -835,7 +835,7 @@ function CreatorContent() {
                         const blob = await res.blob();
                         let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
                         try {
-                            file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+                            file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
                         } catch (e) { console.warn(e); }
                         setUploads((prev) => [...prev, file]);
                     } catch (err) {

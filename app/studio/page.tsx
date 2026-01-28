@@ -1099,7 +1099,7 @@ function StudioContent() {
             const blob = await res.blob();
             let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
             try {
-              file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+              file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
             } catch (e) { console.warn(e); }
             setUploads((prev) => [...prev, file]);
           } catch (err) {

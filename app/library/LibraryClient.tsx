@@ -279,7 +279,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             const compressedImages = await Promise.all(
                 imagesToProcess.map(async (file) => {
                     try {
-                        return await compressImage(file, { maxWidth: 1536, quality: 0.85 });
+                        return await compressImage(file, { maxWidth: 1280, quality: 0.8 });
                     } catch (e) {
                         return file;
                     }
