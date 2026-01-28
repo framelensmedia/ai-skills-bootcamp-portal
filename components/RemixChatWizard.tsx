@@ -329,16 +329,22 @@ export default function RemixChatWizard({
                     </div>
 
                     {/* Chat Area */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-4 md:p-4">
-                        {messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className="flex-1 overflow-y-auto px-4 py-8 space-y-6 scroll-smooth">
+
+                        <div className="text-center pb-4">
+                            <p className="text-[10px] text-white/30 uppercase tracking-widest">Guided Remix</p>
+                            <p className="text-[10px] text-white/30 italic">AI is not perfect; it can make mistakes.</p>
+                        </div>
+
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`
                                     rounded-2xl p-4 text-sm
-                                    ${m.role === 'user' ? 'bg-lime-400 text-black rounded-tr-none' : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'}
-                                    ${m.isUploadStep ? 'w-full max-w-full' : 'max-w-[95%] md:max-w-[85%]'}
+                                    ${msg.role === 'user' ? 'bg-lime-400 text-black rounded-tr-none' : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'}
+                                    ${msg.isUploadStep ? 'w-full max-w-full' : 'max-w-[95%] md:max-w-[85%]'}
                                 `}>
-                                    {m.text && <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>}
-                                    {m.isUploadStep && (
+                                    {msg.text && <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>}
+                                    {msg.isUploadStep && (
                                         <div className="mt-3 -mx-1">
                                             <UploadStepWrapper
                                                 files={uploads}

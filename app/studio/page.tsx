@@ -13,9 +13,11 @@ import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download 
 import SelectPill from "@/components/SelectPill";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
+import { ArrowLeft } from "lucide-react";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import { Library } from "lucide-react";
+import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 
@@ -740,6 +742,13 @@ function StudioContent() {
       />
 
       <div className="mb-6">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 inline-flex items-center gap-2 text-sm text-lime-400 hover:text-lime-300 transition-colors font-bold uppercase tracking-wide"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Prompt Studio</h1>
         <p className="mt-2 text-sm text-white/70 sm:text-base">
           Remix an existing prompt or build from scratch. Generate, save, and reuse winners.
@@ -1001,6 +1010,10 @@ function StudioContent() {
                 Remix Again
               </button>
             </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <StudioCommunityFeed />
           </div>
         </div>
 

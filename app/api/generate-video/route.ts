@@ -50,7 +50,11 @@ async function pollOperation(
 
         if (data.done) {
             if (data.error) {
-                throw new Error(`Operation failed: ${JSON.stringify(data.error)}`);
+                // Handle harmless "Service Unavailable" errors gracefully
+                if (data.error.code === 14 || data.error.message?.includes("unavailable")) {
+                    throw new Error("Video service is currently busy. Please try again in a moment.");
+                }
+                throw new Error(`Operation failed: ${data.error.message || JSON.stringify(data.error)}`);
             }
             // Log the raw response to debug "No video" issues
             console.log("Operation Done. Raw Response keys:", Object.keys(data.response || {}));
@@ -113,7 +117,7 @@ async function describeImage(
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64 } = body;
+        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64, aspectRatio, promptId } = body;
 
         // 1. Auth via Session
         const supabase = await createSupabaseServerClient();
@@ -338,7 +342,13 @@ export async function POST(req: Request) {
         };
 
         if (!inputVideo) {
-            parameters.aspectRatio = detectedAspectRatio;
+            // Use client-provided aspect ratio if valid, otherwise fallback to detected (but avoid 1:1)
+            let ratioToUse = aspectRatio || detectedAspectRatio;
+            if (ratioToUse === "1:1" || ratioToUse === "4:5") {
+                console.warn(`Unsupported video aspect ratio '${ratioToUse}', defaulting to 16:9`);
+                ratioToUse = "16:9";
+            }
+            parameters.aspectRatio = ratioToUse;
         }
 
         console.log("Using GCS storageUri:", storageUri);
@@ -462,6 +472,7 @@ export async function POST(req: Request) {
         await admin.from("video_generations").insert({
             user_id: userId,
             source_image_id: sourceImageId || null,
+            prompt_id: promptId || null, // NEW: Save linkage
             video_url: videoUrl,
             thumbnail_url: thumbnailUrl,
             prompt,

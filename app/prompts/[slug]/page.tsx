@@ -11,11 +11,12 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
-import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft } from "lucide-react";
+import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
+import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import AutoplayVideo from "@/components/AutoplayVideo";
@@ -198,6 +199,30 @@ function PromptContent() {
     setUploads([]);
   }
 
+  // Subject Settings (Parity with Studio)
+  const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
+  const [subjectLock, setSubjectLock] = useState(true);
+
+  // Manual Mode Handler with Template Pre-load
+  const handleFreestyleEnter = async () => {
+    setManualMode(true);
+
+    // Auto-load template image as reference if none exists
+    if (uploads.length === 0 && metaRow?.featured_image_url) {
+      try {
+        const res = await fetch(metaRow.featured_image_url);
+        const blob = await res.blob();
+        let file = new File([blob], "template_ref.jpg", { type: "image/jpeg" });
+        try {
+          file = await compressImage(file, { maxWidth: 1536, quality: 0.8 });
+        } catch (e) { console.warn("Compression failed", e); }
+        setUploads([file]);
+      } catch (e) {
+        console.error("Failed to preload template image", e);
+      }
+    }
+  };
+
   // If we land here from a Remix action, we allow:
   // - override preview image
   // - optional prefilled prompt to generate (treated as a full prompt)
@@ -211,9 +236,6 @@ function PromptContent() {
   // We use 'any[]' to accommodate RemixItem shape
   const [specificRemixes, setSpecificRemixes] = useState<any[]>([]);
   const [specificLoading, setSpecificLoading] = useState(false);
-
-  // 2. Trending Prompts (Grid)
-  const [trendingPrompts, setTrendingPrompts] = useState<any[]>([]);
 
   // 3. Global Community Remixes (Infinite)
   // We use 'any[]' to accommodate the RemixItem shape required by RemixCard
@@ -447,12 +469,11 @@ function PromptContent() {
         .order("created_at", { ascending: false })
         .limit(16);
 
-      // Fetch Videos (linked via source_image -> prompt_id)
-      // We assume relation name is 'prompt_generations' based on FK
+      // Fetch Videos (linked via prompt_id directy - NEW logic)
       const { data: videoData } = await supabase
         .from("video_generations")
-        .select("*, prompt_generations!inner(prompt_id)")
-        .eq("prompt_generations.prompt_id", metaRow!.id)
+        .select("*")
+        .eq("prompt_id", metaRow!.id)
         .order("created_at", { ascending: false })
         .limit(16);
 
@@ -499,155 +520,7 @@ function PromptContent() {
     loadSpecific();
   }, [metaRow?.id, remixRefreshTrigger]);
 
-  // EFFECT: Load Global Community Remixes (Infinite)
-  useEffect(() => {
-    const fetchCommunity = async () => {
-      if (!hasMoreCommunity) return;
-      setCommunityLoading(true);
 
-      const supabase = createSupabaseBrowserClient();
-      const LIMIT = 12;
-
-      // Initial Fetch & Shuffle (Client-side)
-      if (communityPage === 0 && shuffledRemixIds.current.length === 0) {
-        try {
-          const { data: allImageIds } = await supabase
-            .from("prompt_generations")
-            .select("id")
-            .eq("is_public", true)
-            .order("created_at", { ascending: false })
-            .limit(500);
-
-          const { data: allVideoIds } = await supabase
-            .from("video_generations")
-            .select("id")
-            .eq("is_public", true)
-            .eq("status", "completed")
-            .order("created_at", { ascending: false })
-            .limit(200);
-
-          let mixedIds: { id: string, type: "image" | "video" }[] = [];
-          if (allImageIds) mixedIds.push(...allImageIds.map((x: any) => ({ id: x.id, type: "image" as const })));
-          if (allVideoIds) mixedIds.push(...allVideoIds.map((x: any) => ({ id: x.id, type: "video" as const })));
-
-          if (mixedIds.length > 0) {
-            // Fisher-Yates Shuffle
-            for (let i = mixedIds.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [mixedIds[i], mixedIds[j]] = [mixedIds[j], mixedIds[i]];
-            }
-            shuffledRemixIds.current = mixedIds;
-          }
-        } catch (e) {
-          console.error("Failed to fetch ids", e);
-        }
-      }
-
-      const start = communityPage * LIMIT;
-      const end = start + LIMIT;
-      const pageItems = shuffledRemixIds.current.slice(start, end);
-
-      if (pageItems.length === 0) {
-        if (shuffledRemixIds.current.length > 0) {
-          setHasMoreCommunity(false);
-        } else {
-          setHasMoreCommunity(false);
-        }
-        setCommunityLoading(false);
-        return;
-      }
-
-      const imageIds = pageItems.filter(p => p.type === "image").map(p => p.id);
-      const videoIds = pageItems.filter(p => p.type === "video").map(p => p.id);
-
-      const promises = [];
-      if (imageIds.length > 0) promises.push(supabase.from("prompt_generations").select("*").in("id", imageIds));
-      if (videoIds.length > 0) promises.push(supabase.from("video_generations").select("*").in("id", videoIds));
-
-      const results = await Promise.all(promises);
-      let mixedData: any[] = [];
-
-      results.forEach(res => {
-        if (res.data) {
-          // Heuristic to detect type: video_url vs no video_url
-          const rows = res.data;
-          if (rows.length > 0) {
-            if (rows[0].video_url) {
-              mixedData.push(...rows.map((r: any) => ({ ...r, mediaType: "video", image_url: r.thumbnail_url || r.image_url || "", video_url: r.video_url })));
-            } else {
-              mixedData.push(...rows.map((r: any) => ({ ...r, mediaType: "image" })));
-            }
-          }
-        }
-      });
-
-      if (mixedData.length > 0) {
-        // Fetch profiles for remixes similar to Creator Studio
-        // Note: mixedData has user_id, but different fields maybe? Both tables have user_id.
-        const userIds = Array.from(new Set(mixedData.map((r: any) => r.user_id).filter(Boolean)));
-        let profileMap = new Map();
-
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, profile_image").in("user_id", userIds);
-          profiles?.forEach((p: any) => profileMap.set(p.user_id, p));
-        }
-
-        const processedRemixes = mixedData.map((r: any) => {
-          const profile = profileMap.get(r.user_id) || {};
-          const settings = r.settings || {};
-          // Map to RemixItem shape
-          return {
-            id: String(r.id),
-            imageUrl: String(r.image_url || ""),
-            videoUrl: r.video_url, // Add this
-            mediaType: r.mediaType, // Add this
-            title: settings.headline || (r.mediaType === "video" ? "Animated Scene" : "Untitled Remix"),
-            username: profile.full_name || "Anonymous Creator",
-            userAvatar: profile.profile_image || null,
-            upvotesCount: r.upvotes_count || 0,
-            originalPromptText: r.prompt_text || r.original_prompt_text || r.prompt,
-            remixPromptText: r.remix || r.remix_prompt_text,
-            combinedPromptText: r.final_prompt || r.combined_prompt_text || r.prompt,
-            createdAt: r.created_at,
-            promptId: r.prompt_id || null,
-            prompt_slug: r.prompt_slug ?? null,
-          };
-        });
-
-        // We permit items with videoUrl even if imageUrl is empty
-        const validRows = processedRemixes.filter((r: any) => (r.imageUrl && r.imageUrl.trim().length > 0) || (r.videoUrl));
-
-        // Sort validRows to match pageItems order
-        const sortedRows = pageItems.map(p => validRows.find((r: any) => r.id === String(p.id))).filter(Boolean);
-
-        setCommunityRemixes((prev) => {
-          if (communityPage === 0) return sortedRows;
-          const existing = new Set(prev.map((p) => p.id));
-          return [...prev, ...sortedRows.filter((p: any) => !existing.has(p.id))];
-        });
-      } else {
-        setHasMoreCommunity(false);
-      }
-      setCommunityLoading(false);
-    };
-
-    fetchCommunity();
-  }, [communityPage, hasMoreCommunity]);
-
-  // EFFECT: Fetch Trending Prompts (Once)
-  useEffect(() => {
-    const fetchPrompts = async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { data: promptsData } = await supabase
-        .from("prompts_public")
-        .select("id, title, slug, summary, category, access_level, image_url, featured_image_url, media_url")
-        .order("created_at", { ascending: false })
-        .limit(4);
-
-      if (promptsData) setTrendingPrompts(promptsData);
-    };
-    fetchPrompts();
-  }, []);
 
 
 
@@ -915,11 +788,36 @@ function PromptContent() {
 
       // --- VIDEO GENERATION ---
       if (mediaType === "video") {
+        let sourceImageWithBase64: string | undefined = !inputVideo ? imageSrc : undefined; // Default to template image
+
+        // If user uploaded a file, convert to base64 for Image-to-Video
+        // This matches Studio behavior handling
+        if (uploadsToUse.length > 0) {
+          try {
+            const file = uploadsToUse[0];
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
+            sourceImageWithBase64 = base64;
+          } catch (e) {
+            console.warn("Failed to convert upload to base64", e);
+            // Fallback to uploaded URL if base64 fails
+            if (imageUrls.length > 0) sourceImageWithBase64 = imageUrls[0];
+          }
+        }
+
         const videoPayload = {
-          image: !inputVideo && imageUrls.length > 0 ? imageUrls[0] : (!inputVideo ? imageSrc : undefined),
+          image: sourceImageWithBase64,
           inputVideo: inputVideo || undefined, // Send video if extending
           prompt: promptToUse,
-          sourceImageId: metaRow.id,
+          // sourceImageId: metaRow.id, // REMOVED: Prompt ID != Generation ID
+          // Only send sourceImageId if we are remixing an actual generation
+          sourceImageId: undefined,
+          promptId: metaRow.id, // NEW: Link to Prompt Template directly
+          aspectRatio, // Ensure aspect ratio is sent
+          userId // Ensure userId is sent
         };
 
         const res = await fetch("/api/generate-video", {
@@ -1263,6 +1161,7 @@ function PromptContent() {
                 </div>
               )}
             </div>
+
           </section>
 
           {/* TOOL PANEL */}
@@ -1338,7 +1237,7 @@ function PromptContent() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setManualMode(true)}
+                      onClick={handleFreestyleEnter}
                       className="group flex w-36 items-center justify-center gap-2 rounded-full border border-white/20 bg-black/40 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-white/10 hover:border-white/30 transition-all hover:scale-105"
                     >
                       <span>Freestyle</span>
@@ -1352,6 +1251,60 @@ function PromptContent() {
                 <RefineChat onRefine={handleRefine} isGenerating={generating} />
               ) : (
                 <div className={`relative transition-all duration-500 ${!manualMode && !isLocked ? 'blur-sm opacity-40 scale-[0.98]' : ''}`}>
+
+                  {/* Reference Images (Top - Parity with Studio) */}
+                  {!isLocked && manualMode && (
+                    <div className="mb-4">
+                      <ImageUploader files={uploads} onChange={setUploads} disabled={!manualMode} />
+                    </div>
+                  )}
+
+                  {/* Subject Mode & Lock (Parity with Studio) */}
+                  {manualMode && !isLocked && (
+                    <div className="flex items-center justify-between px-2 mb-4 animate-in fade-in zoom-in duration-300">
+                      {/* Subject Toggle */}
+                      <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setSubjectMode("human")}
+                          className={`
+                            px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5
+                            ${subjectMode === "human" ? "bg-white/10 text-white shadow-sm border border-white/10" : "text-white/40 hover:text-white hover:bg-white/5"}
+                          `}
+                        >
+                          <span>Human Subject</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSubjectMode("non_human")}
+                          className={`
+                            px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5
+                            ${subjectMode === "non_human" ? "bg-white/10 text-white shadow-sm border border-white/10" : "text-white/40 hover:text-white hover:bg-white/5"}
+                          `}
+                        >
+                          <span>Object</span>
+                        </button>
+                      </div>
+
+                      {/* Lock Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setSubjectLock(!subjectLock)}
+                        className={`
+                          flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all
+                          ${subjectLock
+                            ? "bg-lime-400/10 border-lime-400/30 text-lime-400"
+                            : "bg-black/40 border-white/10 text-white/40 hover:text-white hover:border-white/20"}
+                        `}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${subjectLock ? "bg-lime-400 animate-pulse" : "bg-white/20"}`} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">
+                          {subjectLock ? "Strict Lock" : "Loose"}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
                   <textarea
                     readOnly={!manualMode || isLocked}
                     onClick={!manualMode && !isLocked ? undefined : undefined}
@@ -1361,7 +1314,7 @@ function PromptContent() {
                       }
                     }}
                     className={[
-                      "w-full rounded-2xl rounded-tl-none border-0 p-5 text-sm outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner",
+                      "w-full rounded-2xl border-0 p-5 text-sm outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner",
                       isLocked
                         ? "bg-white/5 text-white/30 cursor-not-allowed"
                         : "bg-[#2A2A2A] text-white focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
@@ -1370,15 +1323,6 @@ function PromptContent() {
                     placeholder={isLocked ? "Locked." : "Describe your image..."}
                     value={editSummary}
                   />
-
-                  {!isLocked && (
-                    <div className={`grid transition-all duration-300 ease-in-out ${manualMode ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0 mt-0'}`}>
-                      <div className="overflow-hidden">
-                        <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Reference Images</div>
-                        <ImageUploader files={uploads} onChange={setUploads} disabled={!manualMode} />
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1403,7 +1347,18 @@ function PromptContent() {
                   onClick={() => setMediaType("image")}
                   disabled={isLocked || generating}
                 />
-                <SelectPill label="Video" selected={mediaType === "video"} disabled={isLocked || generating} onClick={() => setMediaType("video")} />
+                <SelectPill
+                  label="Video"
+                  selected={mediaType === "video"}
+                  disabled={isLocked || generating}
+                  onClick={() => {
+                    setMediaType("video");
+                    // Auto-switch incompatible aspect ratios for video
+                    if (aspectRatio === "1:1" || aspectRatio === "4:5") {
+                      setAspectRatio("16:9");
+                    }
+                  }}
+                />
               </div>
 
               <div className="mt-3">
@@ -1431,7 +1386,7 @@ function PromptContent() {
                     icon={<Square size={16} />}
                     selected={aspectRatio === "1:1"}
                     onClick={() => setAspectRatio("1:1")}
-                    disabled={isLocked || generating}
+                    disabled={isLocked || generating || mediaType === "video"}
                   />
                   <SelectPill
                     label="4:5"
@@ -1439,7 +1394,7 @@ function PromptContent() {
                     icon={<RectangleVertical size={16} />}
                     selected={aspectRatio === "4:5"}
                     onClick={() => setAspectRatio("4:5")}
-                    disabled={isLocked || generating}
+                    disabled={isLocked || generating || mediaType === "video"}
                   />
                 </div>
               </div>
@@ -1462,13 +1417,18 @@ function PromptContent() {
                 {generating ? (
                   <span className="flex items-center gap-2">
                     <LoadingHourglass className="w-5 h-5 text-black" />
-                    <span>Generating...</span>
+                    <span>{mediaType === "video" ? "Creating Video..." : "Generating..."}</span>
                   </span>
                 ) : lockReason === "login"
                   ? "Log in to Generate"
                   : isLocked
                     ? "Upgrade to Pro"
-                    : "Generate Artwork"}
+                    : mediaType === "video" ? (
+                      <span className="flex items-center gap-2">
+                        <Clapperboard size={18} />
+                        <span>Animate Video</span>
+                      </span>
+                    ) : "Generate Artwork"}
               </button>
             </div>
 
@@ -1553,66 +1513,10 @@ function PromptContent() {
               )}
             </div>
 
-            {/* 2. TRENDING PROMPTS (Grid) */}
-            {trendingPrompts.length > 0 && (
-              <div className="mt-16 pt-8 border-t border-white/10">
-                <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider opacity-60 px-2">Trending Prompts</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {trendingPrompts.map((p) => (
-                    <div key={p.id} className="scale-[0.85] origin-top-left -mr-[15%] -mb-[15%]">
-                      <PromptCard
-                        id={p.id}
-                        title={p.title}
-                        summary={p.summary || ""}
-                        slug={p.slug}
-                        featuredImageUrl={p.featured_image_url || p.image_url || p.media_url}
-                        category={p.category}
-                        accessLevel={p.access_level}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-8 flex justify-center">
-                  <Link
-                    href="/prompts"
-                    className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10 hover:scale-105 hover:border-lime-400/50"
-                  >
-                    <span>View More Templates</span>
-                    <ArrowRight size={16} className="text-lime-400 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                </div>
-              </div>
-            )}
-
-
-
-            {/* 3. GLOBAL COMMUNITY REMIXES (Infinite) */}
-            {communityRemixes.length > 0 && (
-              <div className="mt-16 pt-8 border-t border-white/10 relative">
-                <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-wider opacity-60 px-2">Community Remixes</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {communityRemixes.map((r, i) => (
-                    <div
-                      key={`${r.id}-${i}`}
-                      ref={i === communityRemixes.length - 1 ? lastCommunityRef : null}
-                    >
-                      <RemixCard item={r} />
-                    </div>
-                  ))}
-                </div>
-
-                {communityLoading && (
-                  <div className="py-8 flex justify-center w-full">
-                    <LoadingOrb />
-                  </div>
-                )}
-
-                {/* Sticky Back To Top */}
-                <div className="sticky bottom-8 flex justify-center pointer-events-none z-50 mt-8">
-                  <GalleryBackToTop />
-                </div>
-              </div>
-            )}
+            {/* Community Feed */}
+            <div className="mt-8 border-t border-white/10 pt-8">
+              <StudioCommunityFeed />
+            </div>
 
           </section >
         </div >

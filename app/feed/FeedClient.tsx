@@ -536,7 +536,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 ))}
 
                 {loading && (
-                    <div className="py-12 flex justify-center">
+                    <div className="col-span-2 md:col-span-3 py-20 flex flex-col items-center justify-center w-full min-h-[50vh]">
                         <Loading />
                     </div>
                 )}
