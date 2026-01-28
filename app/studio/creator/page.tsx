@@ -13,6 +13,7 @@ import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboa
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import VideoGenerationOverlay from "@/components/VideoGenerationOverlay";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
@@ -389,7 +390,14 @@ function CreatorContent() {
                 sourceImage = (previewImage && previewImage !== "/orb-neon.gif") ? previewImage : undefined;
 
                 if (uploads.length > 0) {
-                    const file = uploads[0];
+                    let file = uploads[0];
+                    // Compress to prevent Payload Too Large
+                    try {
+                        file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+                    } catch (e) {
+                        console.warn("Compression skipped", e);
+                    }
+
                     const reader = new FileReader();
                     const base64 = await new Promise<string>((resolve) => {
                         reader.onload = () => resolve(reader.result as string);
@@ -767,7 +775,7 @@ function CreatorContent() {
                         {/* Generating Overlay */}
                         {generating && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                                <LoadingOrb />
+                                <VideoGenerationOverlay />
                             </div>
                         )}
 
