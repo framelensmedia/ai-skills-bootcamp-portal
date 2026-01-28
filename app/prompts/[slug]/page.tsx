@@ -20,6 +20,7 @@ import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import LazyMedia from "@/components/LazyMedia";
+import VideoGenerationOverlay from "@/components/VideoGenerationOverlay";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { compressImage } from "@/lib/compressImage";
 
@@ -1103,9 +1104,7 @@ function PromptContent() {
                   )}
                   {/* Generating Overlay */}
                   {generating && (
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                      <LoadingOrb />
-                    </div>
+                    <VideoGenerationOverlay />
                   )}
 
                   {/* Expand Icon Overlay - Subtle */}
