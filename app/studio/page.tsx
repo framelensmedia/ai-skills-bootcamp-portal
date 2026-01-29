@@ -378,13 +378,32 @@ function StudioContent() {
       // For now, let's keep logo simple or stage it too if it's large. 
       // Usually logos are small. But let's stay safe and stage it if present.
       if (logo) {
-        const logoCompressed = await compressImage(logo, { maxWidth: 1024, quality: 0.9 });
-        const lForm = new FormData();
-        lForm.append("file", logoCompressed);
-        const lRes = await fetch("/api/upload-temp", { method: "POST", body: lForm });
-        if (lRes.ok) {
-          const lData = await lRes.json();
-          payload.logo_image = lData.url; // API accepts `logo_image` string URL too
+        try {
+          const logoCompressed = await compressImage(logo, { maxWidth: 1024, quality: 0.9 });
+
+          // Use signed URL like other uploads
+          const signRes = await fetch("/api/sign-upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: logoCompressed.name,
+              fileType: logoCompressed.type
+            })
+          });
+
+          if (signRes.ok) {
+            const { signedUrl, publicUrl } = await signRes.json();
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: logoCompressed,
+              headers: { "Content-Type": logoCompressed.type }
+            });
+            if (upRes.ok) {
+              payload.logo_image = publicUrl;
+            }
+          }
+        } catch (e) {
+          console.warn("Logo upload failed:", e);
         }
       }
       if (businessName) payload.business_name = businessName;
