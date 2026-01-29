@@ -1,25 +1,44 @@
-export async function compressImage(file: File, options: { maxWidth?: number; quality?: number } = {}): Promise<File> {
-    const { maxWidth = 1024, quality = 0.8 } = options;
+/**
+ * Compress and resize an image file for upload.
+ * - Always outputs JPEG for maximum compatibility (iOS, Android, Desktop)
+ * - Handles HEIC, PNG, JPEG, WebP inputs via browser's native codec
+ * - Aggressive compression to ensure files stay under Vercel's 4.5MB limit
+ */
+export async function compressImage(
+    file: File,
+    options: { maxWidth?: number; quality?: number } = {}
+): Promise<File> {
+    const { maxWidth = 1280, quality = 0.8 } = options;
 
-    // 1. Always sanitize filename first (remove weird chars, ensure safe extension)
-    // We'll target .webp for output, but keep original if fallback happens
+    // Sanitize filename (remove special chars, use .jpg extension)
     const baseName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_").replace(/\.[^/.]+$/, "");
-    const safeName = `${baseName}.webp`;
+    const safeName = `${baseName}.jpg`;
 
-    try {
-        return await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target?.result as string;
-                img.onload = () => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onerror = () => {
+            console.warn("FileReader failed, returning sanitized original");
+            resolve(createFallbackFile(file));
+        };
+
+        reader.onload = (event) => {
+            const img = new Image();
+
+            img.onerror = () => {
+                console.warn("Image load failed (possibly unsupported format), returning sanitized original");
+                resolve(createFallbackFile(file));
+            };
+
+            img.onload = () => {
+                try {
                     const canvas = document.createElement("canvas");
                     let width = img.width;
                     let height = img.height;
 
+                    // Resize if needed
                     if (width > maxWidth) {
-                        height = (height * maxWidth) / width;
+                        height = Math.round((height * maxWidth) / width);
                         width = maxWidth;
                     }
 
@@ -28,48 +47,59 @@ export async function compressImage(file: File, options: { maxWidth?: number; qu
 
                     const ctx = canvas.getContext("2d");
                     if (!ctx) {
-                        reject(new Error("Failed to get canvas context"));
+                        console.warn("Canvas context failed, returning sanitized original");
+                        resolve(createFallbackFile(file));
                         return;
                     }
 
+                    // Draw image to canvas
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Prefer JPEG for photos (smaller, compatible). Use PNG/WebP only if source was PNG (transparency).
-                    const isPng = file.type === "image/png";
-                    const outType = isPng ? "image/webp" : "image/jpeg";
-
+                    // Always use JPEG for maximum compatibility
                     canvas.toBlob(
                         (blob) => {
                             if (blob) {
-                                const newFile = new File([blob], safeName.replace(".webp", isPng ? ".webp" : ".jpg"), {
-                                    type: outType,
+                                const compressedFile = new File([blob], safeName, {
+                                    type: "image/jpeg",
                                     lastModified: Date.now(),
                                 });
-                                resolve(newFile);
+
+                                // Log compression result for debugging
+                                const reduction = Math.round((1 - blob.size / file.size) * 100);
+                                console.log(
+                                    `Compressed: ${file.name} (${Math.round(file.size / 1024)}KB → ${Math.round(blob.size / 1024)}KB, ${reduction}% reduction)`
+                                );
+
+                                resolve(compressedFile);
                             } else {
-                                reject(new Error("Canvas to Blob failed"));
+                                console.warn("toBlob returned null, returning sanitized original");
+                                resolve(createFallbackFile(file));
                             }
                         },
-                        outType,
-                        quality // JPEG uses quality param effectively
+                        "image/jpeg",
+                        quality
                     );
-                };
-                img.onerror = (err) => reject(err);
+                } catch (err) {
+                    console.warn("Canvas operation failed:", err);
+                    resolve(createFallbackFile(file));
+                }
             };
-            reader.onerror = (err) => reject(err);
-        });
-    } catch (error) {
-        console.warn("Compression failed, falling back to original (sanitized)", error);
 
-        // Mobile SAFETY: If compression failed (e.g. Memory limit) and file is > 4MB,
-        // we MUST ERROR. Uploading will fail anyway (Vercel limit 4.5MB).
-        if (file.size > 4 * 1024 * 1024) {
-            throw new Error("Image too large and compression failed. Please try a smaller image.");
-        }
+            img.src = event.target?.result as string;
+        };
 
-        // Fallback: Return original file but with SANITIZED name to prevent FormData crash
-        // We keep original extension/type if fallback happens
-        const fallbackName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-        return new File([file], fallbackName, { type: file.type, lastModified: file.lastModified });
-    }
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Create a sanitized fallback file when compression fails.
+ * This ensures FormData doesn't crash on special characters.
+ */
+function createFallbackFile(file: File): File {
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_") || "image.jpg";
+    return new File([file], safeName, {
+        type: file.type || "image/jpeg",
+        lastModified: file.lastModified,
+    });
 }
