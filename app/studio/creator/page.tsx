@@ -241,78 +241,115 @@ function CreatorContent() {
                 return;
             }
 
-            const form = new FormData();
-            form.append("prompt", stylePreset
-                ? `${prompt} --style ${STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt}`
-                : prompt
-            );
-            form.append("userId", user.id);
-            form.append("aspectRatio", aspectRatio);
-            form.append("combined_prompt_text", prompt);
+            // 1. Stage images via signed URL uploads (bypasses Vercel 4.5MB limit)
+            const uploadedImageUrls: string[] = [];
 
-            // Subject Settings Logic
+            if (imageUploads.length > 0) {
+                for (const file of imageUploads.slice(0, 10)) {
+                    try {
+                        // Compress first
+                        const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+
+                        // Get signed URL
+                        const signRes = await fetch("/api/sign-upload", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                filename: compressed.name,
+                                fileType: compressed.type
+                            })
+                        });
+
+                        if (!signRes.ok) {
+                            throw new Error(`Upload init failed: ${signRes.status}`);
+                        }
+                        const { signedUrl, publicUrl } = await signRes.json();
+
+                        // Direct upload to storage
+                        const upRes = await fetch(signedUrl, {
+                            method: "PUT",
+                            body: compressed,
+                            headers: { "Content-Type": compressed.type }
+                        });
+
+                        if (!upRes.ok) {
+                            throw new Error(`Storage upload failed`);
+                        }
+
+                        uploadedImageUrls.push(publicUrl);
+                    } catch (e: any) {
+                        console.error("Image staging failed:", e);
+                        throw new Error("Failed to upload image. Please try again.");
+                    }
+                }
+            }
+
+            // 2. Handle logo separately
+            let logoUrl: string | null = null;
+            if (options.logoFile) {
+                try {
+                    const logoCompressed = await compressImage(options.logoFile, { maxWidth: 512, quality: 0.8 });
+                    const signRes = await fetch("/api/sign-upload", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            filename: logoCompressed.name,
+                            fileType: logoCompressed.type
+                        })
+                    });
+                    if (signRes.ok) {
+                        const { signedUrl, publicUrl } = await signRes.json();
+                        const upRes = await fetch(signedUrl, {
+                            method: "PUT",
+                            body: logoCompressed,
+                            headers: { "Content-Type": logoCompressed.type }
+                        });
+                        if (upRes.ok) {
+                            logoUrl = publicUrl;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Logo upload failed:", e);
+                }
+            }
+
+            // 3. Build JSON payload (not FormData)
+            const payload: any = {
+                prompt: stylePreset
+                    ? `${prompt} --style ${STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt}`
+                    : prompt,
+                userId: user.id,
+                aspectRatio: aspectRatio,
+                combined_prompt_text: prompt,
+                imageUrls: uploadedImageUrls, // URLs instead of files
+            };
+
+            // Subject Settings
             const effectiveSubjectLock = options.subjectLock !== undefined ? options.subjectLock : subjectLock;
-
             if (effectiveSubjectLock) {
-                form.append("subjectLock", "true");
-
-                // Force Cutout should only apply if we are in Human mode and Locked
-                // User Request: "make sure we are using the photoshop cut out method by default when the strcit lock human is on"
+                payload.subjectLock = "true";
                 if (subjectMode === "human") {
-                    form.append("forceCutout", "true");
+                    payload.forceCutout = "true";
                 }
             } else {
-                form.append("subjectLock", "false");
+                payload.subjectLock = "false";
+            }
+            payload.subjectMode = subjectMode === "human" ? "human" : "object";
+
+            if (logoUrl) {
+                payload.logo_image = logoUrl;
             }
 
-            // Pass Subject Mode so API knows which instructions to use
-            // (Human = Subject Reference, Object = Object Reference)
-            form.append("subjectMode", subjectMode === "human" ? "human" : "object");
-
-            if (options.logoFile) {
-                let logoToSend = options.logoFile;
-                try {
-                    // Compress logo to prevent payload limits and timeouts
-                    logoToSend = await compressImage(options.logoFile, { maxWidth: 512, quality: 0.8 });
-                } catch (e) {
-                    console.warn("Logo compression failed, sending original", e);
-                }
-
-                const safeName = (logoToSend.name || "logo.png").replace(/[^a-zA-Z0-9.-]/g, "_");
-                form.append("logo_image", logoToSend, safeName);
-            }
-
-            // Upload images directly via FormData
-            // FIX: Compress images before upload to prevent Mobile Data timeouts / Browser Security Errors (413)
-            const imagesToProcess = imageUploads.slice(0, 10);
-            const compressedImages = await Promise.all(
-                imagesToProcess.map(async (file) => {
-                    try {
-                        // 1536px is good balance for Subject details (Face) vs Size (<1MB)
-                        return await compressImage(file, { maxWidth: 1280, quality: 0.8 });
-                    } catch (e) {
-                        console.warn("Image compression failed, using original", file.name);
-                        return file;
-                    }
-                })
-            );
-
-            compressedImages.forEach((file) => {
-                // DEFENSE IN DEPTH: Sanitize filename one last time before append
-                const safeName = (file.name || "image.jpg").replace(/[^a-zA-Z0-9.-]/g, "_");
-                form.append("images", file, safeName);
-            });
-
-            // Note: If we need template reference or remix details, append them here.
-            // For now, matching previous logic which only used prompt + uploads.
+            // Template reference
             const remixImg = searchParams?.get("img");
             if (remixImg) {
-                form.append("template_reference_image", remixImg);
+                payload.template_reference_image = remixImg;
             }
 
             const res = await fetch("/api/generate", {
                 method: "POST",
-                body: form,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             });
 
 
