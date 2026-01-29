@@ -471,6 +471,7 @@ function StudioContent() {
         // Sign
         const sRes = await fetch("/api/sign-upload", {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: "canvas_source.png", fileType: srcBlob.type || "image/png" })
         });
         if (!sRes.ok) throw new Error("Sign failed");
@@ -496,6 +497,7 @@ function StudioContent() {
             // Sign
             const sRes = await fetch("/api/sign-upload", {
               method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ filename: compressed.name, fileType: compressed.type })
             });
             if (!sRes.ok) {
