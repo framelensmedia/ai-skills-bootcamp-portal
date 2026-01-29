@@ -59,14 +59,15 @@ export default function StudioCommunityFeed() {
     // Fetch Remixes (Paginated)
     useEffect(() => {
         const fetchRemixes = async () => {
-            if (!hasMore && page > 0) return; // Allow initial load even if hasMore is theoretically false to verify
+            if (!hasMore && page > 0) return;
             setLoadingRemixes(true);
 
-            const LIMIT = 6;
+            const LIMIT = 12; // Increased for better UX
             const from = page * LIMIT;
             const to = from + LIMIT - 1;
 
             try {
+                // Build query based on tab
                 let query = supabase
                     .from("prompt_generations")
                     .select(`
@@ -74,13 +75,20 @@ export default function StudioCommunityFeed() {
                          user_id, prompt_id
                       `)
                     .eq("is_public", true)
-                    .range(from, to);
+                    .not("image_url", "is", null); // Only show items with images
 
+                // Apply ordering BEFORE range for consistent results
                 if (fetchingTab === "trending") {
-                    query = query.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
+                    query = query
+                        .order("upvotes_count", { ascending: false })
+                        .order("created_at", { ascending: false });
                 } else {
+                    // Latest: newest first
                     query = query.order("created_at", { ascending: false });
                 }
+
+                // Apply range after ordering
+                query = query.range(from, to);
 
                 const { data: remixesData, error } = await query;
 
@@ -127,13 +135,13 @@ export default function StudioCommunityFeed() {
                     });
 
                     setCommunityRemixes((prev) => {
-                        // If page 0, replace. Else append.
+                        // If page 0, replace entirely
                         if (page === 0) return processedRemixes;
 
-                        // Avoid duplicates
-                        const newIds = new Set(processedRemixes.map((r: any) => r.id));
-                        const filteredPrev = prev.filter(p => !newIds.has(p.id));
-                        return [...filteredPrev, ...processedRemixes];
+                        // Append new items, avoiding duplicates by ID
+                        const existingIds = new Set(prev.map((r: any) => r.id));
+                        const newItems = processedRemixes.filter((r: any) => !existingIds.has(r.id));
+                        return [...prev, ...newItems];
                     });
                 }
             } catch (e) {
@@ -144,7 +152,7 @@ export default function StudioCommunityFeed() {
         };
 
         fetchRemixes();
-    }, [page, fetchingTab, supabase]); // Removed feedTab dependency to avoid double fetch, fetchingTab depends on it
+    }, [page, fetchingTab, supabase, hasMore]);
 
     return (
         <div className="space-y-8">
