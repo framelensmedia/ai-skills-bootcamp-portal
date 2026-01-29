@@ -71,7 +71,7 @@ export default function StudioCommunityFeed() {
                 let query = supabase
                     .from("prompt_generations")
                     .select(`
-                         id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
+                         id, image_url, video_url, media_type, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
                          user_id, prompt_id
                       `)
                     .eq("is_public", true)
@@ -122,6 +122,8 @@ export default function StudioCommunityFeed() {
                         return {
                             id: r.id,
                             imageUrl: r.image_url,
+                            videoUrl: r.video_url || null,
+                            mediaType: r.media_type || (r.video_url ? "video" : "image"),
                             title: settings.headline || "Untitled Remix",
                             username: profile.full_name || "Anonymous Creator",
                             userAvatar: profile.profile_image || null,
