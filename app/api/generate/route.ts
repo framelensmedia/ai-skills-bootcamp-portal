@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 // sharp import removed (dynamic import used instead)
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const SYSTEM_CORE = `
 [GLOBAL SYSTEM INSTRUCTIONS]
@@ -379,7 +379,11 @@ export async function POST(req: Request) {
         }
 
         const model = process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
-        const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+        const apiEndpoint = location === "global"
+            ? "aiplatform.googleapis.com"
+            : `${location}-aiplatform.googleapis.com`;
+
+        const url = `https://${apiEndpoint}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
 
         const imageParts: any[] = [];
