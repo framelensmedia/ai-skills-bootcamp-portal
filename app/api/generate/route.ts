@@ -352,7 +352,7 @@ export async function POST(req: Request) {
 
         // 3. ENV Setup
         const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
-        const location = (process.env.GOOGLE_CLOUD_LOCATION || "global").trim();
+        const location = (process.env.GOOGLE_CLOUD_LOCATION || "europe-west9").trim();
 
         const credsJson = mustEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
         let credentials;
