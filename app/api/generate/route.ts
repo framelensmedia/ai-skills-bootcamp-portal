@@ -620,21 +620,48 @@ Execute the user's instruction precisely.
             ],
         };
 
-        // 6. Call Vertex
-        const res = await fetch(url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token.token}`, // Fixed trailing space
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+        // 6. Call Vertex with Retry Logic (Backoff)
+        let res;
+        let json;
+        let attempts = 0;
+        const maxAttempts = 2; // Strict limit to avoid Vercel 60s timeout
 
-        const json: any = await res.json();
+        while (attempts < maxAttempts) {
+            try {
+                res = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token.token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (res.status === 429) {
+                    console.warn(`VERTEX RATE LIMIT (429): Attempt ${attempts + 1}/${maxAttempts}. Retrying...`);
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        // Wait 2s before retry
+                        await new Promise(r => setTimeout(r, 2000));
+                        continue;
+                    }
+                }
+
+                // If success or other error, break
+                break;
+            } catch (networkErr) {
+                console.error("Network Error during fetch:", networkErr);
+                throw networkErr;
+            }
+        }
+
+        if (!res) throw new Error("Fetch failed to initialize");
+
+        json = await res.json();
 
         if (!res.ok) {
             if (res.status === 429) {
-                console.warn("VERTEX RATE LIMIT (429): Resource exhausted.");
+                console.warn("VERTEX RATE LIMIT (429): Resource exhausted after retries.");
                 return NextResponse.json(
                     { error: "System is busy (High Traffic). Please wait a minute and try again." },
                     { status: 429 }
