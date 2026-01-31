@@ -18,12 +18,13 @@ type Props = {
     sourceVideo?: string; // URL for Video-to-Video
     userId?: string;
     initialPrompt?: string;
+    initialModelId?: string;
 };
 
-export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt }: Props) {
+export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt, initialModelId }: Props) {
     const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
-    const [selectedModel, setSelectedModel] = useState(DEFAULT_VIDEO_MODEL_ID);
+    const [selectedModel, setSelectedModel] = useState(initialModelId || DEFAULT_VIDEO_MODEL_ID);
 
 
     const [isGenerating, setIsGenerating] = useState(false);

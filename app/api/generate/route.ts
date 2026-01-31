@@ -450,7 +450,7 @@ export async function POST(req: Request) {
         let model = requestedModel || process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
 
         // Handle "Nano Banana Pro" -> Flux Pro mapping if client sends friendly name, or just expect ID
-        if (model === "nano-banana-pro") model = "fal-ai/flux-pro/v1.1";
+        if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
         if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
 
         // Check Global Pause (Fail-safe: continue if table missing)

@@ -11,7 +11,7 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download, Loader2 } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
-import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 import GenerationOverlay from "@/components/GenerationOverlay";
 import { ArrowLeft, TriangleAlert } from "lucide-react";
@@ -918,13 +918,13 @@ function StudioContent() {
               <SelectPill
                 label="Image"
                 selected={mediaType === "image"}
-                onClick={() => setMediaType("image")}
+                onClick={() => { setMediaType("image"); setSelectedModel(DEFAULT_MODEL_ID); }}
                 disabled={generating || animating}
               />
               <SelectPill
                 label="Video"
                 selected={mediaType === "video"}
-                onClick={() => setMediaType("video")}
+                onClick={() => { setMediaType("video"); setSelectedModel(DEFAULT_VIDEO_MODEL_ID); }}
                 disabled={generating || animating}
               />
             </div>
@@ -942,6 +942,24 @@ function StudioContent() {
                       selected={selectedModel === model.id}
                       onClick={() => setSelectedModel(model.id)}
                       disabled={modelsConfig && modelsConfig[model.id] === false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Video Model Selector */}
+            {mediaType === "video" && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {VIDEO_MODELS.map((model) => (
+                    <SelectPill
+                      key={model.id}
+                      label={model.label}
+                      description={model.description}
+                      selected={selectedModel === model.id}
+                      onClick={() => setSelectedModel(model.id)}
                     />
                   ))}
                 </div>
@@ -1192,6 +1210,7 @@ function StudioContent() {
         sourceImage={lastImageUrl || previewImageUrl || ""}
         sourceVideo={inputVideoUrl}
         initialPrompt={editSummary}
+        initialModelId={selectedModel}
       />
       <LibraryImagePickerModal
         isOpen={libraryModalOpen}

@@ -23,7 +23,7 @@ import Link from "next/link";
 import { ArrowRight, Library, TriangleAlert } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
-import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -164,6 +164,12 @@ function CreatorContent() {
         if (aspectRatio === "1:1") return "aspect-square";
         return "aspect-[4/5]";
     }, [aspectRatio]);
+
+    // Switch Default Model when Media Type Changes
+    useEffect(() => {
+        if (mediaType === "video") setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
+        else setSelectedModel(DEFAULT_MODEL_ID);
+    }, [mediaType]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -674,6 +680,24 @@ function CreatorContent() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Video Model Selector */}
+                        {mediaType === "video" && (
+                            <div className="mt-4 pt-4 border-t border-white/5">
+                                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {VIDEO_MODELS.map((model) => (
+                                        <SelectPill
+                                            key={model.id}
+                                            label={model.label}
+                                            description={model.description}
+                                            selected={selectedModel === model.id}
+                                            onClick={() => setSelectedModel(model.id)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
 
@@ -950,6 +974,7 @@ function CreatorContent() {
                 onClose={() => setVideoModalOpen(false)}
                 sourceImage={previewImage}
                 initialPrompt={manualPrompt}
+                initialModelId={selectedModel}
             />
             <LibraryImagePickerModal
                 isOpen={libraryModalOpen}
