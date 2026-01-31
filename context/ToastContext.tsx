@@ -8,14 +8,14 @@ interface ToastContextValue {
     showToast: (message: string, type?: ToastType) => void;
 }
 
-const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+const ToastContext = createContext<ToastContextValue>({
+    showToast: (message: string, type: ToastType = "info") => {
+        console.warn("ToastContext missing, toast suppressed:", message);
+    }
+});
 
 export function useToast() {
-    const context = useContext(ToastContext);
-    if (!context) {
-        throw new Error("useToast must be used within a ToastProvider");
-    }
-    return context;
+    return useContext(ToastContext);
 }
 
 export function ToastContextProvider({ children }: { children: ReactNode }) {
@@ -33,12 +33,12 @@ export function ToastContextProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <ToastContext.Provider value={{ showToast }}>
+        <ToastContext value={{ showToast }}>
             {children}
             {/* We render the UI here OR in a separate component that consumes the context */}
             {/* Let's render here to avoid extra files if possible, or use a separate Presentation component */}
             <ToastUI toast={toast} onClose={() => setToast(null)} />
-        </ToastContext.Provider>
+        </ToastContext>
     );
 }
 

@@ -89,6 +89,7 @@ export async function POST(req: Request) {
           current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
+          credits: 200, // Pro: $10.00 worth (200 credits)
         });
 
         break;
@@ -102,6 +103,11 @@ export async function POST(req: Request) {
 
         const isActive = sub.status === "active" || sub.status === "trialing";
 
+        // Determine credits based on new plan status
+        // If becoming active premium -> 200
+        // If not active (free) -> 40
+        const credits = isActive ? 200 : 40;
+
         await updateByCustomerId(customerId, {
           plan: isActive ? "premium" : "free",
           stripe_subscription_id: sub.id,
@@ -109,8 +115,27 @@ export async function POST(req: Request) {
           current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
+          credits: credits,
         });
 
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+
+        // Refill credits on successful payment (monthly renewal)
+        // We assume if they are paying, they are pro/premium
+        // To be safe, we could check the plan, but invoice usually implies payment implies pro.
+        // Let's set to 200.
+        // Let's set to 200.
+        if ((invoice as any).subscription) {
+          await updateByCustomerId(customerId, {
+            credits: 200,
+            updated_at: new Date().toISOString(),
+          });
+        }
         break;
       }
 
@@ -123,6 +148,7 @@ export async function POST(req: Request) {
           subscription_status: sub.status,
           current_period_end: null,
           updated_at: new Date().toISOString(),
+          credits: 40, // Reset to Free default
         });
 
         break;

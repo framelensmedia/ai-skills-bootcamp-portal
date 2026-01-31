@@ -148,6 +148,7 @@ function PromptContent() {
 
   // Generation state
   const [userId, setUserId] = useState<string | null>(null);
+  const [userCredits, setUserCredits] = useState<number | null>(null); // Added State
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -889,6 +890,9 @@ function PromptContent() {
 
         const vUrl = (json?.videoUrl || "").trim();
         if (vUrl) {
+          if (json.remainingCredits !== undefined) {
+            setUserCredits(json.remainingCredits);
+          }
           setGeneratedImageUrl(vUrl);
           setOverridePreviewUrl(vUrl);
           refreshRemixes();
@@ -1499,40 +1503,48 @@ function PromptContent() {
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* ACTION BUTTONS */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
-              <button
-                className={[
-                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
-                  isLocked
-                    ? "bg-white/10 text-white/40 hover:bg-white/15"
-                    : generating
-                      ? "bg-lime-400/60"
-                      : "bg-lime-400 hover:bg-lime-300",
-                ].join(" ")}
-                onClick={() => handleGenerate()}
-                disabled={isLocked || generating || (generationsPaused && !isAdmin)}
-              >
-                {generating ? (
-                  <span className="flex items-center gap-2">
-                    <LoadingHourglass className="w-5 h-5 text-black" />
-                    <span>{mediaType === "video" ? "Creating Video..." : "Generating..."}</span>
-                  </span>
-                ) : lockReason === "login"
-                  ? "Log in to Generate"
-                  : isLocked
-                    ? "Upgrade to Pro"
-                    : mediaType === "video" ? (
+            {(() => {
+              const VIDEO_COST = 30;
+              const IMAGE_COST = 3;
+              const currentCost = mediaType === "video" ? VIDEO_COST : IMAGE_COST;
+              const hasCredits = (userCredits ?? 0) >= currentCost;
+
+              return (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
+                  <button
+                    className={[
+                      "w-full inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-bold tracking-tight text-black transition-all transform hover:scale-[1.02] shadow-[0_0_20px_-5px_#B7FF00]",
+                      isLocked || generating || !hasCredits
+                        ? "bg-lime-400/60 opacity-70 cursor-not-allowed"
+                        : "bg-lime-400 hover:bg-lime-300",
+                    ].join(" ")}
+                    onClick={() => handleGenerate()}
+                    disabled={isLocked || generating || (generationsPaused && !isAdmin) || !hasCredits}
+                  >
+                    {generating ? (
                       <span className="flex items-center gap-2">
-                        <Clapperboard size={18} />
-                        <span>Animate Video</span>
+                        <LoadingHourglass className="w-5 h-5 text-black" />
+                        <span>{mediaType === "video" ? "Creating Video..." : "Generating..."}</span>
                       </span>
-                    ) : "Generate Artwork"}
-              </button>
-            </div>
+                    ) : lockReason === "login"
+                      ? "Log in to Generate"
+                      : isLocked
+                        ? "Upgrade to Pro"
+                        : !hasCredits && userCredits !== null
+                          ? `Insufficient Credits (Need ${currentCost})`
+                          : mediaType === "video" ? (
+                            <span className="flex items-center gap-2">
+                              <Clapperboard size={18} />
+                              <span>Animate Video (30 Cr)</span>
+                            </span>
+                          ) : "Generate Artwork (3 Cr)"}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* 1. SPECIFIC REMIXES (Made with this Prompt) - Finite */}
             <div className="mt-8">

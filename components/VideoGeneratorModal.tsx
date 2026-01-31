@@ -43,7 +43,9 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     const [generationsPaused, setGenerationsPaused] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Fetch Config & User Role
+    const [userCredits, setUserCredits] = useState<number | null>(null);
+
+    // Fetch Config & User Role & Credits
     useEffect(() => {
         const fetchConfig = async () => {
             const supabase = createSupabaseBrowserClient();
@@ -54,20 +56,32 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                 setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
             }
 
-            // 2. Fetch User Role for Admin Bypass
+            // 2. Fetch User Profile
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("role, credits").eq("user_id", user.id).maybeSingle();
                 if (profile) {
                     const role = String(profile.role || "").toLowerCase();
                     if (role === "admin" || role === "super_admin") {
                         setIsAdmin(true);
                     }
+                    setUserCredits(profile.credits ?? 0);
                 }
             }
         };
         fetchConfig();
     }, []);
+
+    const VIDEO_COST = 30;
+    const hasCredits = (userCredits ?? 0) >= VIDEO_COST;
+    // Admins bypass credit check? API might check it differently, but for UX let's warn.
+    // Actually API logic enforces credits for everyone unless explicit admin bypass was coded in API (which I didn't see explicitly).
+    // Let's assume admins have infinite credits or check needs to happen.
+    // If I didn't code admin bypass in API for credits, then they need credits.
+    // But usually admins give themselves credits.
+
+    const canGenerate = prompt.trim() && !isGenerating && (!generationsPaused || isAdmin) && hasCredits;
+    const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${VIDEO_COST}, you have ${userCredits}.` : null;
 
     useEffect(() => {
         if (isOpen && initialPrompt) {
@@ -90,7 +104,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     if (!isOpen) return null;
 
     const handleGenerate = async () => {
-        if (!prompt.trim()) return;
+        if (!canGenerate) return;
+
         setIsGenerating(true);
         setError(null);
         setResultUrl(null);
@@ -119,6 +134,11 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
             }
 
             if (!res.ok) throw new Error(data.error || "Failed to generate video");
+
+            // Update local credits count on success
+            if (data.remainingCredits !== undefined) {
+                setUserCredits(data.remainingCredits);
+            }
 
             setResultUrl(data.videoUrl);
         } catch (e: any) {
@@ -287,15 +307,15 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
                     {/* Footer Actions */}
                     <div className="p-6 border-t border-white/10 bg-[#121212] sticky bottom-0 z-20">
-                        {error && (
+                        {(error || creditError) && (
                             <div className="mb-4 text-xs text-red-400 bg-red-950/30 border border-red-500/20 p-3 rounded-lg">
-                                {error}
+                                {error || creditError}
                             </div>
                         )}
                         <button
                             onClick={handleGenerate}
-                            disabled={!prompt.trim() || isGenerating || (generationsPaused && !isAdmin)}
-                            className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!prompt.trim() || isGenerating || (generationsPaused && !isAdmin)
+                            disabled={!canGenerate}
+                            className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!canGenerate
                                 ? "bg-white/10 text-white/20 cursor-not-allowed"
                                 : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
                                 }`}
@@ -305,7 +325,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             ) : (
                                 <>
                                     <Wand2 size={18} />
-                                    {sourceVideo ? "Generate Edit" : "Generate Remix"}
+                                    {sourceVideo ? "Generate Edit" : "Generate Remix"} (30 Cr)
                                 </>
                             )}
                         </button>

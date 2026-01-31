@@ -1,8 +1,8 @@
 export const GENERATION_MODELS = [
     {
         id: "nano-banana-pro",
-        label: "Nano Banana Pro",
-        description: "Fal.ai Flux Pro",
+        label: "Gemini Image 3",
+        description: "Fal.ai Preview",
         default: true,
     }
 ];

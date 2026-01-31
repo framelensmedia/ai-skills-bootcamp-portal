@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
-import { Menu } from "lucide-react";
+import { Menu, Coins } from "lucide-react";
 
 export default function Nav() {
   const router = useRouter();
@@ -19,6 +19,7 @@ export default function Nav() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -26,17 +27,19 @@ export default function Nav() {
     async function fetchProfile() {
       if (!user) {
         setAvatarUrl(null);
+        setCredits(null);
         return;
       }
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("profile_image")
+        .select("profile_image, credits")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (mounted && profile) {
         setAvatarUrl(profile.profile_image);
+        setCredits(profile.credits ?? 0);
       }
     }
 
@@ -45,7 +48,7 @@ export default function Nav() {
     return () => {
       mounted = false;
     };
-  }, [user, supabase]);
+  }, [user, supabase, pathname]); // Refresh on navigation
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -125,8 +128,14 @@ export default function Nav() {
             <div className="relative">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="outline-none focus:ring-2 focus:ring-[#B7FF00]/50 rounded-full"
+                className="flex items-center gap-3 outline-none focus:ring-2 focus:ring-[#B7FF00]/50 rounded-full pr-1"
               >
+                {credits !== null && (
+                  <div className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs font-semibold text-[#B7FF00]">
+                    <Coins size={12} />
+                    <span>{credits}</span>
+                  </div>
+                )}
                 <UserAvatar />
               </button>
 
@@ -240,7 +249,10 @@ export default function Nav() {
                         <div className="h-8 w-8 rounded-full bg-zinc-800 overflow-hidden border border-white/10">
                           {avatarUrl ? <img src={avatarUrl} className="h-full w-full object-cover" /> : null}
                         </div>
-                        <span className="text-sm font-semibold text-white">Edit Profile</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-white">Edit Profile</span>
+                          {credits !== null && <span className="text-xs text-[#B7FF00] font-mono">{credits} Credits</span>}
+                        </div>
                       </Link>
                       <button
                         onClick={handleLogout}

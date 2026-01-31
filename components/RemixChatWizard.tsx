@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import ImageUploader from "./ImageUploader";
 import SelectPill from "@/components/SelectPill";
 import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 export type RemixAnswers = Record<string, string>;
 
@@ -187,6 +188,25 @@ export default function RemixChatWizard({
             ]);
         }
     }, [isOpen, templateConfig]);
+
+    // Fetch Credits
+    const [userCredits, setUserCredits] = useState<number | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        const fetchCredits = async () => {
+            const supabase = createSupabaseBrowserClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("credits").eq("user_id", user.id).maybeSingle();
+                setUserCredits(profile?.credits ?? 0);
+            }
+        };
+        fetchCredits();
+    }, [isOpen]);
+
+    const IMAGE_COST = 3;
+    const hasCredits = (userCredits ?? 0) >= IMAGE_COST;
+    const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${IMAGE_COST}, have ${userCredits}.` : null;
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -399,12 +419,18 @@ export default function RemixChatWizard({
                                 </div>
                             </div>
                         ) : activeStep?.type === "review" ? (
-                            <button
-                                onClick={() => completeWorkflow(messages, answers, true)}
-                                className="w-full rounded-xl bg-lime-400 py-4 text-base font-bold text-black hover:bg-lime-300 md:py-4 shadow-lg shadow-lime-400/20 transform hover:scale-[1.02] transition-all"
-                            >
-                                ✨ Generate Artwork
-                            </button>
+                            <div className="space-y-3">
+                                {creditError && (
+                                    <div className="text-xs text-red-400 text-center">{creditError}</div>
+                                )}
+                                <button
+                                    onClick={() => completeWorkflow(messages, answers, true)}
+                                    disabled={!hasCredits}
+                                    className={`w-full rounded-xl py-4 text-base font-bold text-black md:py-4 shadow-lg transition-all ${!hasCredits ? "bg-white/10 text-white/20 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300 shadow-lime-400/20 transform hover:scale-[1.02]"}`}
+                                >
+                                    ✨ Generate Artwork ({IMAGE_COST} Cr)
+                                </button>
+                            </div>
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">

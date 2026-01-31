@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
-import { GoogleAuth } from "google-auth-library";
 import { createClient } from "@supabase/supabase-js";
+import { GoogleAuth } from "google-auth-library"; // Restored
+import { createAspectGuide } from "./ar_guide"; // Import Helper
+import { NextRequest, NextResponse } from "next/server";
 // sharp import removed (dynamic import used instead)
 
 export const runtime = "nodejs";
@@ -188,11 +189,25 @@ async function generateFalImage(
 
     const endpoint = `https://queue.fal.run/${modelId}`;
 
+    // Helper: Extract simple ratio string if imageSize is an enum or object
+    // But since we control the call site, let's just assume we want to pass "16:9" if it was "landscape_16_9" or pass the enum as "image_size".
+    // Let's rely on the fact that we are passing `imageSize` which might be "landscape_16_9".
+    // BUT we also want to send "aspectRatio": "16:9" just in case.
+
     const payload: any = {
         prompt,
-        image_size: imageSize,
+        image_size: imageSize, // keep this
         safety_tolerance: "2",
     };
+
+    // Attempt to parse ratio string from imageSize if it's a known enum, or just pass it if provided
+    // Actually, let's just add it if we can infer it. 
+    // "landscape_16_9" -> "16:9"
+    if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
+    if (typeof imageSize === 'string' && imageSize.includes('9_16')) payload.aspect_ratio = "9:16";
+    if (typeof imageSize === 'string' && imageSize.includes('square')) payload.aspect_ratio = "1:1";
+    if (typeof imageSize === 'string' && imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
+    if (typeof imageSize === 'string' && imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
 
     // Handle Nano Banana Pro specifically (uses image_urls array and /edit endpoint)
     const isNanoBanana = modelId.includes("nano-banana");
@@ -201,6 +216,8 @@ async function generateFalImage(
         if (isNanoBanana) {
             // Nano Banana Pro uses image_urls (array) for reference images
             payload.image_urls = [mainImageUrl];
+            // Also force aspect_ratio explicitly for edit mode if missing
+            if (!payload.aspect_ratio && payload.image_size === "landscape_16_9") payload.aspect_ratio = "16:9";
         } else {
             // Other Fal models use image_url (singular)
             payload.image_url = mainImageUrl;
@@ -212,7 +229,13 @@ async function generateFalImage(
         ? `https://queue.fal.run/${modelId}/edit`
         : endpoint;
 
-    console.log(`Fal Image Request (${modelId}):`, { prompt: prompt.slice(0, 50), hasImage: !!mainImageUrl, isNanoBanana, endpoint: actualEndpoint });
+    console.log(`Fal Image Request (${modelId}):`, {
+        prompt: prompt.slice(0, 50),
+        hasImage: !!mainImageUrl,
+        isNanoBanana,
+        endpoint: actualEndpoint,
+        image_size: imageSize // Added for debugging
+    });
 
     // 1. Submit Request
     const res = await fetch(actualEndpoint, {
@@ -306,6 +329,7 @@ export async function POST(req: Request) {
         let canvasUrl: string | null = null; // New
         let forceCutout = false; // New
         let requestedModel: string | null = null; // New
+        let keepOutfit = true; // Default to true
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -367,6 +391,7 @@ export async function POST(req: Request) {
             subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
             forceCutout = String(form.get("forceCutout") ?? "false").trim() === "true";
             requestedModel = String(form.get("modelId") ?? "").trim() || null;
+            keepOutfit = String(form.get("keepOutfit") ?? "true").trim() === "true";
         } else {
             // JSON Handling
             const body = await req.json();
@@ -413,6 +438,7 @@ export async function POST(req: Request) {
 
             // ✅ Read modelId from JSON payload
             requestedModel = body.modelId ? String(body.modelId).trim() || null : null;
+            if (body.keepOutfit !== undefined) keepOutfit = String(body.keepOutfit) === "true";
         }
 
         // 2. Validation
@@ -469,6 +495,30 @@ export async function POST(req: Request) {
 
 
 
+        // Check Credits
+        const { data: userProfile, error: profileErr } = await admin
+            .from("profiles")
+            .select("credits, role")
+            .eq("user_id", userId)
+            .single();
+
+        if (profileErr || !userProfile) {
+            return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+        }
+
+        const userCredits = userProfile.credits ?? 0;
+        const IMAGE_COST = 3;
+
+        // Admins bypass credit check? Maybe for testing. Let's enforce for now unless explicit bypass requested.
+        // If user has 0 credits, fail.
+        if (userCredits < IMAGE_COST) {
+            return NextResponse.json({
+                error: "Insufficient credits. Please upgrade or top up.",
+                required: IMAGE_COST,
+                available: userCredits
+            }, { status: 402 });
+        }
+
         // --- BRANCH: FAL.AI MODELS ---
         if (model.startsWith("fal-ai/")) {
             console.log(`Using Fal Model: ${model}`);
@@ -482,13 +532,7 @@ export async function POST(req: Request) {
                     .maybeSingle();
 
                 if (config?.value === true || config?.value === "true") {
-                    const { data: profile } = await admin
-                        .from("profiles")
-                        .select("role")
-                        .eq("user_id", userId)
-                        .maybeSingle();
-
-                    const role = String(profile?.role || "").toLowerCase();
+                    const role = String(userProfile.role || "").toLowerCase();
                     const isBypass = role === "admin" || role === "super_admin";
 
                     if (!isBypass) {
@@ -523,10 +567,84 @@ export async function POST(req: Request) {
             }
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
-            const falImageSize = ar || "landscape_4_3";
+            // Flux models (Pro) require explicit dimensions to guarantee ratio in remix mode
+            // BUT Nano Banana (Gemini) might prefer the standard enum strings
+            let falImageSize: any = { width: 1024, height: 768 }; // Default 4:3
+            const ratio = ar as string;
+
+            const isNano = model.includes("nano-banana");
+
+            if (isNano) {
+                // Use Standard Fal Enums for Gemini/Nano
+                if (ratio === "1:1") falImageSize = "square_hd";
+                else if (ratio === "16:9") falImageSize = "landscape_16_9";
+                else if (ratio === "9:16") falImageSize = "portrait_16_9";
+                else if (ratio === "4:3") falImageSize = "landscape_4_3";
+                else if (ratio === "3:4") falImageSize = "portrait_4_3";
+                else falImageSize = "square_hd"; // Fallback
+
+                // AR GUIDE TRICK: If no reference image, inject a transparent PNG with desired AR
+                // This forces Gemini to respect the aspect ratio (Image-to-Image trick)
+                if (!refImageUrl) {
+                    try {
+                        console.log("Generating AR Guide for Gemini:", ratio);
+                        const guideBuffer = await createAspectGuide(ratio);
+                        const guidePath = `fal-guides/${ratio.replace(":", "_")}.png`; // e.g. fal-guides/16_9.png
+
+                        // Upload (Upsert true to overwrite/reuse)
+                        const { error: guideErr } = await admin.storage
+                            .from("generations")
+                            .upload(guidePath, guideBuffer, { contentType: "image/png", upsert: true });
+
+                        if (!guideErr) {
+                            const { data: guidePub } = admin.storage.from("generations").getPublicUrl(guidePath);
+                            refImageUrl = guidePub.publicUrl;
+                            subjectLock = false; // Disable subject lock for blank guide
+                            console.log("Injected AR Guide URL:", refImageUrl);
+                        } else {
+                            console.warn("Failed to upload AR Guide:", guideErr);
+                        }
+                    } catch (e) {
+                        console.error("Failed to create AR Guide:", e);
+                    }
+                }
+
+            } else {
+                // Use Explicit Pixels for Flux
+                if (ratio === "1:1") falImageSize = { width: 1024, height: 1024 };
+                else if (ratio === "16:9") falImageSize = { width: 1216, height: 832 }; // Flux Optimized
+                else if (ratio === "9:16") falImageSize = { width: 832, height: 1216 }; // Flux Optimized
+                else if (ratio === "4:3") falImageSize = { width: 1024, height: 768 };
+                else if (ratio === "3:4") falImageSize = { width: 768, height: 1024 };
+                else if (ratio === "21:9") falImageSize = { width: 1536, height: 640 };
+                else if (ratio === "9:21") falImageSize = { width: 640, height: 1536 };
+                else if (typeof ratio === "string") falImageSize = ratio; // Fallback
+            }
+
+            // Enhance Prompt for Realism & Subject Consistency
+            let finalFalPrompt = rawPrompt;
+
+            // 1. Enforce Photorealism (Default) unless style overrides
+            const isCartoon = rawPrompt.toLowerCase().includes("cartoon") || rawPrompt.toLowerCase().includes("illustration") || rawPrompt.toLowerCase().includes("anime") || rawPrompt.toLowerCase().includes("sketch");
+            if (!isCartoon) {
+                finalFalPrompt += ", photorealistic, hyper-realistic, 8k, highly detailed, master photography";
+            }
+
+            // 2. Subject Lock Instructions (Eye Line / Angle)
+            if (refImageUrl && subjectLock) {
+                // Base Face/Identity Lock (Always Active when Face Lock is on)
+                finalFalPrompt += " --preserve-face-structure: Maintain the exact eye line, camera angle, gaze direction, and face direction of the subject. Ensure the subject's face looks identical to the original. Do not mirror or rotate the face.";
+
+                // Outfit Branching
+                if (keepOutfit) {
+                    finalFalPrompt += " --preserve-clothing: Keep the subject's clothing and outfit exactly as in the reference image.";
+                } else {
+                    finalFalPrompt += " --ignore-clothing: Change the subject's clothing. Use creative attire that fits the scene. Do NOT preserve the original outfit. Allow dynamic body poses while keeping the face locked.";
+                }
+            }
 
             try {
-                const falImageUrl = await generateFalImage(model, rawPrompt, falImageSize, refImageUrl);
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
@@ -548,8 +666,15 @@ export async function POST(req: Request) {
                     return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
                 }
 
+                // DEDUCT CREDITS
+                const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
+                if (rpcErr) {
+                    // Fallback if RPC missing
+                    await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
+                }
+
                 console.log("Fal Image Saved to DB:", inserted?.id);
-                return NextResponse.json({ images: [{ url: falImageUrl }], generationId: inserted?.id, imageUrl: falImageUrl });
+                return NextResponse.json({ images: [{ url: falImageUrl }], generationId: inserted?.id, imageUrl: falImageUrl, remainingCredits: userCredits - IMAGE_COST });
 
             } catch (falErr: any) {
                 console.error("Fal Generation Error:", falErr);
@@ -860,13 +985,14 @@ Execute the user's instruction precisely.
         if (model.startsWith("fal-ai/")) {
             console.log(`Using Fal.ai Provider for model: ${model}`);
             try {
-                // Determine aspect ratio for Fal
-                // Fal expects: square_hd, landscape_4_3, landscape_16_9, portrait_4_3, portrait_16_9
-                let falSize = "landscape_4_3";
-                if (ar === "1:1") falSize = "square_hd";
-                if (ar === "16:9") falSize = "landscape_16_9";
-                if (ar === "9:16") falSize = "portrait_16_9";
-                if (ar === "3:4" || ar === "4:5") falSize = "portrait_4_3";
+                // Determine aspect ratio for Fal with explicit dimensions (More robust for Flux/Edit)
+                let falSize: any = { width: 1024, height: 768 }; // Default 4:3
+
+                if (ar === "1:1") falSize = { width: 1024, height: 1024 };
+                if (ar === "16:9") falSize = { width: 1216, height: 832 }; // Flux Optimized
+                if (ar === "9:16") falSize = { width: 832, height: 1216 }; // Flux Optimized
+                if (ar === "3:4") falSize = { width: 768, height: 1024 };
+                if (ar === "4:5") falSize = { width: 832, height: 1024 };
 
                 // Construct Prompt (Simplified for Fal, it doesn't need system instructions as prefix typically, but we can include)
                 // Actually Flux follows prompt well. Let's send the "finalPrompt" text but maybe strip system headers if needed.
@@ -1064,7 +1190,15 @@ Execute the user's instruction precisely.
             // don't fail the request, just log it
         }
 
-        return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl }, { status: 200 });
+        // DEDUCT CREDITS (Vertex)
+        {
+            const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
+            if (rpcErr) {
+                await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
+            }
+        }
+
+        return NextResponse.json({ imageUrl, fullQualityUrl: originalUrl, remainingCredits: userCredits - IMAGE_COST }, { status: 200 });
     } catch (e: any) {
         console.error("GENERATE ERROR:", e);
         return NextResponse.json(

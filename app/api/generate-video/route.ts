@@ -218,6 +218,33 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing required field (prompt is required)" }, { status: 400 });
         }
 
+        // Check Credits (Video Cost: 30)
+        const adminAuth = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        const { data: userProfile, error: profileErr } = await adminAuth
+            .from("profiles")
+            .select("credits, role")
+            .eq("user_id", userId)
+            .single();
+
+        if (profileErr || !userProfile) {
+            return NextResponse.json({ error: "User profile not found" }, { status: 404 });
+        }
+
+        const userCredits = userProfile.credits ?? 0;
+        const VIDEO_COST = 30;
+
+        if (userCredits < VIDEO_COST) {
+            return NextResponse.json({
+                error: "Insufficient credits for video. Please upgrade or top up.",
+                required: VIDEO_COST,
+                available: userCredits
+            }, { status: 402 });
+        }
+
         // --- BRANCH: FAL / GROK ---
         if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.startsWith("xai/") || requestedModelId.includes("grok"))) {
             // Map friendly IDs to actual Fal model paths
@@ -294,7 +321,13 @@ export async function POST(req: Request) {
                     model: falModelId
                 });
 
-                return NextResponse.json({ videoUrl, model: falModelId });
+                // DEDUCT CREDITS (Fal)
+                const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
+                if (rpcErr) {
+                    await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+                }
+
+                return NextResponse.json({ videoUrl, model: falModelId, remainingCredits: userCredits - VIDEO_COST });
 
             } catch (e: any) {
                 console.error("Fal Generation Error:", e);
@@ -677,7 +710,13 @@ export async function POST(req: Request) {
             is_public: true
         });
 
-        return NextResponse.json({ videoUrl, model: modelId });
+        // DEDUCT CREDITS (Veo)
+        const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
+        if (rpcErr) {
+            await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+        }
+
+        return NextResponse.json({ videoUrl, model: modelId, remainingCredits: userCredits - VIDEO_COST });
 
     } catch (e: any) {
         console.error("Video Gen Error:", e);

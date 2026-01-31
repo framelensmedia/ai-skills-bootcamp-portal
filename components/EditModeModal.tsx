@@ -1,11 +1,11 @@
-// ... imports
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Sparkles, Send, X, Paperclip, Trash2 } from "lucide-react";
 import LoadingHourglass from "./LoadingHourglass";
 import GenerationOverlay from "./GenerationOverlay";
 import SelectPill from "@/components/SelectPill";
 import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 export type QueueItem = any;
 
@@ -30,27 +30,50 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
     const [input, setInput] = useState("");
     const [images, setImages] = useState<File[]>([]);
     const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+    const [userCredits, setUserCredits] = useState<number | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
+    // Fetch User Credits
+    useEffect(() => {
+        if (!isOpen) return;
+        const fetchCredits = async () => {
+            const supabase = createSupabaseBrowserClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("credits").eq("user_id", user.id).maybeSingle();
+                if (profile) {
+                    setUserCredits(profile.credits ?? 0);
+                }
+            }
+        };
+        fetchCredits();
+    }, [isOpen]);
+
     if (!isOpen) return null;
+
+    const IMAGE_COST = 3;
+    const hasCredits = (userCredits ?? 0) >= IMAGE_COST;
+    const placeholder = !hasCredits && userCredits !== null
+        ? `Insufficient credits. Need ${IMAGE_COST} Cr.`
+        : isGenerating ? "Processing..." : `Type instruction... (${IMAGE_COST} Cr)`;
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const p = input.trim();
-        // Allow submitting if there are images, even if prompt is empty? Usually prompt is needed.
-        if (!p || isGenerating) return;
+        if (!p || isGenerating || !hasCredits) return;
         onGenerate(p, images, selectedModel);
         setInput("");
         setImages([]);
     };
 
     const handleSuggestion = (s: string) => {
-        if (isGenerating) return;
+        if (isGenerating || !hasCredits) return;
         onGenerate(s, images, selectedModel); // Pass current images if any
         setInput("");
         setImages([]);
     };
 
+    // ... rest of component
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const newFiles = Array.from(e.target.files);
@@ -92,6 +115,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         <div className="flex items-center gap-2">
                             <Sparkles size={16} className="text-[#B7FF00]" />
                             <span className="text-sm font-bold text-white">Refine & Edit</span>
+                            {hasCredits && <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/50">{IMAGE_COST} Cr</span>}
                         </div>
                         <button onClick={onClose} disabled={isGenerating} className="text-white/50 hover:text-white transition-colors">
                             <X size={20} />
@@ -150,7 +174,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                                 <button
                                     key={s}
                                     onClick={() => handleSuggestion(s)}
-                                    disabled={isGenerating}
+                                    disabled={isGenerating || !hasCredits}
                                     className="px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all disabled:opacity-50 text-left"
                                 >
                                     {s}
@@ -161,11 +185,11 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         {/* Input */}
                         <form onSubmit={handleSubmit} className="relative">
                             <textarea
-                                className="w-full rounded-xl bg-black border border-white/10 p-4 pr-20 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all resize-none min-h-[60px] max-h-[120px]"
-                                placeholder={isGenerating ? "Processing..." : "Type instruction..."}
+                                className={`w-full rounded-xl bg-black border border-white/10 p-4 pr-20 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00]/50 transition-all resize-none min-h-[60px] max-h-[120px] ${!hasCredits ? "border-red-500/30 bg-red-950/20" : ""}`}
+                                placeholder={placeholder}
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
-                                disabled={isGenerating}
+                                disabled={isGenerating || !hasCredits}
                                 rows={2}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -186,7 +210,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={!input.trim() || isGenerating}
+                                    disabled={!input.trim() || isGenerating || !hasCredits}
                                     className="p-2 rounded-lg text-[#B7FF00] hover:bg-[#B7FF00]/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                                 >
                                     {isGenerating ? <div className="h-4 w-4"><LoadingHourglass className="h-4 w-4 text-[#B7FF00]" /></div> : <Send size={18} />}

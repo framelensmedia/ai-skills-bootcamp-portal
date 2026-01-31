@@ -91,15 +91,16 @@ function CreatorContent() {
                 setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
             }
 
-            // 2. Fetch User Role for Admin Bypass
+            // 2. Fetch User Role for Admin Bypass AND Credits
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("role, credits").eq("user_id", user.id).maybeSingle();
                 if (profile) {
                     const role = String(profile.role || "").toLowerCase();
                     if (role === "admin" || role === "super_admin") {
                         setIsAdmin(true);
                     }
+                    setUserCredits(profile.credits ?? 0);
                 }
             }
 
@@ -117,6 +118,17 @@ function CreatorContent() {
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:5");
     const [mediaType, setMediaType] = useState<"image" | "video">("image");
+
+    // Credits
+    const [userCredits, setUserCredits] = useState<number | null>(null);
+    const VIDEO_COST = 30;
+    const IMAGE_COST = 3;
+    const isVideo = mediaType === "video";
+    const currentCost = isVideo ? VIDEO_COST : IMAGE_COST;
+    const hasCredits = (userCredits ?? 0) >= currentCost;
+    const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${currentCost}, have ${userCredits}.` : null;
+
+
 
     // Model Selection
     const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
@@ -148,6 +160,7 @@ function CreatorContent() {
     // Subject Settings
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
     const [subjectLock, setSubjectLock] = useState(true);
+    const [keepOutfit, setKeepOutfit] = useState(true); // New Toggle
 
     // Generation state
     const [generating, setGenerating] = useState(false);
@@ -361,15 +374,17 @@ function CreatorContent() {
             }
 
             // 3. Build JSON payload (not FormData)
+            const stylePrompt = stylePreset ? STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt : "";
+            const finalPrompt = stylePrompt ? `${prompt}, ${stylePrompt}` : prompt; // Natural append
+
             const payload: any = {
-                prompt: stylePreset
-                    ? `${prompt} --style ${STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt}`
-                    : prompt,
+                prompt: finalPrompt,
                 userId: user.id,
                 aspectRatio: aspectRatio,
                 combined_prompt_text: prompt,
-                imageUrls: uploadedImageUrls, // URLs instead of files
+                imageUrls: uploadedImageUrls,
                 modelId: selectedModel,
+                keepOutfit: keepOutfit, // Pass to API
             };
 
             // Subject Settings
@@ -413,6 +428,11 @@ function CreatorContent() {
             if (!res.ok) {
                 const msg = json?.message || json?.error || (text.length < 200 ? text : `Server Error (${res.status})`);
                 throw new Error(msg || "Generation failed");
+            }
+
+            // Update Credits
+            if (json.remainingCredits !== undefined) {
+                setUserCredits(json.remainingCredits);
             }
 
             // Navigate to library to see result ... OR stay if Video Intent
@@ -534,6 +554,9 @@ function CreatorContent() {
             if (!res.ok) throw new Error(data.error || "Video generation failed");
 
             if (data.videoUrl) {
+                if (data.remainingCredits !== undefined) {
+                    setUserCredits(data.remainingCredits);
+                }
                 setVideoResult(data.videoUrl);
             } else {
                 throw new Error("No video URL returned from server");
@@ -840,7 +863,23 @@ function CreatorContent() {
                                                         id="studio-subject-lock-inline"
                                                     />
                                                     <label htmlFor="studio-subject-lock-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
-                                                        <span className="font-bold">Strict Lock</span>
+                                                        <span className="font-bold">Face Lock</span>
+                                                        <span className="text-[9px] text-white/50">Maintain identity & gaze</span>
+                                                    </label>
+                                                </div>
+
+                                                {/* Keep Outfit Toggle */}
+                                                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={keepOutfit}
+                                                        onChange={(e) => setKeepOutfit(e.target.checked)}
+                                                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
+                                                        id="studio-outfit-lock-inline"
+                                                    />
+                                                    <label htmlFor="studio-outfit-lock-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
+                                                        <span className="font-bold">Keep Outfit</span>
+                                                        <span className="text-[9px] text-white/50">Uncheck for new clothes</span>
                                                     </label>
                                                 </div>
                                             </div>
@@ -869,15 +908,20 @@ function CreatorContent() {
                             {error}
                         </div>
                     )}
+                    {creditError && (
+                        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+                            {creditError}
+                        </div>
+                    )}
 
                     {mediaType === "video" ? (
                         <button
                             className={[
                                 "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                                animating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
+                                animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={handleAnimate}
-                            disabled={animating || (generationsPaused && !isAdmin)}
+                            disabled={animating || (generationsPaused && !isAdmin) || !hasCredits}
                         >
                             {animating ? (
                                 <span className="flex items-center gap-2">
@@ -887,7 +931,7 @@ function CreatorContent() {
                             ) : (
                                 <span className="flex items-center gap-2">
                                     <Clapperboard size={20} />
-                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"}</span>
+                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"} ({VIDEO_COST} Cr)</span>
                                 </span>
                             )}
                         </button>
@@ -895,17 +939,17 @@ function CreatorContent() {
                         <button
                             className={[
                                 "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                                generating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
+                                generating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={mode === "auto" ? undefined : handleManualGenerate}
-                            disabled={generating || (generationsPaused && !isAdmin)}
+                            disabled={generating || (generationsPaused && !isAdmin) || !hasCredits}
                         >
                             {generating ? (
                                 <span className="flex items-center gap-2">
                                     <LoadingHourglass className="w-5 h-5 text-black" />
                                     <span>Generating...</span>
                                 </span>
-                            ) : "Generate Artwork"}
+                            ) : `Generate Artwork (${IMAGE_COST} Cr)`}
                         </button>
                     )}
 
