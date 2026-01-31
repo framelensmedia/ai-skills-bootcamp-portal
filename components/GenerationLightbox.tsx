@@ -229,6 +229,8 @@ export default function GenerationLightbox({
               autoPlay
               loop
               playsInline
+              // @ts-ignore
+              webkit-playsinline="true"
               controls
               onClick={(e) => e.stopPropagation()}
             />
@@ -436,10 +438,16 @@ export default function GenerationLightbox({
                     className="w-full h-full object-contain drop-shadow-2xl"
                     loop
                     playsInline
+                    // @ts-ignore
+                    webkit-playsinline="true"
                     muted={isMuted}
                     autoPlay
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
+                    onLoadedData={(e) => {
+                      // Force play when data loaded
+                      if (isMuted) e.currentTarget.play().catch(() => { });
+                    }}
                   />
                   {/* Video Controls */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full">

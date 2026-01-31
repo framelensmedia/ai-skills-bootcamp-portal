@@ -1,6 +1,6 @@
 import { useInView } from "@/hooks/useInView";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 type LazyMediaProps = {
     src: string;
@@ -8,7 +8,7 @@ type LazyMediaProps = {
     alt?: string;
     type: "video" | "image";
     className?: string;
-    unoptimized?: boolean; // Keep for backward compat if needed, but we prefer false
+    unoptimized?: boolean;
 };
 
 export default function LazyMedia({ src, poster, alt = "", type, className, unoptimized = false }: LazyMediaProps) {
@@ -21,14 +21,10 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
                 // Video Logic: Only render <video> tag if in view. 
                 // Render Poster if out of view or waiting.
                 isInView ? (
-                    <video
+                    <VideoPlayer
                         src={src}
-                        poster={poster || undefined}
+                        poster={poster}
                         className="absolute inset-0 w-full h-full object-cover"
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
                     />
                 ) : (
                     // Placeholder / Poster
@@ -47,7 +43,6 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
             ) : (
                 // Image Logic: Use Next.js Image Priority/Lazy handling naturally, 
                 // OR enforce strict DOM injection.
-                // Let's enforce strict DOM injection for extreme memory saving on lists of 100s.
                 isInView ? (
                     <Image
                         src={src}
@@ -63,5 +58,51 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
                 )
             )}
         </div>
+    );
+}
+
+function VideoPlayer({ src, poster, className }: { src: string, poster?: string | null, className?: string }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // Force play on mount (essential for mobile when injected dynamically)
+        const attemptPlay = () => {
+            if (video.paused) {
+                video.play().catch(() => {
+                    // Autoplay blocked, maybe muted issue?
+                    // Ensure muted is set (it is in props)
+                });
+            }
+        };
+
+        attemptPlay();
+
+        // Also try again on any touch for iOS low-power mode if stuck
+        const onTouch = () => {
+            if (video.paused) attemptPlay();
+        };
+        window.addEventListener('touchstart', onTouch, { once: true, passive: true });
+
+        return () => {
+            window.removeEventListener('touchstart', onTouch);
+        };
+    }, []);
+
+    return (
+        <video
+            ref={videoRef}
+            src={src}
+            poster={poster || undefined}
+            className={className}
+            autoPlay
+            muted
+            loop
+            playsInline
+            // @ts-ignore
+            webkit-playsinline="true"
+        />
     );
 }
