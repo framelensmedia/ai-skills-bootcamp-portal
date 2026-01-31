@@ -115,7 +115,7 @@ async function describeImage(
 }
 
 async function generateFalVideo(
-    modelId: string, // e.g. "fal-ai/kling-video/v1.0/standard"
+    modelId: string, // e.g. "fal-ai/xai/grok-imagine-video/image-to-video"
     prompt: string,
     imageUrl?: string,
     videoUrl?: string,
@@ -126,15 +126,22 @@ async function generateFalVideo(
 
     const endpoint = `https://queue.fal.run/${modelId}`;
 
-    // Map Aspect Ratio to Kling Format if needed (Kling usually takes "16:9")
-    // If not provided, default to 16:9
+    // Default aspect ratio
     const ar = aspectRatio || "16:9";
 
+    // Build payload with model-specific parameters
     const payload: any = {
         prompt,
         aspect_ratio: ar,
-        duration: "5", // Kling Standard is 5s usually, Pro 10s? Fal defaults apply.
     };
+
+    // Grok-specific: 8 second duration and 480p resolution (faster generation, can upscale on download)
+    if (modelId.includes("grok")) {
+        payload.duration = 8;
+        payload.resolution = "480p";
+    } else {
+        payload.duration = 5; // Default for other models
+    }
 
     if (imageUrl) payload.image_url = imageUrl;
     if (videoUrl) payload.video_url = videoUrl;
@@ -159,9 +166,10 @@ async function generateFalVideo(
     const { request_id } = await res.json();
     console.log("Fal Request ID:", request_id);
 
-    // 2. Poll (5 mins max for video generation)
+    // 2. Poll (10 mins max for video generation - Grok 10s videos take longer)
     let attempts = 0;
-    while (attempts < 300) {
+    const maxAttempts = modelId.includes("grok") ? 600 : 300; // 10 min for Grok, 5 min for others
+    while (attempts < maxAttempts) {
         attempts++;
         await new Promise(r => setTimeout(r, 1000));
 
@@ -188,7 +196,7 @@ async function generateFalVideo(
 
         throw new Error(`Fal Generation Failed: ${JSON.stringify(statusJson)}`);
     }
-    throw new Error("Fal Timeout (5 min)");
+    throw new Error(`Fal Timeout (${maxAttempts / 60} min)`);
 }
 
 export async function POST(req: Request) {
@@ -210,13 +218,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing required field (prompt is required)" }, { status: 400 });
         }
 
-        // --- BRANCH: FAL / KLING ---
-        if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.includes("kling"))) {
-            // Map "kling-2.6" to actual ID if needed
+        // --- BRANCH: FAL / GROK ---
+        if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.startsWith("xai/") || requestedModelId.includes("grok"))) {
+            // Map friendly IDs to actual Fal model paths
             let falModelId = requestedModelId;
-            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v2.6/pro/image-to-video";
+            if (requestedModelId === "grok-imagine-video") {
+                // Auto-switch to edit-video if video input provided
+                falModelId = inputVideo
+                    ? "fal-ai/xai/grok-imagine-video/edit-video"
+                    : "fal-ai/xai/grok-imagine-video/image-to-video";
+            }
+            if (requestedModelId === "grok-video-edit") falModelId = "fal-ai/xai/grok-imagine-video/edit-video";
 
-            console.log("Using Fal Model:", falModelId);
+            console.log("Using Fal Model:", falModelId, inputVideo ? "(video-to-video edit)" : "(image-to-video)");
 
             // Prepare inputs
             // Image might be base64. Fal accepts data uri.

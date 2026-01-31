@@ -150,6 +150,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
     const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
     const [videoSourceImage, setVideoSourceImage] = useState<string | null>(null);
     const [videoSourceId, setVideoSourceId] = useState<string | undefined>(undefined);
+    const [videoSourceVideo, setVideoSourceVideo] = useState<string | null>(null); // For video-to-video editing
 
 
     // Derived state for the toggle
@@ -1005,8 +1006,12 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 onRemix={handleRemix}
                 onEdit={isOwnedByCurrentUser ? () => {
                     if (lbMediaType === "video") {
-                        const targetUrl = `/studio?mode=edit&intent=video&videoUrl=${encodeURIComponent(lbVideoUrl || lightboxUrl || "")}&img=${encodeURIComponent(lightboxUrl || "")}&prompt=${encodeURIComponent(lbCombined || lbOriginal || "")}`;
-                        router.push(targetUrl);
+                        // Video-to-video editing via modal
+                        setVideoSourceImage(lightboxUrl || null); // Thumbnail as preview
+                        setVideoSourceVideo(lbVideoUrl || null); // Source video for editing
+                        setVideoSourceId(lightboxItemId || undefined);
+                        setLightboxOpen(false);
+                        setIsVideoModalOpen(true);
                     } else {
                         setLightboxOpen(false);
                         setEditModalOpen(true);
@@ -1039,12 +1044,16 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             />
 
             {/* Video Generator Modal */}
-            {videoSourceImage && (
+            {(videoSourceImage || videoSourceVideo) && (
                 <VideoGeneratorModal
                     isOpen={isVideoModalOpen}
-                    onClose={() => setIsVideoModalOpen(false)}
-                    sourceImage={videoSourceImage}
+                    onClose={() => {
+                        setIsVideoModalOpen(false);
+                        setVideoSourceVideo(null); // Reset source video on close
+                    }}
+                    sourceImage={videoSourceImage || undefined}
                     sourceImageId={videoSourceId}
+                    sourceVideo={videoSourceVideo || undefined} // For video-to-video editing
                     userId={undefined} // Route handles authentication
                 />
             )}

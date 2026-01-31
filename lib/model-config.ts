@@ -14,11 +14,12 @@ export const VIDEO_MODELS = [
         description: "Native Vertex AI",
         default: true,
     },
-    {
-        id: "kling-2.6",
-        label: "Kling 2.6",
-        description: "Fal.ai (Experimental)",
-    }
+    // Grok temporarily disabled - timeout issues
+    // {
+    //     id: "grok-imagine-video",
+    //     label: "Grok Imagine",
+    //     description: "xAI via Fal.ai",
+    // }
 ];
 
 export const DEFAULT_MODEL_ID = "nano-banana-pro";

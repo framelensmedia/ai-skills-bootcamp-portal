@@ -198,22 +198,24 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             </div>
                         )}
 
-                        {/* Model Selector */}
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Video Model</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {VIDEO_MODELS.map(m => (
-                                    <SelectPill
-                                        key={m.id}
-                                        label={m.label}
-                                        description={m.description}
-                                        selected={selectedModel === m.id}
-                                        onClick={() => setSelectedModel(m.id)}
-                                        disabled={isGenerating}
-                                    />
-                                ))}
+                        {/* Model Selector - Only show if multiple models available */}
+                        {VIDEO_MODELS.length > 1 && (
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Video Model</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {VIDEO_MODELS.map(m => (
+                                        <SelectPill
+                                            key={m.id}
+                                            label={m.label}
+                                            description={m.description}
+                                            selected={selectedModel === m.id}
+                                            onClick={() => setSelectedModel(m.id)}
+                                            disabled={isGenerating}
+                                        />
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* 1. Context / Prompt */}
                         <div className="space-y-3">

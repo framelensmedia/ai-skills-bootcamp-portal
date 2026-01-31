@@ -1482,8 +1482,8 @@ function PromptContent() {
                 </div>
               )}
 
-              {/* VIDEO MODEL SELECTOR */}
-              {mediaType === "video" && (
+              {/* VIDEO MODEL SELECTOR - Only show if multiple models */}
+              {mediaType === "video" && VIDEO_MODELS.length > 1 && (
                 <div className="mt-4 pt-4 border-t border-white/5">
                   <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
