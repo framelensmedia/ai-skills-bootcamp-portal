@@ -1468,6 +1468,13 @@ function PromptContent() {
                       disabled={modelsConfig && modelsConfig["nano-banana-pro"] === false}
                     />
                     <SelectPill
+                      label="Nano Banana Pro"
+                      description="Fal.ai Flux Pro"
+                      selected={selectedModel === "nano-banana-pro"}
+                      onClick={() => setSelectedModel("nano-banana-pro")}
+                      disabled={modelsConfig && modelsConfig["nano-banana-pro"] === false}
+                    />
+                    <SelectPill
                       label="SeeDream 4K"
                       description="Ultra Detail"
                       selected={selectedModel === "seedream-4k"}
