@@ -11,6 +11,7 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import ImageUploader from "@/components/ImageUploader";
 import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download, Loader2 } from "lucide-react";
 import SelectPill from "@/components/SelectPill";
+import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 
 import GenerationOverlay from "@/components/GenerationOverlay";
 import { ArrowLeft, TriangleAlert } from "lucide-react";
@@ -58,6 +59,10 @@ function StudioContent() {
   const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
   const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
+
+  // Model Selection
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [modelsConfig, setModelsConfig] = useState<any>({});
   const previewRef = useRef<HTMLElement>(null);
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("/orb-neon.gif");
@@ -171,6 +176,12 @@ function StudioContent() {
             setIsAdmin(true);
           }
         }
+      }
+
+      // 3. Fetch Model Config
+      const { data: models } = await supabase.from("app_config").select("value").eq("key", "model_availability").maybeSingle();
+      if (models && models.value) {
+        setModelsConfig(models.value);
       }
     };
     fetchConfig();
@@ -391,6 +402,7 @@ function StudioContent() {
         template_reference_image: normalize(previewImageUrl),
         imageUrls: uploadedImageUrls, // ✅ Pass URLs instead of Files
         // Files are NOT passed here
+        modelId: selectedModel,
       };
 
       if (prePromptId) payload.promptId = normalize(prePromptId);
@@ -911,6 +923,25 @@ function StudioContent() {
                 disabled={generating || animating}
               />
             </div>
+
+            {/* Model Selector */}
+            {mediaType === "image" && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {GENERATION_MODELS.map((model) => (
+                    <SelectPill
+                      key={model.id}
+                      label={model.label}
+                      description={model.description}
+                      selected={selectedModel === model.id}
+                      onClick={() => setSelectedModel(model.id)}
+                      disabled={modelsConfig && modelsConfig[model.id] === false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {mediaType === "video" && (
               <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">

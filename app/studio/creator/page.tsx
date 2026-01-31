@@ -23,6 +23,7 @@ import Link from "next/link";
 import { ArrowRight, Library, TriangleAlert } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
+import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
 
@@ -101,6 +102,12 @@ function CreatorContent() {
                     }
                 }
             }
+
+            // 3. Fetch Model Config
+            const { data: models } = await supabase.from("app_config").select("value").eq("key", "model_availability").maybeSingle();
+            if (models && models.value) {
+                setModelsConfig(models.value);
+            }
         };
         fetchConfig();
     }, []);
@@ -110,6 +117,10 @@ function CreatorContent() {
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:5");
     const [mediaType, setMediaType] = useState<"image" | "video">("image");
+
+    // Model Selection
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+    const [modelsConfig, setModelsConfig] = useState<any>({});
 
     // Video State
     const [animating, setAnimating] = useState(false);
@@ -352,6 +363,7 @@ function CreatorContent() {
                 aspectRatio: aspectRatio,
                 combined_prompt_text: prompt,
                 imageUrls: uploadedImageUrls, // URLs instead of files
+                modelId: selectedModel,
             };
 
             // Subject Settings
@@ -643,6 +655,25 @@ function CreatorContent() {
                                 />
                             </div>
                         </div>
+
+                        {/* Model Selector */}
+                        {mediaType === "image" && (
+                            <div className="mt-4 pt-4 border-t border-white/5">
+                                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {GENERATION_MODELS.map((model) => (
+                                        <SelectPill
+                                            key={model.id}
+                                            label={model.label}
+                                            description={model.description}
+                                            selected={selectedModel === model.id}
+                                            onClick={() => setSelectedModel(model.id)}
+                                            disabled={modelsConfig && modelsConfig[model.id] === false}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
 

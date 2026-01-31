@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
@@ -175,7 +176,7 @@ function PromptContent() {
   // Model Management State
   const [generationsPaused, setGenerationsPaused] = useState(false);
   const [modelsConfig, setModelsConfig] = useState<any>({});
-  const [selectedModel, setSelectedModel] = useState("nano-banana-pro");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
 
   // Fetch Config & User Role
   useEffect(() => {
@@ -1460,34 +1461,16 @@ function PromptContent() {
                 <div className="mt-4 pt-4 border-t border-white/5">
                   <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <SelectPill
-                      label="Nano Banana Pro"
-                      description="High Quality"
-                      selected={selectedModel === "nano-banana-pro"}
-                      onClick={() => setSelectedModel("nano-banana-pro")}
-                      disabled={modelsConfig && modelsConfig["nano-banana-pro"] === false}
-                    />
-                    <SelectPill
-                      label="Nano Banana Pro"
-                      description="Fal.ai Flux Pro"
-                      selected={selectedModel === "nano-banana-pro"}
-                      onClick={() => setSelectedModel("nano-banana-pro")}
-                      disabled={modelsConfig && modelsConfig["nano-banana-pro"] === false}
-                    />
-                    <SelectPill
-                      label="SeeDream 4K"
-                      description="Ultra Detail"
-                      selected={selectedModel === "seedream-4k"}
-                      onClick={() => setSelectedModel("seedream-4k")}
-                      disabled={modelsConfig && modelsConfig["seedream-4k"] === false}
-                    />
-                    <SelectPill
-                      label="Gemini 3"
-                      description="Fast (Legacy)"
-                      selected={selectedModel === "gemini-3-preview"}
-                      onClick={() => setSelectedModel("gemini-3-preview")}
-                      disabled={modelsConfig && modelsConfig["gemini-3-preview"] === false}
-                    />
+                    {GENERATION_MODELS.map((model) => (
+                      <SelectPill
+                        key={model.id}
+                        label={model.label}
+                        description={model.description}
+                        selected={selectedModel === model.id}
+                        onClick={() => setSelectedModel(model.id)}
+                        disabled={modelsConfig && modelsConfig[model.id] === false}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
