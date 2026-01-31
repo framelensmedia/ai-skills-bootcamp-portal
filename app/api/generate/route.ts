@@ -194,15 +194,28 @@ async function generateFalImage(
         safety_tolerance: "2",
     };
 
+    // Handle Nano Banana Pro specifically (uses image_urls array and /edit endpoint)
+    const isNanoBanana = modelId.includes("nano-banana");
+
     if (mainImageUrl) {
-        payload.image_url = mainImageUrl;
-        // payload.strength = 0.85; // Optional: Default strength for img2img? Let's leave model default for now or strict?
-        // Flux Pro doesn't always perform img2img on this endpoint, but if it does, image_url is key.
-        // If it ignores it, we are no worse off.
+        if (isNanoBanana) {
+            // Nano Banana Pro uses image_urls (array) for reference images
+            payload.image_urls = [mainImageUrl];
+        } else {
+            // Other Fal models use image_url (singular)
+            payload.image_url = mainImageUrl;
+        }
     }
 
+    // Use /edit endpoint for Nano Banana Pro with reference images
+    const actualEndpoint = isNanoBanana && mainImageUrl
+        ? `https://queue.fal.run/${modelId}/edit`
+        : endpoint;
+
+    console.log(`Fal Image Request (${modelId}):`, { prompt: prompt.slice(0, 50), hasImage: !!mainImageUrl, isNanoBanana, endpoint: actualEndpoint });
+
     // 1. Submit Request
-    const res = await fetch(endpoint, {
+    const res = await fetch(actualEndpoint, {
         method: "POST",
         headers: {
             "Authorization": `Key ${falKey}`,
@@ -234,6 +247,11 @@ async function generateFalImage(
 
         const statusJson = await statusRes.json();
 
+        // Check for direct completion (some Fal models return images directly)
+        if (statusJson.images?.[0]?.url) {
+            return statusJson.images[0].url;
+        }
+
         if (statusJson.status === "COMPLETED") {
             const imageUrl = statusJson.images?.[0]?.url;
             if (!imageUrl) throw new Error("Fal.ai completed but returned no image URL");
@@ -244,6 +262,7 @@ async function generateFalImage(
             continue;
         }
 
+        // Only throw error if no images and not in progress
         throw new Error(`Fal.ai Generation Failed: ${JSON.stringify(statusJson)}`);
     }
 
@@ -391,6 +410,9 @@ export async function POST(req: Request) {
             if (body.canvas_image && typeof body.canvas_image === "string") {
                 canvasUrl = String(body.canvas_image).trim();
             }
+
+            // ✅ Read modelId from JSON payload
+            requestedModel = body.modelId ? String(body.modelId).trim() || null : null;
         }
 
         // 2. Validation
@@ -429,7 +451,114 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Total upload too large. Max total is 20MB." }, { status: 400 });
         }
 
-        // 3. ENV Setup
+        // 2.5 Model Resolution (before credentials - so we can branch early)
+        let model = requestedModel || process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
+
+        console.log(`GENERATE: requestedModel=${requestedModel}, resolved model=${model}`);
+
+        // Handle "Nano Banana Pro" -> Fal mapping if client sends friendly name
+        if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
+        if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
+
+        console.log(`GENERATE: final model after mapping=${model}`);
+
+        // Setup Supabase Admin (needed for both branches)
+        const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
+        const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
+        const admin = createClient(supabaseUrl, serviceRole);
+
+
+
+        // --- BRANCH: FAL.AI MODELS ---
+        if (model.startsWith("fal-ai/")) {
+            console.log(`Using Fal Model: ${model}`);
+
+            // Check Global Pause first
+            try {
+                const { data: config } = await admin
+                    .from("app_config")
+                    .select("value")
+                    .eq("key", "generations_paused")
+                    .maybeSingle();
+
+                if (config?.value === true || config?.value === "true") {
+                    const { data: profile } = await admin
+                        .from("profiles")
+                        .select("role")
+                        .eq("user_id", userId)
+                        .maybeSingle();
+
+                    const role = String(profile?.role || "").toLowerCase();
+                    const isBypass = role === "admin" || role === "super_admin";
+
+                    if (!isBypass) {
+                        return NextResponse.json({ error: "Generations are currently paused for maintenance." }, { status: 503 });
+                    }
+                }
+            } catch (e) {
+                console.warn("Global pause check failed (ignoring):", e);
+            }
+
+            // Prepare image URL if reference image provided
+            let refImageUrl: string | null = null;
+            if (imageFiles.length > 0) {
+                // Upload first image to Supabase to get a public URL for Fal
+                const firstFile = imageFiles[0];
+                const ab = await firstFile.arrayBuffer();
+                const buffer = Buffer.from(ab);
+                const filePath = `fal-uploads/${userId}/${Date.now()}.jpg`;
+
+                const { error: uploadErr } = await admin.storage
+                    .from("generations")
+                    .upload(filePath, buffer, { contentType: firstFile.type || "image/jpeg", upsert: false });
+
+                if (!uploadErr) {
+                    const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                    refImageUrl = pubUrl.publicUrl;
+                } else {
+                    console.warn("Failed to upload reference image for Fal:", uploadErr);
+                }
+            } else if (imageUrls.length > 0) {
+                refImageUrl = imageUrls[0];
+            }
+
+            // Fal supports aspect ratio as string like "16:9" or object {width, height}
+            const falImageSize = ar || "landscape_4_3";
+
+            try {
+                const falImageUrl = await generateFalImage(model, rawPrompt, falImageSize, refImageUrl);
+                console.log("Fal Image Generated:", falImageUrl);
+
+                // Save to DB
+                const { data: inserted, error: dbErr } = await admin.from("prompt_generations").insert({
+                    user_id: userId,
+                    prompt_id: promptId,
+                    prompt_slug: promptSlug,
+                    image_url: falImageUrl,
+                    combined_prompt_text: rawPrompt,
+                    settings: {
+                        model,
+                        provider: "fal",
+                        input_images: refImageUrl ? 1 : 0,
+                    },
+                }).select().single();
+
+                if (dbErr) {
+                    console.error("DB Insert Error:", dbErr);
+                    return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
+                }
+
+                console.log("Fal Image Saved to DB:", inserted?.id);
+                return NextResponse.json({ images: [{ url: falImageUrl }], generationId: inserted?.id, imageUrl: falImageUrl });
+
+            } catch (falErr: any) {
+                console.error("Fal Generation Error:", falErr);
+                return NextResponse.json({ error: falErr.message || "Fal generation failed" }, { status: 500 });
+            }
+        }
+
+        // --- BRANCH: VERTEX / GEMINI ---
+        // 3. ENV Setup (only needed for Vertex)
         const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");
         const location = (process.env.GOOGLE_CLOUD_LOCATION || "europe-west9").trim();
 
@@ -440,18 +569,6 @@ export async function POST(req: Request) {
         } catch {
             throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON");
         }
-
-        const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
-        const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
-        const admin = createClient(supabaseUrl, serviceRole);
-
-        // 2.5 Global Pause Check & Model Resolution
-        // Determine effective model
-        let model = requestedModel || process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
-
-        // Handle "Nano Banana Pro" -> Flux Pro mapping if client sends friendly name, or just expect ID
-        if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
-        if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
 
         // Check Global Pause (Fail-safe: continue if table missing)
         try {

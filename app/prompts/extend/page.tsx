@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Wand2, Film, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import Image from "next/image";
+import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
+import SelectPill from "@/components/SelectPill";
 
 export default function ExtendVideoPage() {
     const searchParams = useSearchParams();
@@ -18,6 +20,7 @@ export default function ExtendVideoPage() {
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [timer, setTimer] = useState(0);
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_VIDEO_MODEL_ID);
 
     // Video preview controls
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,6 +70,7 @@ export default function ExtendVideoPage() {
                     inputVideo: videoUrl,
                     prompt,
                     dialogue,
+                    modelId: selectedModel,
                 }),
             });
 
@@ -247,8 +251,8 @@ export default function ExtendVideoPage() {
                             onClick={handleGenerate}
                             disabled={!prompt.trim() || isGenerating}
                             className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!prompt.trim() || isGenerating
-                                    ? "bg-white/10 text-white/20 cursor-not-allowed"
-                                    : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
+                                ? "bg-white/10 text-white/20 cursor-not-allowed"
+                                : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
                                 }`}
                         >
                             {isGenerating ? (

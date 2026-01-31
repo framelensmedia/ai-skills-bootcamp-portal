@@ -159,9 +159,9 @@ async function generateFalVideo(
     const { request_id } = await res.json();
     console.log("Fal Request ID:", request_id);
 
-    // 2. Poll
+    // 2. Poll (5 mins max for video generation)
     let attempts = 0;
-    while (attempts < 120) { // 2 mins max
+    while (attempts < 300) {
         attempts++;
         await new Promise(r => setTimeout(r, 1000));
 
@@ -172,6 +172,12 @@ async function generateFalVideo(
         if (!statusRes.ok) continue;
 
         const statusJson = await statusRes.json();
+
+        // Log progress every 10 seconds
+        if (attempts % 10 === 0) {
+            console.log(`Fal Poll ${attempts}s: status=${statusJson.status}`);
+        }
+
         if (statusJson.status === "COMPLETED") {
             const videoUrl = statusJson.video?.url || statusJson.video_url?.url || statusJson.images?.[0]?.url; // Check structure
             // Kling usually returns `video: { url: ... }`
@@ -182,7 +188,7 @@ async function generateFalVideo(
 
         throw new Error(`Fal Generation Failed: ${JSON.stringify(statusJson)}`);
     }
-    throw new Error("Fal Timeout");
+    throw new Error("Fal Timeout (5 min)");
 }
 
 export async function POST(req: Request) {
@@ -208,7 +214,7 @@ export async function POST(req: Request) {
         if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.includes("kling"))) {
             // Map "kling-2.6" to actual ID if needed
             let falModelId = requestedModelId;
-            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v2.1/standard/image-to-video";
+            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v2.6/pro/image-to-video";
 
             console.log("Using Fal Model:", falModelId);
 
@@ -292,7 +298,18 @@ export async function POST(req: Request) {
         const modelId = process.env.VEO_MODEL_ID || "veo-3.1-fast-generate-001";
 
         const credsJson = mustEnv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
-        const credentials = JSON.parse(credsJson);
+
+        // Debug: Show first 20 chars and their codes to diagnose JSON issues
+        console.log("CREDS DEBUG: first 20 chars =", credsJson.slice(0, 20));
+        console.log("CREDS DEBUG: char codes =", credsJson.slice(0, 10).split('').map(c => c.charCodeAt(0)));
+
+        let credentials;
+        try {
+            credentials = JSON.parse(credsJson);
+        } catch (e) {
+            console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON parse error:", e);
+            throw new Error(`Invalid GOOGLE_APPLICATION_CREDENTIALS_JSON: ${e}`);
+        }
 
         const auth = new GoogleAuth({
             credentials,

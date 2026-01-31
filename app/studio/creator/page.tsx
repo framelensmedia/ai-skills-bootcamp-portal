@@ -517,7 +517,8 @@ function CreatorContent() {
                     prompt: promptText,
                     userId: user?.id,
                     aspectRatio: aspectRatio,
-                    sourceImageId: searchParams?.get("promptId") || undefined
+                    sourceImageId: searchParams?.get("promptId") || undefined,
+                    modelId: selectedModel
                 })
             });
 

@@ -8,7 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
-import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
@@ -177,6 +177,12 @@ function PromptContent() {
   const [generationsPaused, setGenerationsPaused] = useState(false);
   const [modelsConfig, setModelsConfig] = useState<any>({});
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+
+  // Sync model selection when media type changes
+  useEffect(() => {
+    if (mediaType === "video") setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
+    else setSelectedModel(DEFAULT_MODEL_ID);
+  }, [mediaType]);
 
   // Fetch Config & User Role
   useEffect(() => {
@@ -864,7 +870,8 @@ function PromptContent() {
           sourceImageId: undefined,
           promptId: metaRow.id, // NEW: Link to Prompt Template directly
           aspectRatio, // Ensure aspect ratio is sent
-          userId // Ensure userId is sent
+          userId, // Ensure userId is sent
+          modelId: selectedModel // Pass selected video model
         };
 
         const res = await fetch("/api/generate-video", {
@@ -1469,6 +1476,24 @@ function PromptContent() {
                         selected={selectedModel === model.id}
                         onClick={() => setSelectedModel(model.id)}
                         disabled={modelsConfig && modelsConfig[model.id] === false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VIDEO MODEL SELECTOR */}
+              {mediaType === "video" && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {VIDEO_MODELS.map((model) => (
+                      <SelectPill
+                        key={model.id}
+                        label={model.label}
+                        description={model.description}
+                        selected={selectedModel === model.id}
+                        onClick={() => setSelectedModel(model.id)}
                       />
                     ))}
                   </div>

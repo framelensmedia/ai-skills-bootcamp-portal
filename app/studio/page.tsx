@@ -711,7 +711,8 @@ function StudioContent() {
           prompt: promptText,
           userId: user?.id,
           aspectRatio: aspectRatio,
-          sourceImageId: prePromptId || undefined
+          sourceImageId: prePromptId || undefined,
+          modelId: selectedModel
         })
       });
 

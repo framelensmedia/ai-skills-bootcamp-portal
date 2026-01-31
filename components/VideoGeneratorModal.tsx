@@ -26,6 +26,11 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     const [dialogue, setDialogue] = useState("");
     const [selectedModel, setSelectedModel] = useState(initialModelId || DEFAULT_VIDEO_MODEL_ID);
 
+    // Sync state with prop if it changes (e.g. Sidebar selection)
+    useEffect(() => {
+        if (initialModelId) setSelectedModel(initialModelId);
+    }, [initialModelId]);
+
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [resultUrl, setResultUrl] = useState<string | null>(null);
