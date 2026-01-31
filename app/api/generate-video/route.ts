@@ -208,7 +208,7 @@ export async function POST(req: Request) {
         if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.includes("kling"))) {
             // Map "kling-2.6" to actual ID if needed
             let falModelId = requestedModelId;
-            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v1.0/standard"; // Or v1.5/pro if available. Using Standard for now.
+            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v2.1/standard/image-to-video";
 
             console.log("Using Fal Model:", falModelId);
 

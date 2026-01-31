@@ -521,7 +521,15 @@ function CreatorContent() {
                 })
             });
 
-            const data = await res.json();
+            let data;
+            try {
+                data = await res.json();
+            } catch (jsonErr) {
+                // If JSON fails (e.g. 504 Gateway Timeout HTML), read raw text
+                const text = await res.text().catch(() => "Unknown server error");
+                throw new Error(`Video Generation Failed (${res.status}): ${text.slice(0, 100)}`);
+            }
+
             if (!res.ok) throw new Error(data.error || "Video generation failed");
 
             if (data.videoUrl) {
