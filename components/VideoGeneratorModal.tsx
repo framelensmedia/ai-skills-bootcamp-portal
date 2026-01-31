@@ -5,6 +5,8 @@ import Image from "next/image";
 import { X, Play, Wand2, Film, Maximize2, TriangleAlert } from "lucide-react";
 import GenerationOverlay from "./GenerationOverlay";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
+import SelectPill from "@/components/SelectPill";
 
 
 
@@ -21,6 +23,7 @@ type Props = {
 export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt }: Props) {
     const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_VIDEO_MODEL_ID);
 
 
     const [isGenerating, setIsGenerating] = useState(false);
@@ -96,7 +99,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                     prompt,
                     dialogue,
                     userId,
-                    sourceImageId
+                    sourceImageId,
+                    modelId: selectedModel
                 })
             });
 
@@ -150,7 +154,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 <Film className="text-lime-400" size={20} />
                                 {sourceVideo ? "Edit Video" : "Video Remix"}
                             </h2>
-                            <p className="text-xs text-white/40">Using Veo 3.1 & Ingredients</p>
+                            <p className="text-xs text-white/40">Powered by {VIDEO_MODELS.find(m => m.id === selectedModel)?.label || "Veo"}</p>
                         </div>
                         <button
                             onClick={onClose}
@@ -180,6 +184,23 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 </div>
                             </div>
                         )}
+
+                        {/* Model Selector */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Video Model</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {VIDEO_MODELS.map(m => (
+                                    <SelectPill
+                                        key={m.id}
+                                        label={m.label}
+                                        description={m.description}
+                                        selected={selectedModel === m.id}
+                                        onClick={() => setSelectedModel(m.id)}
+                                        disabled={isGenerating}
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
                         {/* 1. Context / Prompt */}
                         <div className="space-y-3">
@@ -331,6 +352,6 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                 </div>
 
             </div>
-        </div>
+        </div >
     );
 }

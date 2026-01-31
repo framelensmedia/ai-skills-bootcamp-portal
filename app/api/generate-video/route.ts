@@ -114,10 +114,81 @@ async function describeImage(
     }
 }
 
+async function generateFalVideo(
+    modelId: string, // e.g. "fal-ai/kling-video/v1.0/standard"
+    prompt: string,
+    imageUrl?: string,
+    videoUrl?: string,
+    aspectRatio?: string
+) {
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) throw new Error("Missing FAL_KEY");
+
+    const endpoint = `https://queue.fal.run/${modelId}`;
+
+    // Map Aspect Ratio to Kling Format if needed (Kling usually takes "16:9")
+    // If not provided, default to 16:9
+    const ar = aspectRatio || "16:9";
+
+    const payload: any = {
+        prompt,
+        aspect_ratio: ar,
+        duration: "5", // Kling Standard is 5s usually, Pro 10s? Fal defaults apply.
+    };
+
+    if (imageUrl) payload.image_url = imageUrl;
+    if (videoUrl) payload.video_url = videoUrl;
+
+    console.log(`Fal Video Request (${modelId}):`, { prompt, ar, hasImage: !!imageUrl, hasVideo: !!videoUrl });
+
+    // 1. Submit
+    const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            "Authorization": `Key ${falKey}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Fal Request Failed: ${res.status} ${err}`);
+    }
+
+    const { request_id } = await res.json();
+    console.log("Fal Request ID:", request_id);
+
+    // 2. Poll
+    let attempts = 0;
+    while (attempts < 120) { // 2 mins max
+        attempts++;
+        await new Promise(r => setTimeout(r, 1000));
+
+        const statusRes = await fetch(`https://queue.fal.run/${modelId}/requests/${request_id}`, {
+            headers: { "Authorization": `Key ${falKey}` },
+        });
+
+        if (!statusRes.ok) continue;
+
+        const statusJson = await statusRes.json();
+        if (statusJson.status === "COMPLETED") {
+            const videoUrl = statusJson.video?.url || statusJson.video_url?.url || statusJson.images?.[0]?.url; // Check structure
+            // Kling usually returns `video: { url: ... }`
+            if (!videoUrl) throw new Error("Fal completed but returned no video URL");
+            return videoUrl;
+        }
+        if (statusJson.status === "IN_QUEUE" || statusJson.status === "IN_PROGRESS") continue;
+
+        throw new Error(`Fal Generation Failed: ${JSON.stringify(statusJson)}`);
+    }
+    throw new Error("Fal Timeout");
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64, aspectRatio, promptId } = body;
+        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64, aspectRatio, promptId, modelId: requestedModelId } = body;
 
         // 1. Auth via Session
         const supabase = await createSupabaseServerClient();
@@ -132,6 +203,86 @@ export async function POST(req: Request) {
         if (!prompt) {
             return NextResponse.json({ error: "Missing required field (prompt is required)" }, { status: 400 });
         }
+
+        // --- BRANCH: FAL / KLING ---
+        if (requestedModelId && (requestedModelId.startsWith("fal-ai/") || requestedModelId.includes("kling"))) {
+            // Map "kling-2.6" to actual ID if needed
+            let falModelId = requestedModelId;
+            if (requestedModelId === "kling-2.6") falModelId = "fal-ai/kling-video/v1.0/standard"; // Or v1.5/pro if available. Using Standard for now.
+
+            console.log("Using Fal Model:", falModelId);
+
+            // Prepare inputs
+            // Image might be base64. Fal accepts data uri.
+            let finalImageUrl = undefined;
+            if (image) {
+                if (image.startsWith("http")) finalImageUrl = image;
+                else if (image.startsWith("data:")) finalImageUrl = image;
+                // Else if base64 without prefix? Wrap it.
+            }
+
+            // Video Input
+            let finalVideoUrl = inputVideo; // usually URL from frontend (or base64?)
+            // Frontend sends URL for video input mostly.
+
+            try {
+                const generatedVideoUrl = await generateFalVideo(falModelId, prompt, finalImageUrl, finalVideoUrl, aspectRatio);
+
+                // Fal returns a public URL (usually temporary). We should download and store it to Supabase Generatons bucket.
+                console.log("Fal Video Generated:", generatedVideoUrl);
+
+                // Download
+                const vRes = await fetch(generatedVideoUrl);
+                const vBlob = await vRes.blob();
+                const vBuffer = Buffer.from(await vBlob.arrayBuffer());
+
+                // Upload to Supabase
+                const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
+                const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
+                const admin = createClient(supabaseUrl, serviceRole, { auth: { persistSession: false } });
+
+                const filePath = `videos/${userId}/${Date.now()}.mp4`;
+                const { error: uploadError } = await admin.storage
+                    .from("generations")
+                    .upload(filePath, vBuffer, { contentType: "video/mp4", upsert: false });
+
+                if (uploadError) throw uploadError;
+
+                const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                const videoUrl = pubUrl.publicUrl;
+
+                // Save DB
+                // Reuse or duplicate DB logic?
+                // Let's duplicate briefly for simplicity or refactor?
+                // I will duplicate strictly the DB insert part for safety.
+
+                // Thumbnail logic (simplified)
+                let thumbnailUrl = image && image.startsWith("http") ? image : null;
+                // If base64 image, we might want to upload it too? 
+                // Existing logic handles base64 thumbnail upload.
+
+                await admin.from("video_generations").insert({
+                    user_id: userId,
+                    source_image_id: sourceImageId || null,
+                    prompt_id: promptId || null,
+                    video_url: videoUrl,
+                    thumbnail_url: thumbnailUrl,
+                    prompt,
+                    dialogue,
+                    status: "completed",
+                    is_public: true,
+                    model: falModelId
+                });
+
+                return NextResponse.json({ videoUrl, model: falModelId });
+
+            } catch (e: any) {
+                console.error("Fal Generation Error:", e);
+                return NextResponse.json({ error: e.message || "Fal Generation Failed" }, { status: 500 });
+            }
+        }
+
+        // --- BRANCH: VEO (Vertex AI) ---
 
         // 2. Setup Env & Auth
         const projectId = mustEnv("GOOGLE_CLOUD_PROJECT_ID");

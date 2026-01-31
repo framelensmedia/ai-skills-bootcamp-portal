@@ -484,20 +484,22 @@ export default function RemixChatWizard({
                     </div>
 
                     {/* Model Selector (Always visible in side panel) */}
-                    <div className="hidden md:block w-full mt-6">
-                        <div className="text-xs font-semibold text-white/50 mb-2 uppercase tracking-wide">Model</div>
-                        <div className="flex flex-col gap-2">
-                            {GENERATION_MODELS.map((model) => (
-                                <SelectPill
-                                    key={model.id}
-                                    label={model.label}
-                                    description={model.description}
-                                    selected={selectedModel === model.id}
-                                    onClick={() => setSelectedModel(model.id)}
-                                />
-                            ))}
+                    {GENERATION_MODELS.length > 1 && (
+                        <div className="hidden md:block w-full mt-6">
+                            <div className="text-xs font-semibold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                            <div className="flex flex-col gap-2">
+                                {GENERATION_MODELS.map((model) => (
+                                    <SelectPill
+                                        key={model.id}
+                                        label={model.label}
+                                        description={model.description}
+                                        selected={selectedModel === model.id}
+                                        onClick={() => setSelectedModel(model.id)}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
