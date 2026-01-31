@@ -181,12 +181,25 @@ async function generateFalImage(
     modelId: string, // "fal-ai/flux-pro/v1.1" or "fal-ai/flux-pro/v1.1-ultra"
     prompt: string,
     imageSize: any = "landscape_4_3", // or {width, height}
-    safetyTolerance: string = "2" // 1 (strict) to 6 (loose)? Check docs. Flux Pro usually just prompt.
+    mainImageUrl?: string | null
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
 
     const endpoint = `https://queue.fal.run/${modelId}`;
+
+    const payload: any = {
+        prompt,
+        image_size: imageSize,
+        safety_tolerance: "2",
+    };
+
+    if (mainImageUrl) {
+        payload.image_url = mainImageUrl;
+        // payload.strength = 0.85; // Optional: Default strength for img2img? Let's leave model default for now or strict?
+        // Flux Pro doesn't always perform img2img on this endpoint, but if it does, image_url is key.
+        // If it ignores it, we are no worse off.
+    }
 
     // 1. Submit Request
     const res = await fetch(endpoint, {
@@ -195,11 +208,7 @@ async function generateFalImage(
             "Authorization": `Key ${falKey}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-            prompt,
-            image_size: imageSize,
-            safety_tolerance: "2", // Default safe-ish
-        }),
+        body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -746,7 +755,13 @@ Execute the user's instruction precisely.
                 // Actually Flux follows prompt well. Let's send the "finalPrompt" text but maybe strip system headers if needed.
                 // For now, sending the full prompt is safer to preserve instructions.
 
-                const falImageUrl = await generateFalImage(model, finalPrompt, falSize);
+                // Resolve Main Image for Fal (Img2Img)
+                let falMainImage = null;
+                if (canvasUrl) falMainImage = canvasUrl;
+                else if (template_reference_image) falMainImage = template_reference_image;
+                else if (imageUrls && imageUrls.length > 0) falMainImage = imageUrls[0];
+
+                const falImageUrl = await generateFalImage(model, finalPrompt, falSize, falMainImage);
 
                 // Fal returns a URL. We need to download it to process it as we do for Vertex (upload to our storage)
                 // Use urlToBase64 or similar logic?
