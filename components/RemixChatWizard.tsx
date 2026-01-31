@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useState, useEffect, useRef, useMemo } from "react";
 import ImageUploader from "./ImageUploader";
+import SelectPill from "@/components/SelectPill";
+import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 
 export type RemixAnswers = Record<string, string>;
 
@@ -97,6 +99,7 @@ export default function RemixChatWizard({
 
     // Steps State
     const [stepIndex, setStepIndex] = useState(0);
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
 
     // Build steps derived from config
     const steps = useMemo(() => {
@@ -288,6 +291,7 @@ export default function RemixChatWizard({
         // Include subjectLock and subjectMode in answers
         finalAnswers.subjectLock = String(subjectLock);
         finalAnswers.subjectMode = subjectMode;
+        finalAnswers.modelId = selectedModel;
 
         const sum = generateEditSummary(finalAnswers, uploads.length > 0);
         setMessages([
@@ -478,11 +482,32 @@ export default function RemixChatWizard({
                     <div className="relative h-full aspect-[9/16] md:w-full md:max-w-[280px] md:h-auto overflow-hidden rounded-lg border border-white/10 bg-black">
                         <Image src={templatePreviewUrl} alt="Template" fill className="object-contain" unoptimized />
                     </div>
+
+                    {/* Model Selector (Always visible in side panel) */}
+                    <div className="hidden md:block w-full mt-6">
+                        <div className="text-xs font-semibold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                        <div className="flex flex-col gap-2">
+                            {GENERATION_MODELS.map((model) => (
+                                <SelectPill
+                                    key={model.id}
+                                    label={model.label}
+                                    description={model.description}
+                                    selected={selectedModel === model.id}
+                                    onClick={() => setSelectedModel(model.id)}
+                                />
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
+
+// Mobile Model Selector (Inject into Review Step or Footer? Let's put it in the Review Step for mobile)
+// Actually, let's just leave it desktop only for now or inject it into the review step logic if we want to be fancy.
+// For now, let's keep it simple. If we need mobile support, we can add it to the Review Step component logic.
+
 
 function UploadStepWrapper({
     files,

@@ -296,6 +296,10 @@ function StudioContent() {
   function handleWizardComplete(summary: string, ans: RemixAnswers, shouldGenerate = false) {
     setEditSummary(summary);
     setRemixAnswers(ans);
+    // If wizard returned a modelId, set it as the selected model
+    if (ans.modelId) {
+      setSelectedModel(ans.modelId);
+    }
     setWizardOpen(false);
     if (summary) setManualMode(true);
 
@@ -402,7 +406,7 @@ function StudioContent() {
         template_reference_image: normalize(previewImageUrl),
         imageUrls: uploadedImageUrls, // ✅ Pass URLs instead of Files
         // Files are NOT passed here
-        modelId: selectedModel,
+        modelId: answersToUse?.modelId || selectedModel,
       };
 
       if (prePromptId) payload.promptId = normalize(prePromptId);
