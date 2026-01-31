@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { X, Play, Wand2, Film, Maximize2 } from "lucide-react";
+import { X, Play, Wand2, Film, Maximize2, TriangleAlert } from "lucide-react";
 import GenerationOverlay from "./GenerationOverlay";
+import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
 
 
@@ -28,6 +29,36 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     const [timer, setTimer] = useState(0);
 
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+    // Global Pause State
+    const [generationsPaused, setGenerationsPaused] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Fetch Config & User Role
+    useEffect(() => {
+        const fetchConfig = async () => {
+            const supabase = createSupabaseBrowserClient();
+
+            // 1. Fetch Global Config
+            const { data: pausedConfig } = await supabase.from("app_config").select("value").eq("key", "generations_paused").maybeSingle();
+            if (pausedConfig) {
+                setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
+            }
+
+            // 2. Fetch User Role for Admin Bypass
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+                if (profile) {
+                    const role = String(profile.role || "").toLowerCase();
+                    if (role === "admin" || role === "super_admin") {
+                        setIsAdmin(true);
+                    }
+                }
+            }
+        };
+        fetchConfig();
+    }, []);
 
     useEffect(() => {
         if (isOpen && initialPrompt) {
@@ -130,6 +161,26 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                     </div>
 
                     <div className="p-6 space-y-8 flex-1">
+                        {/* GLOBAL PAUSE BANNER */}
+                        {generationsPaused && (
+                            <div className={`mb-4 rounded-xl border p-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-4 ${isAdmin ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+                                }`}>
+                                <div className={`p-1.5 rounded-full ${isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+                                    <TriangleAlert size={18} />
+                                </div>
+                                <div>
+                                    <h3 className={`text-sm font-bold ${isAdmin ? "text-amber-200" : "text-red-200"}`}>
+                                        {isAdmin ? "Generations Paused (Admin Bypass Active)" : "Generations Paused"}
+                                    </h3>
+                                    <p className={`text-xs ${isAdmin ? "text-amber-200/70" : "text-red-200/70"}`}>
+                                        {isAdmin
+                                            ? "System is paused for users, but you can still generate."
+                                            : "Maintenance in progress."}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* 1. Context / Prompt */}
                         <div className="space-y-3">
                             <label className="text-xs font-bold text-white/40 uppercase tracking-wider flex items-center gap-2">
@@ -207,8 +258,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         )}
                         <button
                             onClick={handleGenerate}
-                            disabled={!prompt.trim() || isGenerating}
-                            className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!prompt.trim() || isGenerating
+                            disabled={!prompt.trim() || isGenerating || (generationsPaused && !isAdmin)}
+                            className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!prompt.trim() || isGenerating || (generationsPaused && !isAdmin)
                                 ? "bg-white/10 text-white/20 cursor-not-allowed"
                                 : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
                                 }`}

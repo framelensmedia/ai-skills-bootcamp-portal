@@ -20,7 +20,7 @@ import { GenerationFailureNotification } from "@/components/GenerationFailureNot
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import Link from "next/link";
-import { ArrowRight, Library } from "lucide-react";
+import { ArrowRight, Library, TriangleAlert } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 
@@ -74,6 +74,36 @@ function CreatorContent() {
 
     // User auth
     const [user, setUser] = useState<any>(null);
+
+    // Global Pause State
+    const [generationsPaused, setGenerationsPaused] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Fetch Config & User Role
+    useEffect(() => {
+        const fetchConfig = async () => {
+            const supabase = createSupabaseBrowserClient();
+
+            // 1. Fetch Global Config
+            const { data: pausedConfig } = await supabase.from("app_config").select("value").eq("key", "generations_paused").maybeSingle();
+            if (pausedConfig) {
+                setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
+            }
+
+            // 2. Fetch User Role for Admin Bypass
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+                if (profile) {
+                    const role = String(profile.role || "").toLowerCase();
+                    if (role === "admin" || role === "super_admin") {
+                        setIsAdmin(true);
+                    }
+                }
+            }
+        };
+        fetchConfig();
+    }, []);
 
     // Manual mode state
     const [manualPrompt, setManualPrompt] = useState("");
@@ -500,6 +530,26 @@ function CreatorContent() {
                 <p className="mt-2 text-white/60">Generate stunning visuals in minutes</p>
             </div>
 
+            {/* GLOBAL PAUSE BANNER */}
+            {generationsPaused && (
+                <div className={`mb-8 rounded-2xl border p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 ${isAdmin ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+                    }`}>
+                    <div className={`p-2 rounded-full ${isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+                        <TriangleAlert size={24} />
+                    </div>
+                    <div>
+                        <h3 className={`text-lg font-bold ${isAdmin ? "text-amber-200" : "text-red-200"}`}>
+                            {isAdmin ? "Generations Paused (Admin Bypass Active)" : "Generations Paused"}
+                        </h3>
+                        <p className={`text-sm ${isAdmin ? "text-amber-200/70" : "text-red-200/70"}`}>
+                            {isAdmin
+                                ? "System is paused for users, but you can still generate as an Admin."
+                                : "System upgrades in progress. Please check back shortly."}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* LEFT COLUMN: Controls */}
                 <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
@@ -763,7 +813,7 @@ function CreatorContent() {
                                 animating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={handleAnimate}
-                            disabled={animating}
+                            disabled={animating || (generationsPaused && !isAdmin)}
                         >
                             {animating ? (
                                 <span className="flex items-center gap-2">
@@ -784,7 +834,7 @@ function CreatorContent() {
                                 generating ? "bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={mode === "auto" ? undefined : handleManualGenerate}
-                            disabled={generating}
+                            disabled={generating || (generationsPaused && !isAdmin)}
                         >
                             {generating ? (
                                 <span className="flex items-center gap-2">

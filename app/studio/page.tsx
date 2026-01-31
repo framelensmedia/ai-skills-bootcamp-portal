@@ -13,7 +13,7 @@ import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download,
 import SelectPill from "@/components/SelectPill";
 
 import GenerationOverlay from "@/components/GenerationOverlay";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, TriangleAlert } from "lucide-react";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import { Library } from "lucide-react";
@@ -145,6 +145,36 @@ function StudioContent() {
 
   // ✅ Auth State
   const [user, setUser] = useState<any>(null);
+
+  // Global Pause State
+  const [generationsPaused, setGenerationsPaused] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Fetch Config & User Role
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const supabase = createSupabaseBrowserClient();
+
+      // 1. Fetch Global Config
+      const { data: pausedConfig } = await supabase.from("app_config").select("value").eq("key", "generations_paused").maybeSingle();
+      if (pausedConfig) {
+        setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
+      }
+
+      // 2. Fetch User Role for Admin Bypass
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+        if (profile) {
+          const role = String(profile.role || "").toLowerCase();
+          if (role === "admin" || role === "super_admin") {
+            setIsAdmin(true);
+          }
+        }
+      }
+    };
+    fetchConfig();
+  }, []);
 
   // Video Edit State
   const [inputVideoUrl, setInputVideoUrl] = useState<string | undefined>(undefined);
@@ -779,6 +809,26 @@ function StudioContent() {
           onClose={() => setGenError(null)}
           onRetry={() => handleGenerate()}
         />
+
+        {/* GLOBAL PAUSE BANNER */}
+        {generationsPaused && (
+          <div className={`mt-4 rounded-2xl border p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 ${isAdmin ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+            }`}>
+            <div className={`p-2 rounded-full ${isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+              <TriangleAlert size={24} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-bold ${isAdmin ? "text-amber-200" : "text-red-200"}`}>
+                {isAdmin ? "Generations Paused (Admin Bypass Active)" : "Generations Paused"}
+              </h3>
+              <p className={`text-sm ${isAdmin ? "text-amber-200/70" : "text-red-200/70"}`}>
+                {isAdmin
+                  ? "System is paused for users, but you can still generate as an Admin."
+                  : "System upgrades in progress. Please check back shortly."}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2" ref={previewRef}>
@@ -975,7 +1025,7 @@ function StudioContent() {
               <button
                 type="button"
                 onClick={handleAnimate}
-                disabled={animating}
+                disabled={animating || (generationsPaused && !isAdmin)}
                 className={[
                   "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
                   animating ? "cursor-not-allowed bg-zinc-700" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
@@ -998,7 +1048,7 @@ function StudioContent() {
               <button
                 type="button"
                 onClick={() => handleGenerate()}
-                disabled={generating}
+                disabled={generating || (generationsPaused && !isAdmin)}
                 className={[
                   "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
                   generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",

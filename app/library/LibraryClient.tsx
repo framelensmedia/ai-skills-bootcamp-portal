@@ -1024,11 +1024,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     setLightboxOpen(false);
                     setIsVideoModalOpen(true);
                 } : undefined}
-                onExtend={lbMediaType === "video" && lbVideoUrl ? (vUrl) => {
-                    const target = `/prompts/extend?video=${encodeURIComponent(vUrl)}&prompt=${encodeURIComponent(lbCombined || "")}`;
-                    router.push(target);
-                    closeLightbox();
-                } : undefined}
+
             />
 
             {/* Edit Mode Modal */}

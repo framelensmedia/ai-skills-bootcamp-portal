@@ -11,7 +11,7 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
-import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard } from "lucide-react";
+import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, TriangleAlert } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
@@ -171,6 +171,44 @@ function PromptContent() {
   // Video Remix State
   const [videoRemixOpen, setVideoRemixOpen] = useState(false);
   const [selectedVideoRemix, setSelectedVideoRemix] = useState<any>(null);
+
+  // Model Management State
+  const [generationsPaused, setGenerationsPaused] = useState(false);
+  const [modelsConfig, setModelsConfig] = useState<any>({});
+  const [selectedModel, setSelectedModel] = useState("nano-banana-pro");
+
+  // Fetch Config & User Role
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const supabase = createSupabaseBrowserClient();
+
+      // 1. Fetch Global Config
+      const { data: pausedConfig, error: configError } = await supabase.from("app_config").select("value").eq("key", "generations_paused").maybeSingle();
+      if (configError) console.error("Error fetching pause config:", configError);
+
+      if (pausedConfig) {
+        setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
+      }
+
+      const { data: models } = await supabase.from("app_config").select("value").eq("key", "model_availability").maybeSingle();
+      if (models && models.value) {
+        setModelsConfig(models.value);
+      }
+
+      // 2. Fetch User Role for Admin Bypass
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+        if (profile) {
+          const role = String(profile.role || "").toLowerCase();
+          if (role === "admin" || role === "super_admin") {
+            setIsAdmin(true);
+          }
+        }
+      }
+    };
+    fetchConfig();
+  }, []);
 
   useEffect(() => {
     // revoke old urls
@@ -876,7 +914,10 @@ function PromptContent() {
         promotion: answersToUse?.promotion,
 
         industry_intent: answersToUse?.industry_intent,
-        subjectLock: answersToUse?.subjectLock
+        subjectLock: answersToUse?.subjectLock,
+
+        // Pass Selected Model
+        modelId: selectedModel
       };
 
       const res = await fetch("/api/generate", {
@@ -985,21 +1026,30 @@ function PromptContent() {
           combinedPromptText={editSummary || fullPromptText || ""}
           onShare={handleShare}
           onRemix={handleRemixFocus}
-          onExtend={(vUrl) => {
-            console.log("Extending video:", vUrl);
-            // Direct state update for responsiveness
-            setMediaType("video");
-            setManualMode(true);
-            setInputVideo(vUrl);
-            setEditSummary(editSummary || "");
 
-            // Sync URL
-            const target = `/prompts/${slug}?video=${encodeURIComponent(vUrl)}&prompt=${encodeURIComponent(editSummary || "")}`;
-            router.push(target);
 
-            closeLightbox();
-          }}
+
         />
+
+        {/* GLOBAL PAUSE BANNER */}
+        {generationsPaused && (
+          <div className={`mb-6 rounded-2xl border p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 ${isAdmin ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+            }`}>
+            <div className={`p-2 rounded-full ${isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+              <TriangleAlert size={24} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-bold ${isAdmin ? "text-amber-200" : "text-red-200"}`}>
+                {isAdmin ? "Generations Paused (Admin Bypass Active)" : "Generations Paused"}
+              </h3>
+              <p className={`text-sm ${isAdmin ? "text-amber-200/70" : "text-red-200/70"}`}>
+                {isAdmin
+                  ? "System is paused for users, but you can still generate as an Admin."
+                  : "System upgrades in progress. Please check back shortly."}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mb-5 sm:mb-7">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -1404,6 +1454,37 @@ function PromptContent() {
                   />
                 </div>
               </div>
+
+              {/* MODEL SELECTOR (New) */}
+              {mediaType === "image" && !isLocked && !generationsPaused && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <SelectPill
+                      label="Nano Banana Pro"
+                      description="High Quality"
+                      selected={selectedModel === "nano-banana-pro"}
+                      onClick={() => setSelectedModel("nano-banana-pro")}
+                      disabled={modelsConfig && modelsConfig["nano-banana-pro"] === false}
+                    />
+                    <SelectPill
+                      label="SeeDream 4K"
+                      description="Ultra Detail"
+                      selected={selectedModel === "seedream-4k"}
+                      onClick={() => setSelectedModel("seedream-4k")}
+                      disabled={modelsConfig && modelsConfig["seedream-4k"] === false}
+                    />
+                    <SelectPill
+                      label="Gemini 3"
+                      description="Fast (Legacy)"
+                      selected={selectedModel === "gemini-3-preview"}
+                      onClick={() => setSelectedModel("gemini-3-preview")}
+                      disabled={modelsConfig && modelsConfig["gemini-3-preview"] === false}
+                    />
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* ACTION BUTTONS */}
@@ -1418,7 +1499,7 @@ function PromptContent() {
                       : "bg-lime-400 hover:bg-lime-300",
                 ].join(" ")}
                 onClick={() => handleGenerate()}
-                disabled={isLocked || generating}
+                disabled={isLocked || generating || (generationsPaused && !isAdmin)}
               >
                 {generating ? (
                   <span className="flex items-center gap-2">

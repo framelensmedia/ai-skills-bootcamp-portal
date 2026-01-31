@@ -71,7 +71,7 @@ export default function StudioCommunityFeed() {
                 let query = supabase
                     .from("prompt_generations")
                     .select(`
-                         id, image_url, video_url, media_type, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
+                         id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
                          user_id, prompt_id
                       `)
                     .eq("is_public", true)
@@ -93,7 +93,7 @@ export default function StudioCommunityFeed() {
                 const { data: remixesData, error } = await query;
 
                 if (error) {
-                    console.error("Fetch error:", error);
+                    console.error("Fetch error:", error.message || error);
                     setLoadingRemixes(false);
                     return;
                 }

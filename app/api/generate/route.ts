@@ -175,6 +175,72 @@ async function urlToBase64(url: string) {
     throw new Error(`Failed to fetch image (Public & Admin failed): ${url}`);
 }
 
+// --- FAL.AI INTEGRATION ---
+
+async function generateFalImage(
+    modelId: string, // "fal-ai/flux-pro/v1.1" or "fal-ai/flux-pro/v1.1-ultra"
+    prompt: string,
+    imageSize: any = "landscape_4_3", // or {width, height}
+    safetyTolerance: string = "2" // 1 (strict) to 6 (loose)? Check docs. Flux Pro usually just prompt.
+) {
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) throw new Error("Missing FAL_KEY env var");
+
+    const endpoint = `https://queue.fal.run/${modelId}`;
+
+    // 1. Submit Request
+    const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+            "Authorization": `Key ${falKey}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            prompt,
+            image_size: imageSize,
+            safety_tolerance: "2", // Default safe-ish
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Fal.ai Request Failed: ${res.status} ${err}`);
+    }
+
+    const { request_id } = await res.json();
+
+    // 2. Poll for Status
+    let attempts = 0;
+    while (attempts < 60) { // 60 seconds max polling
+        attempts++;
+        await new Promise(r => setTimeout(r, 1000)); // 1s wait
+
+        const statusRes = await fetch(`https://queue.fal.run/${modelId}/requests/${request_id}`, {
+            headers: {
+                "Authorization": `Key ${falKey}`,
+            },
+        });
+
+        if (!statusRes.ok) continue; // retry polling
+
+        const statusJson = await statusRes.json();
+
+        if (statusJson.status === "COMPLETED") {
+            const imageUrl = statusJson.images?.[0]?.url;
+            if (!imageUrl) throw new Error("Fal.ai completed but returned no image URL");
+            return imageUrl;
+        }
+
+        if (statusJson.status === "IN_QUEUE" || statusJson.status === "IN_PROGRESS") {
+            continue;
+        }
+
+        throw new Error(`Fal.ai Generation Failed: ${JSON.stringify(statusJson)}`);
+    }
+
+    throw new Error("Fal.ai Generation Timed Out");
+}
+
 export async function POST(req: Request) {
     try {
         const contentType = req.headers.get("content-type") || "";
@@ -211,6 +277,7 @@ export async function POST(req: Request) {
         let logoUrl: string | null = null;
         let canvasUrl: string | null = null; // New
         let forceCutout = false; // New
+        let requestedModel: string | null = null; // New
 
         // 1. Parse Input
         if (contentType.includes("multipart/form-data")) {
@@ -268,7 +335,10 @@ export async function POST(req: Request) {
 
             imageFiles = form.getAll("images") as File[];
             subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
+            imageFiles = form.getAll("images") as File[];
+            subjectLock = String(form.get("subjectLock") ?? "false").trim() === "true";
             forceCutout = String(form.get("forceCutout") ?? "false").trim() === "true";
+            requestedModel = String(form.get("modelId") ?? "").trim() || null;
         } else {
             // JSON Handling
             const body = await req.json();
@@ -366,6 +436,43 @@ export async function POST(req: Request) {
         const serviceRole = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
         const admin = createClient(supabaseUrl, serviceRole);
 
+        // 2.5 Global Pause Check & Model Resolution
+        // Determine effective model
+        let model = requestedModel || process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
+
+        // Handle "Nano Banana Pro" -> Flux Pro mapping if client sends friendly name, or just expect ID
+        if (model === "nano-banana-pro") model = "fal-ai/flux-pro/v1.1";
+        if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
+
+        // Check Global Pause (Fail-safe: continue if table missing)
+        try {
+            const { data: config } = await admin
+                .from("app_config")
+                .select("value")
+                .eq("key", "generations_paused")
+                .maybeSingle();
+
+            if (config?.value === true || config?.value === "true") {
+                // Check if user is admin
+                const { data: profile } = await admin
+                    .from("profiles")
+                    .select("role")
+                    .eq("user_id", userId)
+                    .maybeSingle();
+
+                const role = String(profile?.role || "").toLowerCase();
+                const isBypass = role === "admin" || role === "super_admin";
+
+                if (!isBypass) {
+                    return NextResponse.json({ error: "Generations are currently paused for maintenance." }, { status: 503 });
+                } else {
+                    console.log(`Admin Bypass Active for user ${userId}`);
+                }
+            }
+        } catch (e) {
+            console.warn("Global pause check failed (ignoring):", e);
+        }
+
         // 4. Vertex Auth
         const auth = new GoogleAuth({
             credentials,
@@ -378,7 +485,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
         }
 
-        const model = process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
         const apiEndpoint = location === "global"
             ? "aiplatform.googleapis.com"
             : `${location}-aiplatform.googleapis.com`;
@@ -620,45 +726,111 @@ Execute the user's instruction precisely.
             ],
         };
 
-        // 6. Call Vertex with Retry Logic (Backoff)
+        // 6. Call Provider (Vertex or Fal)
         let res;
         let json;
-        let attempts = 0;
-        const maxAttempts = 2; // Strict limit to avoid Vercel 60s timeout
 
-        while (attempts < maxAttempts) {
+        // FAL.AI BRANCH
+        if (model.startsWith("fal-ai/")) {
+            console.log(`Using Fal.ai Provider for model: ${model}`);
             try {
-                res = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token.token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(payload),
-                });
+                // Determine aspect ratio for Fal
+                // Fal expects: square_hd, landscape_4_3, landscape_16_9, portrait_4_3, portrait_16_9
+                let falSize = "landscape_4_3";
+                if (ar === "1:1") falSize = "square_hd";
+                if (ar === "16:9") falSize = "landscape_16_9";
+                if (ar === "9:16") falSize = "portrait_16_9";
+                if (ar === "3:4" || ar === "4:5") falSize = "portrait_4_3";
 
-                if (res.status === 429) {
-                    console.warn(`VERTEX RATE LIMIT (429): Attempt ${attempts + 1}/${maxAttempts}. Retrying...`);
-                    attempts++;
-                    if (attempts < maxAttempts) {
-                        // Wait 2s before retry
-                        await new Promise(r => setTimeout(r, 2000));
-                        continue;
-                    }
-                }
+                // Construct Prompt (Simplified for Fal, it doesn't need system instructions as prefix typically, but we can include)
+                // Actually Flux follows prompt well. Let's send the "finalPrompt" text but maybe strip system headers if needed.
+                // For now, sending the full prompt is safer to preserve instructions.
 
-                // If success or other error, break
-                break;
-            } catch (networkErr) {
-                console.error("Network Error during fetch:", networkErr);
-                throw networkErr;
+                const falImageUrl = await generateFalImage(model, finalPrompt, falSize);
+
+                // Fal returns a URL. We need to download it to process it as we do for Vertex (upload to our storage)
+                // Use urlToBase64 or similar logic?
+                // Actually, step 7 expects 'res' and 'json'. We should restructure or just mock the response structure?
+                // Or better: Handle Fal success here and jump to Step 9 (Insert History).
+
+                // Let's refactor:
+                // We'll return early for Fal for now to avoid breaking the Vertex flow below.
+
+                // ... But we want to reuse the "Upload to Storage" and "Insert History" logic (Step 8 & 9).
+                // So lets adapt the data to match "inline" format expected by Step 7/8.
+
+                const { data: falBase64, mimeType: falMime } = await urlToBase64(falImageUrl);
+
+                // Mock Vertex-like response structure so downstream code works?
+                // Or just set variables and skip Vertex block.
+
+                json = {
+                    candidates: [{
+                        content: {
+                            parts: [{
+                                inlineData: {
+                                    mimeType: falMime,
+                                    data: falBase64
+                                }
+                            }]
+                        }
+                    }]
+                };
+
+                // Mock 'res' as ok
+                res = { ok: true, status: 200 };
+
+            } catch (falErr: any) {
+                console.error("FAL ERROR:", falErr);
+                return NextResponse.json({ error: falErr.message || "Fal.ai generation failed" }, { status: 500 });
             }
+
+        } else {
+            // VERTEX BRANCH (Original Logic)
+            // 6. Call Vertex with Retry Logic (Backoff)
+            let attempts = 0;
+            const maxAttempts = 2; // Strict limit to avoid Vercel 60s timeout
+
+            while (attempts < maxAttempts) {
+                try {
+                    const apiEndpoint = location === "global"
+                        ? "aiplatform.googleapis.com"
+                        : `${location}-aiplatform.googleapis.com`;
+
+                    const vertexUrl = `https://${apiEndpoint}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
+
+                    res = await fetch(vertexUrl, {
+                        method: "POST",
+                        headers: {
+                            Authorization: `Bearer ${token.token}`,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (res.status === 429) {
+                        console.warn(`VERTEX RATE LIMIT (429): Attempt ${attempts + 1}/${maxAttempts}. Retrying...`);
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            // Wait 2s before retry
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                    }
+
+                    // If success or other error, break
+                    break;
+                } catch (networkErr) {
+                    console.error("Network Error during fetch:", networkErr);
+                    throw networkErr;
+                }
+            }
+
+            if (!res) throw new Error("Fetch failed to initialize");
+            json = await res.json();
         }
 
-        if (!res) throw new Error("Fetch failed to initialize");
-
-        json = await res.json();
-
+        // Common Error Handling (Vertex Only mostly, but Fal handled above)
         if (!res.ok) {
             if (res.status === 429) {
                 console.warn("VERTEX RATE LIMIT (429): Resource exhausted after retries.");
