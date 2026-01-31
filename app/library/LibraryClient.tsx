@@ -16,6 +16,7 @@ import EditModeModal from "@/components/EditModeModal";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LazyMedia from "@/components/LazyMedia";
 import { compressImage } from "@/lib/compressImage";
+import { DEFAULT_MODEL_ID } from "@/lib/model-config";
 
 type SortMode = "newest" | "oldest";
 
@@ -227,7 +228,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         setSelectedIds(next);
     }
 
-    async function handleEditGenerate(prompt: string, images: File[] = []) {
+    async function handleEditGenerate(prompt: string, images: File[] = [], modelId?: string) {
         if (!lightboxUrl) return;
         setIsEditing(true);
 
@@ -273,6 +274,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             form.append("canvas_image", file);
             form.append("prompt", prompt);
             form.append("edit_instructions", prompt);
+            form.append("modelId", modelId || DEFAULT_MODEL_ID);
 
             // Append additional user images (Compressed)
             const imagesToProcess = images.slice(0, 10);

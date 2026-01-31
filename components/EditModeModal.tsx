@@ -4,6 +4,8 @@ import Image from "next/image";
 import { Sparkles, Send, X, Paperclip, Trash2 } from "lucide-react";
 import LoadingHourglass from "./LoadingHourglass";
 import GenerationOverlay from "./GenerationOverlay";
+import SelectPill from "@/components/SelectPill";
+import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 
 export type QueueItem = any;
 
@@ -11,7 +13,7 @@ type Props = {
     isOpen: boolean;
     onClose: () => void;
     sourceImageUrl: string;
-    onGenerate: (prompt: string, images: File[]) => void;
+    onGenerate: (prompt: string, images: File[], modelId?: string) => void;
     isGenerating?: boolean;
 };
 
@@ -27,6 +29,7 @@ const SUGGESTIONS = [
 export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGenerate, isGenerating }: Props) {
     const [input, setInput] = useState("");
     const [images, setImages] = useState<File[]>([]);
+    const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
     const fileRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -36,14 +39,14 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
         const p = input.trim();
         // Allow submitting if there are images, even if prompt is empty? Usually prompt is needed.
         if (!p || isGenerating) return;
-        onGenerate(p, images);
+        onGenerate(p, images, selectedModel);
         setInput("");
         setImages([]);
     };
 
     const handleSuggestion = (s: string) => {
         if (isGenerating) return;
-        onGenerate(s, images); // Pass current images if any
+        onGenerate(s, images, selectedModel); // Pass current images if any
         setInput("");
         setImages([]);
     };
@@ -97,6 +100,23 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
 
                     {/* Chat Area */}
                     <div className="flex-1 flex flex-col justify-end p-4 space-y-4 overflow-y-auto">
+
+                        {/* Model Selector */}
+                        <div className="px-2">
+                            <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Model</div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {GENERATION_MODELS.map((model) => (
+                                    <SelectPill
+                                        key={model.id}
+                                        label={model.label}
+                                        description={model.description}
+                                        selected={selectedModel === model.id}
+                                        onClick={() => setSelectedModel(model.id)}
+                                        disabled={isGenerating}
+                                    />
+                                ))}
+                            </div>
+                        </div>
 
                         <div className="flex-1 flex items-center justify-center text-center opacity-30 px-6">
                             <div>

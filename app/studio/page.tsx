@@ -498,7 +498,7 @@ function StudioContent() {
     }
   }
 
-  async function handleEditGenerate(prompt: string) {
+  async function handleEditGenerate(prompt: string, images: File[] = [], modelId?: string) {
     if (!lastFullQualityUrl) return;
     setGenerating(true);
     setGenError(null);
@@ -600,6 +600,7 @@ function StudioContent() {
         imageUrls: uploadedImageUrls, // ✅ Send URLs
         subjectLock: remixAnswers?.subjectLock ? "true" : "false", // Ensure boolean string or bool? API uses string check usually.
         // subjectLock logic in API: String(form.get("subjectLock") ?? "false").trim() === "true"; OR body.subjectLock
+        modelId: modelId || selectedModel, // Use passed model, fallback to studio selection
       };
 
       // Add Meta
