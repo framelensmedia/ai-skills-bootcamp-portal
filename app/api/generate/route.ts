@@ -182,7 +182,8 @@ async function generateFalImage(
     modelId: string, // "fal-ai/flux-pro/v1.1" or "fal-ai/flux-pro/v1.1-ultra"
     prompt: string,
     imageSize: any = "landscape_4_3", // or {width, height}
-    mainImageUrl?: string | null
+    mainImageUrl?: string | null,
+    template_reference_image?: string | null
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -200,6 +201,11 @@ async function generateFalImage(
         safety_tolerance: "2",
     };
 
+    // Add Strength for Img2Img (Remix)
+    if (mainImageUrl) {
+        payload.strength = 0.85; // High creativity but preserves structure
+    }
+
     // Attempt to parse ratio string from imageSize if it's a known enum, or just pass it if provided
     // Actually, let's just add it if we can infer it. 
     // "landscape_16_9" -> "16:9"
@@ -212,20 +218,38 @@ async function generateFalImage(
     // Handle Nano Banana Pro specifically (uses image_urls array and /edit endpoint)
     const isNanoBanana = modelId.includes("nano-banana");
 
-    if (mainImageUrl) {
-        if (isNanoBanana) {
-            // Nano Banana Pro uses image_urls (array) for reference images
-            payload.image_urls = [mainImageUrl];
-            // Also force aspect_ratio explicitly for edit mode if missing
-            if (!payload.aspect_ratio && payload.image_size === "landscape_16_9") payload.aspect_ratio = "16:9";
-        } else {
-            // Other Fal models use image_url (singular)
-            payload.image_url = mainImageUrl;
+    if (isNanoBanana) {
+        // Nano Banana Pro / Gemini supports multiple reference images
+        // Order matters: [Context/Template, Subject/Character]
+        payload.image_urls = [];
+
+        // 1. Template (Context Anchor) - Prioritize this for Aspect Ratio/Composition
+        if (template_reference_image) {
+            payload.image_urls.push(template_reference_image);
         }
+
+        // 2. Main Image (Subject) - If separate from template
+        if (mainImageUrl && mainImageUrl !== template_reference_image) {
+            payload.image_urls.push(mainImageUrl);
+        }
+
+        // Fallback: If no template, just use main
+        if (payload.image_urls.length === 0 && mainImageUrl) {
+            payload.image_urls.push(mainImageUrl);
+        }
+
+        // Force 9:16 for Remixes if not square
+        if (!payload.aspect_ratio) {
+            if (imageSize === "portrait_16_9") payload.aspect_ratio = "9:16";
+            else if (imageSize === "landscape_16_9") payload.aspect_ratio = "16:9";
+        }
+    } else {
+        // Other Fal models use image_url (singular)
+        if (mainImageUrl) payload.image_url = mainImageUrl;
     }
 
     // Use /edit endpoint for Nano Banana Pro with reference images
-    const actualEndpoint = isNanoBanana && mainImageUrl
+    const actualEndpoint = isNanoBanana && payload.image_urls.length > 0
         ? `https://queue.fal.run/${modelId}/edit`
         : endpoint;
 
@@ -564,12 +588,15 @@ export async function POST(req: Request) {
                 }
             } else if (imageUrls.length > 0) {
                 refImageUrl = imageUrls[0];
+            } else if (template_reference_image) {
+                // Fallback: Use string passed from Remix/Edit flows
+                refImageUrl = template_reference_image;
             }
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
             // Flux models (Pro) require explicit dimensions to guarantee ratio in remix mode
             // BUT Nano Banana (Gemini) might prefer the standard enum strings
-            let falImageSize: any = { width: 1024, height: 768 }; // Default 4:3
+            let falImageSize: any = { width: 832, height: 1216 }; // Default 9:16 (Vertical) for Flux
             const ratio = ar as string;
 
             const isNano = model.includes("nano-banana");
@@ -644,7 +671,7 @@ export async function POST(req: Request) {
             }
 
             try {
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl);
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
