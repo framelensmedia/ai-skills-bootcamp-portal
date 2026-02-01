@@ -28,6 +28,13 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Not an ambassador" }, { status: 404 });
         }
 
+        // SELF-HEALING: FIX MISSING REFERRAL CODES
+        if (!ambassador.referral_code) {
+            const newCode = Math.random().toString(36).substring(2, 10);
+            await admin.from("ambassadors").update({ referral_code: newCode }).eq("id", ambassador.id);
+            ambassador.referral_code = newCode;
+        }
+
         // JUST-IN-TIME STRIPE SYNC
         // If they are on Step 3 (Stripe Linked), check if they actually finished it.
         // This handles cases where they return from Stripe but the hook/callback didn't fire or redirect logic missed.
