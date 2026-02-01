@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, useEffect, useRef, useMemo } from "react";
 import ImageUploader from "./ImageUploader";
 import SelectPill from "@/components/SelectPill";
+import SubjectControls from "@/app/studio/components/SubjectControls";
 import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
@@ -96,6 +97,7 @@ export default function RemixChatWizard({
 
     // Toggle for Subject Lock
     const [subjectLock, setSubjectLock] = useState(true);
+    const [keepOutfit, setKeepOutfit] = useState(true);
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("non_human");
 
     // Steps State
@@ -310,6 +312,7 @@ export default function RemixChatWizard({
     function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers, shouldGenerate = false) {
         // Include subjectLock and subjectMode in answers
         finalAnswers.subjectLock = String(subjectLock);
+        finalAnswers.keepOutfit = String(keepOutfit);
         finalAnswers.subjectMode = subjectMode;
         finalAnswers.modelId = selectedModel;
 
@@ -375,6 +378,8 @@ export default function RemixChatWizard({
                                                 setFiles={onUploadsChange}
                                                 subjectLock={subjectLock}
                                                 setSubjectLock={setSubjectLock}
+                                                keepOutfit={keepOutfit}
+                                                setKeepOutfit={setKeepOutfit}
                                                 subjectMode={subjectMode}
                                                 setSubjectMode={setSubjectMode}
                                             />
@@ -542,6 +547,8 @@ function UploadStepWrapper({
     setFiles,
     subjectLock,
     setSubjectLock,
+    keepOutfit,
+    setKeepOutfit,
     subjectMode,
     setSubjectMode
 }: {
@@ -549,6 +556,8 @@ function UploadStepWrapper({
     setFiles: (f: File[]) => void,
     subjectLock: boolean,
     setSubjectLock: (v: boolean) => void,
+    keepOutfit: boolean,
+    setKeepOutfit: (v: boolean) => void,
     subjectMode: "human" | "non_human",
     setSubjectMode: (v: "human" | "non_human") => void
 }) {
@@ -556,42 +565,14 @@ function UploadStepWrapper({
         <div className="w-full min-w-0">
             <ImageUploader files={files} onChange={setFiles} maxFiles={10} />
             {files.length > 0 && (
-                <div className="mt-4 flex flex-col gap-2">
-                    {/* Subject Mode Selector */}
-                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-1">
-                        <button
-                            onClick={() => setSubjectMode("human")}
-                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${subjectMode === "human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
-                        >
-                            Human Subject
-                        </button>
-                        <button
-                            onClick={() => setSubjectMode("non_human")}
-                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${subjectMode === "non_human" ? "bg-lime-400 text-black shadow-md" : "text-white/60 hover:text-white"}`}
-                        >
-                            Object / Product
-                        </button>
-                    </div>
-
-                    {/* Lock Toggle */}
-                    <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                        <input
-                            type="checkbox"
-                            checked={subjectLock}
-                            onChange={(e) => setSubjectLock(e.target.checked)}
-                            className="mt-1 h-4 w-4 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400"
-                            id="subject-lock"
-                        />
-                        <label htmlFor="subject-lock" className="flex-1 cursor-pointer select-none text-sm text-white">
-                            <span className="block font-semibold">Strict Subject Lock</span>
-                            <span className="block text-xs text-white/50">
-                                {subjectMode === "human"
-                                    ? "Maintains exact facial features, outfit, and body shape."
-                                    : "Maintains exact product details like labels, shape, and texture."}
-                            </span>
-                        </label>
-                    </div>
-                </div>
+                <SubjectControls
+                    subjectMode={subjectMode}
+                    setSubjectMode={setSubjectMode}
+                    subjectLock={subjectLock}
+                    setSubjectLock={setSubjectLock}
+                    keepOutfit={keepOutfit}
+                    setKeepOutfit={setKeepOutfit}
+                />
             )}
         </div>
     );
