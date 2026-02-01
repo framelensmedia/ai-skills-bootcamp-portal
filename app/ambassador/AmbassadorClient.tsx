@@ -252,6 +252,31 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
         }
     };
 
+    const handleDisconnect = async () => {
+        if (!confirm("Are you sure? Use this only if you connected the WRONG Stripe account.\n\nThis will disconnect your current payout method and require you to connect a new one.")) return;
+
+        setLoading(true);
+        try {
+            const supabase = createSupabaseBrowserClient();
+            const { data: { session } } = await supabase.auth.getSession();
+
+            const res = await fetch("/api/stripe/disconnect", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${session?.access_token}` },
+            });
+
+            if (res.ok) {
+                window.location.reload(); // Refresh to reset state
+            } else {
+                alert("Failed to disconnect.");
+                setLoading(false);
+            }
+        } catch (e) {
+            console.error(e);
+            setLoading(false);
+        }
+    };
+
     const debugSkip = async () => {
         setLoading(true);
         try {
@@ -361,6 +386,9 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                             <p className="text-gray-400">Welcome back! Here's how your impact is growing.</p>
                         </div>
                         <div className="flex gap-3">
+                            <button onClick={handleDisconnect} className="text-red-500 hover:text-red-400 text-xs underline px-3">
+                                Disconnect
+                            </button>
                             <button onClick={() => { setPreviousView("dashboard"); setView("details"); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                                 <Info size={16} /> Program Info
                             </button>
