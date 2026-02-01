@@ -659,8 +659,14 @@ export async function POST(req: Request) {
 
             // 2. Subject Lock Instructions (Eye Line / Angle)
             if (refImageUrl && subjectLock) {
-                // Base Face/Identity Lock (Always Active when Face Lock is on)
-                finalFalPrompt += " --preserve-face-structure: Maintain the exact eye line, camera angle, gaze direction, and face direction of the subject. Ensure the subject's face looks identical to the original. Do not mirror or rotate the face.";
+                // DETECT REMIX MODE (Template + Subject)
+                if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
+                    finalFalPrompt = "Subject Replacement: Replace the character in the scene with the person from the reference image. " + finalFalPrompt;
+                    finalFalPrompt += " --preserve-face-structure: The second image provided is the Identity Source. Use the face/identity from the second image and composite it into the first image (the template). The result must look like the person from the second image is in the scene of the first image.";
+                } else {
+                    // Standard Single Image Lock
+                    finalFalPrompt += " --preserve-face-structure: Maintain the exact eye line, camera angle, gaze direction, and face direction of the subject. Ensure the subject's face looks identical to the original. Do not mirror or rotate the face.";
+                }
 
                 // Outfit Branching
                 if (keepOutfit) {
