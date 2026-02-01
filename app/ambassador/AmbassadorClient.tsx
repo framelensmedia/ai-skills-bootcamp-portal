@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import { Check, Copy, DollarSign, LayoutDashboard, Share2, TrendingUp, Users, Info, Zap, BarChart2, Globe } from "lucide-react";
+import { Check, Copy, DollarSign, LayoutDashboard, Share2, TrendingUp, Users, Info, Zap, BarChart2, Globe, Loader2 } from "lucide-react";
 
 const POST_TEMPLATES = [
     {
@@ -551,8 +551,19 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                                 <h2 className="text-xl font-bold">Step 3: Connect Payouts</h2>
                                 <p className="text-gray-400">Link your waiting Stripe account so we can send you instant payouts.</p>
 
-                                <button onClick={handleStripeConnect} className="w-full bg-[#635BFF] hover:bg-[#534be0] py-4 rounded-lg font-bold text-white transition-colors flex items-center justify-center gap-2">
-                                    Connect with Stripe
+                                <button
+                                    onClick={handleStripeConnect}
+                                    disabled={loading}
+                                    className="w-full bg-[#635BFF] hover:bg-[#534be0] py-4 rounded-lg font-bold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="animate-spin" size={20} />
+                                            Connecting...
+                                        </>
+                                    ) : (
+                                        "Connect with Stripe"
+                                    )}
                                 </button>
                                 <p className="text-xs text-center text-gray-500">You will be redirected to Stripe to verify your identity.</p>
                                 <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 py-2 w-full text-center">
