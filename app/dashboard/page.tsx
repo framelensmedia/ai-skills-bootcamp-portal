@@ -8,6 +8,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
 import {
   CreditCard,
+  DollarSign,
   LayoutGrid,
   Zap,
   Library,
@@ -230,6 +231,45 @@ export default function DashboardPage() {
               </div>
             </button>
           </div>
+
+          {/* Ambassador Program CTA */}
+          {hasProAccess ? (
+            <Link
+              href="/ambassador"
+              className="group relative flex items-center justify-between overflow-hidden rounded-xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 p-5 transition-all hover:border-purple-500/60 hover:from-purple-600/30 hover:to-pink-600/30"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20">
+                  <Users size={22} />
+                </div>
+                <div>
+                  <div className="font-bold text-white text-lg">Ambassador Program</div>
+                  <div className="text-sm text-purple-200/70">Earn $10/mo for every member you refer</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-purple-300 opacity-0 group-hover:opacity-100 transition">
+                Join Now <ArrowUpRight size={16} />
+              </div>
+            </Link>
+          ) : (
+            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4 overflow-hidden rounded-xl bg-gradient-to-r from-zinc-800/50 to-zinc-900/50 border border-white/10 p-5">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-white/40">
+                  <Users size={22} />
+                </div>
+                <div>
+                  <div className="font-bold text-white/80 text-lg">Want to Earn as an Ambassador?</div>
+                  <div className="text-sm text-white/50">Upgrade to Pro to join the Ambassador Program and earn $10/mo per referral.</div>
+                </div>
+              </div>
+              <Link
+                href="/ambassador"
+                className="w-full md:w-auto text-center shrink-0 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition"
+              >
+                <DollarSign size={16} className="inline mr-1" /> Start Earning
+              </Link>
+            </div>
+          )}
 
           {/* Staff Section */}
           {isStaffPlus && (

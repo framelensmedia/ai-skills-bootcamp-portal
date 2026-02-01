@@ -2357,12 +2357,89 @@ MANUAL mode remains unchanged.
 
 Build for speed, simplicity, and delight.
 
----
 
-If you want next, I can:
+AMBASSADOR PROGRAM OVERVIEW (CONTEXT DOC)
 
-* Write the **AUTO → generation prompt transformer**
-* Define the **generic user-copyable prompt format**
-* Help you name this feature in-product so it feels iconic
+PROGRAM PURPOSE
+The Ambassador Program is the primary growth engine for the AI Learning Platform. It is designed to turn Pro members into AI educators and consultants who teach their communities how to start or grow businesses using AI, while earning recurring monthly income.
 
-Just say the word.
+This is not positioned as a traditional affiliate or network marketing program. There are no tiers, downlines, overrides, or recruiting commissions. Ambassadors earn only from their direct referrals. The focus is education, community impact, and long-term recurring income.
+
+CORE OFFER
+Pro Membership
+Price: $39.99 per month
+
+Ambassador Commission
+$10 per month per active Pro member referred
+
+Payments are processed via Stripe Connect with instant split payouts. When a referred user upgrades to Pro, the transaction is automatically split and the ambassador is paid immediately.
+
+TRIAL OFFER
+$1 seven day trial
+
+Trial commission:
+Ambassador receives $0.50 instantly when a referred user starts the trial
+
+The trial is designed to remove friction, allow users to experience the platform risk free, and make it easier for ambassadors to invite new users without hard selling.
+
+AMBASSADOR QUALIFICATION REQUIREMENTS
+To qualify as a Brand Ambassador, a user must:
+1. Be an active Pro member
+2. Share five approved social media posts
+3. Watch the Ambassador training video
+4. Connect their Stripe account via Stripe Connect
+
+Once these steps are completed, the Ambassador dashboard and referral tools are unlocked.
+
+AMBASSADOR ROLE AND POSITIONING
+Ambassadors are positioned as AI guides, educators, and consultants, not salespeople.
+
+Their role is to:
+- Teach basic AI literacy
+- Show practical business use cases
+- Help others understand how to apply AI to real problems
+- Invite people to try the platform through the $1 trial
+
+Ambassadors do not sell features or tools. The platform itself closes the sale through education and experience.
+
+INCOME MODEL AND INCENTIVES
+Ambassadors earn recurring monthly income as long as their referred users remain active Pro members.
+
+Example income milestones:
+10 active referrals = $100 per month
+50 active referrals = $500 per month
+100 active referrals = $1,000 per month
+500 active referrals = $5,000 per month
+1,000 active referrals = $10,000 per month
+
+The first major milestone is break even. By referring four users to the $1 trial, ambassadors mentally offset the cost of their Pro membership and everything beyond that feels like profit.
+
+ONBOARDING FLOW
+1. User upgrades to Pro using the $1 seven day trial
+2. User completes the five required social posts
+3. User watches the Ambassador training video
+4. User connects Stripe via Stripe Connect
+5. Ambassador dashboard unlocks with referral link, earnings tracking, and performance metrics
+
+COMMUNITY AND CULTURE
+The Ambassador Program is supported by a private community where ambassadors:
+- Share educational content ideas
+- Post wins and milestones
+- Help new users onboard
+- Learn advanced AI and business strategies
+
+The culture emphasizes education first, long-term value, and ethical promotion.
+
+COMPLIANCE AND GUARDRAILS
+Ambassadors are prohibited from:
+- Making income guarantees
+- Posting misleading earnings claims
+- Spamming direct messages
+- Misrepresenting the platform or its capabilities
+
+The program is intentionally structured without multi-level commissions to remain compliant, ethical, and trust-based.
+
+CORE MESSAGE
+The Ambassador Program is built on the belief that AI will change how businesses operate, and the people who thrive will be the ones who learn it early and help others understand it.
+
+Ambassadors are not selling AI software. They are helping their communities navigate the AI shift while building recurring income using the platform as their foundation.

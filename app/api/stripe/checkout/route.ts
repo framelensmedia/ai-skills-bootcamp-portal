@@ -46,11 +46,33 @@ export async function POST() {
       .eq("user_id", user.id);
   }
 
+  const { data: referral } = await supabase
+    .from("referrals")
+    .select("ambassador_id")
+    .eq("referred_user_id", user.id)
+    .maybeSingle();
+
+  // Also check cookie as fallback
+  let ambassadorId = referral?.ambassador_id;
+  if (!ambassadorId) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const refCode = cookieStore.get("ref_code")?.value;
+    if (refCode) {
+      const { data: amb } = await supabase.from("ambassadors").select("id").eq("referral_code", refCode).maybeSingle();
+      if (amb) ambassadorId = amb.id;
+    }
+  }
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
+    metadata: {
+      supabase_user_id: user.id,
+      ambassador_id: ambassadorId || null
+    },
     line_items: [
       {
         price: priceId,

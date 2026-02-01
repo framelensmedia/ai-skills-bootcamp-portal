@@ -34,6 +34,10 @@ export default function SignupPage() {
     }
 
     // For MVP, we assume email confirmation is off
+
+    // Attempt tracking referral
+    await fetch("/api/ambassador/track-referral", { method: "POST" });
+
     router.push("/feed");
   };
 
