@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,26 @@ export async function GET(req: Request) {
 
         if (!ambassador) {
             return NextResponse.json({ error: "Not an ambassador" }, { status: 404 });
+        }
+
+        // JUST-IN-TIME STRIPE SYNC
+        // If they are on Step 3 (Stripe Linked), check if they actually finished it.
+        // This handles cases where they return from Stripe but the hook/callback didn't fire or redirect logic missed.
+        if (ambassador.onboarding_step === 3 && ambassador.stripe_account_id) {
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+                apiVersion: "2024-10-28.acacia" as any,
+            });
+
+            try {
+                const accountObj = await stripe.accounts.retrieve(ambassador.stripe_account_id);
+                if (accountObj.details_submitted) {
+                    // They are done! Auto-upgrade to Step 4 (Complete)
+                    await admin.from("ambassadors").update({ onboarding_step: 4 }).eq("id", ambassador.id);
+                    ambassador.onboarding_step = 4; // Update local obj for response
+                }
+            } catch (err) {
+                console.error("Failed to sync stripe status:", err);
+            }
         }
 
         // Fetch Referrals Stats
