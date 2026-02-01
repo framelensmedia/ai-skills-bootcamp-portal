@@ -385,14 +385,14 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Ambassador Dashboard</h1>
                             <p className="text-gray-400">Welcome back! Here's how your impact is growing.</p>
                         </div>
-                        <div className="flex gap-3">
-                            <button onClick={handleDisconnect} className="text-red-500 hover:text-red-400 text-xs underline px-3">
+                        <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end mt-4 md:mt-0">
+                            <button onClick={handleDisconnect} className="text-red-500 hover:text-red-400 text-xs underline px-2 whitespace-nowrap order-3 md:order-1 w-full md:w-auto text-left md:text-center mt-2 md:mt-0">
                                 Disconnect
                             </button>
-                            <button onClick={() => { setPreviousView("dashboard"); setView("details"); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <button onClick={() => { setPreviousView("dashboard"); setView("details"); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap order-1 md:order-2 flex-1 md:flex-none justify-center">
                                 <Info size={16} /> Program Info
                             </button>
-                            <button onClick={() => window.open("https://dashboard.stripe.com/login", "_blank")} className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <button onClick={() => window.open("https://dashboard.stripe.com/login", "_blank")} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap order-2 md:order-3 flex-1 md:flex-none text-center">
                                 View Stripe Payouts
                             </button>
                         </div>
