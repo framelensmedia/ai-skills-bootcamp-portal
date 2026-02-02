@@ -223,23 +223,38 @@ async function generateFalImage(
     const isNanoBanana = modelId.includes("nano-banana");
 
     if (isNanoBanana) {
-        // Nano Banana Pro / Gemini supports multiple reference images
-        // Order matters: [Context/Template, Subject/Character]
-        payload.image_urls = [];
+        // REMIX ARCHITECTURE:
+        // Base Canvas (image_url) = Template (Background/Scene)
+        // Reference (image_urls) = Subject (Identity/Outfit)
 
-        // 1. Template (Context Anchor) - Prioritize this for Aspect Ratio/Composition
         if (template_reference_image) {
-            payload.image_urls.push(template_reference_image);
-        }
+            // Case 1: Remix (Template + Subject)
+            payload.image_url = template_reference_image;
+            payload.image_urls = [];
+            if (mainImageUrl && mainImageUrl !== template_reference_image) {
+                payload.image_urls.push(mainImageUrl);
+            }
 
-        // 2. Main Image (Subject) - If separate from template
-        if (mainImageUrl && mainImageUrl !== template_reference_image) {
-            payload.image_urls.push(mainImageUrl);
-        }
-
-        // Fallback: If no template, just use main
-        if (payload.image_urls.length === 0 && mainImageUrl) {
-            payload.image_urls.push(mainImageUrl);
+            // STRENGTH TUNING FOR REMIX
+            if (mainImageUrl) {
+                // keepOutfit = TRUE: We need to REPLACE the body in the template with user's outfit.
+                // The base is the Template (Scene). We need significant hallucination to insert the person.
+                // Strength < 0.5 allows the model to diverge from the base pixels (the empty scene).
+                if (keepOutfit) {
+                    payload.strength = 0.45; // Aggressive change to insert detailed subject
+                } else {
+                    // keepOutfit = FALSE (Face Swap): We want the TEMPLATE's body/pose.
+                    // We only want to change the face.
+                    // Strength 0.65-0.70 preserves the composition/body but allows face change.
+                    payload.strength = 0.65;
+                }
+            }
+        } else {
+            // Case 2: Direct Edit (No Template, just Selfie)
+            if (mainImageUrl) payload.image_url = mainImageUrl;
+            payload.image_urls = []; // No extra refs
+            // For direct edit, we usually want to preserve the selfie unless instructed otherwise
+            payload.strength = 0.75;
         }
 
         // Force 9:16 for Remixes if not square
@@ -252,8 +267,9 @@ async function generateFalImage(
         if (mainImageUrl) payload.image_url = mainImageUrl;
     }
 
-    // Use /edit endpoint for Nano Banana Pro with reference images
-    const actualEndpoint = isNanoBanana && payload.image_urls.length > 0
+    // Use /edit endpoint for Nano Banana Pro if we have an image_url
+    // (Which we now always do if mainImage or Template exists)
+    const actualEndpoint = isNanoBanana && (payload.image_url || payload.image_urls?.length)
         ? `https://queue.fal.run/${modelId}/edit`
         : endpoint;
 
@@ -654,6 +670,8 @@ export async function POST(req: Request) {
                         subjectInstruction += " BODY/OUTFIT SOURCE: Use the outfit, body pose, and clothing from Image 1 (The Template). Do NOT use the clothing from Image 2. ";
                         subjectInstruction += " FACE SOURCE: Only use the Face/Head from Image 2 and composite it onto the body in Image 1. ";
                     } else {
+                        // Keep Outfit CHECKED: Force User's Outfit (Image 2)
+                        subjectInstruction += " OUTFIT SOURCE: You MUST preserve the clothing and outfit from Image 2 (The Subject). Do NOT change the subject's clothes to match the template. Composite the subject WITH their original outfit into the scene. ";
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
                     }
                 } else {
