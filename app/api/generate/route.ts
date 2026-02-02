@@ -183,7 +183,8 @@ async function generateFalImage(
     prompt: string,
     imageSize: any = "landscape_4_3", // or {width, height}
     mainImageUrl?: string | null,
-    template_reference_image?: string | null
+    template_reference_image?: string | null,
+    keepOutfit: boolean = true
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -203,7 +204,10 @@ async function generateFalImage(
 
     // Add Strength for Img2Img (Remix)
     if (mainImageUrl) {
-        payload.strength = 0.85; // High creativity but preserves structure
+        // If keeping outfit, we need high fidelity (0.85-0.9).
+        // If changing outfit, we need more freedom (lower strength), but not too low or face is lost.
+        // For Nano Banana (Edit), this might be less critical than Flux, but good to tune.
+        payload.strength = keepOutfit ? 0.85 : 0.70;
     }
 
     // Attempt to parse ratio string from imageSize if it's a known enum, or just pass it if provided
@@ -602,40 +606,13 @@ export async function POST(req: Request) {
             const isNano = model.includes("nano-banana");
 
             if (isNano) {
-                // Use Standard Fal Enums for Gemini/Nano
-                if (ratio === "1:1") falImageSize = "square_hd";
-                else if (ratio === "16:9") falImageSize = "landscape_16_9";
-                else if (ratio === "9:16") falImageSize = "portrait_16_9";
-                else if (ratio === "4:3") falImageSize = "landscape_4_3";
-                else if (ratio === "3:4") falImageSize = "portrait_4_3";
-                else falImageSize = "square_hd"; // Fallback
-
-                // AR GUIDE TRICK: If no reference image, inject a transparent PNG with desired AR
-                // This forces Gemini to respect the aspect ratio (Image-to-Image trick)
-                if (!refImageUrl) {
-                    try {
-                        console.log("Generating AR Guide for Gemini:", ratio);
-                        const guideBuffer = await createAspectGuide(ratio);
-                        const guidePath = `fal-guides/${ratio.replace(":", "_")}.png`; // e.g. fal-guides/16_9.png
-
-                        // Upload (Upsert true to overwrite/reuse)
-                        const { error: guideErr } = await admin.storage
-                            .from("generations")
-                            .upload(guidePath, guideBuffer, { contentType: "image/png", upsert: true });
-
-                        if (!guideErr) {
-                            const { data: guidePub } = admin.storage.from("generations").getPublicUrl(guidePath);
-                            refImageUrl = guidePub.publicUrl;
-                            subjectLock = false; // Disable subject lock for blank guide
-                            console.log("Injected AR Guide URL:", refImageUrl);
-                        } else {
-                            console.warn("Failed to upload AR Guide:", guideErr);
-                        }
-                    } catch (e) {
-                        console.error("Failed to create AR Guide:", e);
-                    }
-                }
-
+                // FORCE EXPLICIT DIMENSIONS for Remix (9:16)
+                // Using enum strings often defaults to input size in /edit mode.
+                // We want to force the canvas size.
+                if (ratio === "9:16") falImageSize = { width: 832, height: 1216 };
+                else if (ratio === "16:9") falImageSize = { width: 1216, height: 832 };
+                else if (ratio === "1:1") falImageSize = { width: 1024, height: 1024 };
+                else falImageSize = { width: 832, height: 1216 }; // Default
             } else {
                 // Use Explicit Pixels for Flux
                 if (ratio === "1:1") falImageSize = { width: 1024, height: 1024 };
@@ -650,34 +627,59 @@ export async function POST(req: Request) {
 
             // Enhance Prompt for Realism & Subject Consistency
             let finalFalPrompt = rawPrompt;
+            let subjectInstruction = "";
 
             // 1. Enforce Photorealism (Default) unless style overrides
             const isCartoon = rawPrompt.toLowerCase().includes("cartoon") || rawPrompt.toLowerCase().includes("illustration") || rawPrompt.toLowerCase().includes("anime") || rawPrompt.toLowerCase().includes("sketch");
             if (!isCartoon) {
-                finalFalPrompt += ", photorealistic, hyper-realistic, 8k, highly detailed, master photography";
+                // Add specific camera specs to match System Prompt
+                finalFalPrompt += ", shot on Canon 5D Mk IV, 85mm lens, f/1.8, sharp focus, cinematic lighting, photorealistic, hyper-realistic, 8k, master photography";
             }
 
             // 2. Subject Lock Instructions (Eye Line / Angle)
             if (refImageUrl && subjectLock) {
-                // DETECT REMIX MODE (Template + Subject)
-                if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
-                    finalFalPrompt = "Subject Replacement: Replace the character in the scene with the person from the reference image. " + finalFalPrompt;
-                    finalFalPrompt += " --preserve-face-structure: The second image provided is the Identity Source. Use the face/identity from the second image and composite it into the first image (the template). The result must look like the person from the second image is in the scene of the first image.";
+                // OUTFIT LOGIC (Must come first to override visual bias)
+                if (keepOutfit) {
+                    subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
                 } else {
-                    // Standard Single Image Lock
-                    finalFalPrompt += " --preserve-face-structure: Maintain the exact eye line, camera angle, gaze direction, and face direction of the subject. Ensure the subject's face looks identical to the original. Do not mirror or rotate the face.";
+                    subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
                 }
 
-                // Outfit Branching
-                if (keepOutfit) {
-                    finalFalPrompt += " --preserve-clothing: Keep the subject's clothing and outfit exactly as in the reference image.";
+                // DETECT REMIX MODE (Template + Subject)
+                if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
+                    subjectInstruction += " SUBJECT REPLACEMENT: Replace the character in the scene with the person from the Identity Source (Image 2). The first image is just the Background/Structure. ";
+
+                    if (!keepOutfit) {
+                        // Face Swap Strategy: Keep Template Body, Swap Face
+                        subjectInstruction += " BODY/OUTFIT SOURCE: Use the outfit, body pose, and clothing from Image 1 (The Template). Do NOT use the clothing from Image 2. ";
+                        subjectInstruction += " FACE SOURCE: Only use the Face/Head from Image 2 and composite it onto the body in Image 1. ";
+                    } else {
+                        subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
+                    }
                 } else {
-                    finalFalPrompt += " --ignore-clothing: Change the subject's clothing. Use creative attire that fits the scene. Do NOT preserve the original outfit. Allow dynamic body poses while keeping the face locked.";
+                    // Standard Single Image Lock
+                    subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
                 }
+
+                // Prepend instructions
+                finalFalPrompt = subjectInstruction + finalFalPrompt;
+            }
+
+            // 3. Text Rendering Instructions (Crucial for Remix)
+            if (headline || subheadline || cta || promotion || businessName) {
+                let textPrompt = " TEXT RENDERING: You must strictly render the following text in the image. Rearrange the layout to fit the 9:16 vertical aspect ratio naturally. ";
+                if (headline) textPrompt += `Headline: "${headline}". `;
+                if (subheadline) textPrompt += `Subhead: "${subheadline}". `;
+                if (cta) textPrompt += `Button/CTA: "${cta}". `;
+                if (promotion) textPrompt += `Offer: "${promotion}". `;
+                if (businessName) textPrompt += `Business Name: "${businessName}". `;
+                textPrompt += "Typography should be legible, professional, and integrated into the scene. ";
+
+                finalFalPrompt += textPrompt;
             }
 
             try {
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image);
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
@@ -686,7 +688,7 @@ export async function POST(req: Request) {
                     prompt_id: promptId,
                     prompt_slug: promptSlug,
                     image_url: falImageUrl,
-                    combined_prompt_text: rawPrompt,
+                    combined_prompt_text: finalFalPrompt,
                     settings: {
                         model,
                         provider: "fal",
