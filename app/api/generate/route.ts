@@ -673,6 +673,7 @@ export async function POST(req: Request) {
                         // Keep Outfit CHECKED: Force User's Outfit (Image 2)
                         subjectInstruction += " OUTFIT SOURCE: Transfer the subject's clothing/outfit from Image 2. ";
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
+                        subjectInstruction += " SCALE & PERSPECTIVE: Resize and fit the subject to match the depth, scale, and perspective of the scene in Image 1. Do NOT preserve the original scale of Image 2 if it doesn't fit the scene. ";
                     }
                 } else {
                     // STANDARD / GENERIC LOGIC (For single image or non-remix)
