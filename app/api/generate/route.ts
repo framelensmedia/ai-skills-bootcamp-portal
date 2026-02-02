@@ -247,9 +247,9 @@ async function generateFalImage(
             // STRENGTH TUNING
             if (mainImageUrl) {
                 if (keepOutfit) {
-                    // Strength 0.65: Good balance if references are aligned.
-                    // Now that Image 1/2 are correctly mapped, we can trust the prompt to hold the scene.
-                    payload.strength = 0.65;
+                    // Strength 0.75: Increased to preserve Scene/Text better. 
+                    // Relies on prompt to force subject insertion.
+                    payload.strength = 0.75;
                 } else {
                     payload.strength = 0.72; // Face Swap needs more rigidity
                 }
@@ -671,8 +671,9 @@ export async function POST(req: Request) {
                 // DETECT REMIX MODE (Template + Subject)
                 // We handle this FIRST and exclusively for Nano to avoid ambiguous "Reference Image" terms
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
-                    subjectInstruction += " SCENE PRESERVATION: Keep the background, lighting, and composition of Image 1 (The Template) exactly as is. ";
-                    subjectInstruction += " SUBJECT REPLACEMENT: Replace the character in the scene with the person from the Identity Source (Image 2). ";
+                    subjectInstruction += " SCENE PRESERVATION: Keep the background, lighting, text, and composition of Image 1 (The Template) exactly as is. ";
+                    subjectInstruction += " SUBJECT INSERTION: Insert the person from Image 2 into the scene. ";
+                    subjectInstruction += " IGNORE SOURCE BACKGROUND: Completely ignore the background context/environment of Image 2. Only extract the person. ";
 
                     if (!keepOutfit) {
                         // Face Swap Strategy: Keep Template Body, Swap Face
@@ -680,7 +681,7 @@ export async function POST(req: Request) {
                         subjectInstruction += " FACE SOURCE: Only use the Face/Head from Image 2 and composite it onto the body in Image 1. ";
                     } else {
                         // Keep Outfit CHECKED: Force User's Outfit (Image 2)
-                        subjectInstruction += " OUTFIT SOURCE: You MUST preserve the clothing and outfit from Image 2 (The Subject). Do NOT change the subject's clothes to match the template. Composite the subject WITH their original outfit into the scene. ";
+                        subjectInstruction += " OUTFIT SOURCE: Transfer the subject's clothing/outfit from Image 2. ";
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
                     }
                 } else {
