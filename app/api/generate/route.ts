@@ -243,9 +243,10 @@ async function generateFalImage(
             // STRENGTH TUNING FOR REMIX
             if (mainImageUrl) {
                 // keepOutfit = TRUE: We need to REPLACE the body in the template with user's outfit.
-                // Strength 0.75 allows insertion while keeping the scene structure.
+                // Strength 0.75 is too high (preserves template body).
+                // Lowering to 0.55 allows the model to overwrite the template pixels with the subject pixels.
                 if (keepOutfit) {
-                    payload.strength = 0.75;
+                    payload.strength = 0.55;
                 } else {
                     // keepOutfit = FALSE (Face Swap): We want the TEMPLATE's body/pose.
                     // Strength 0.70-0.75 preserves the composition/body but allows face change.
@@ -663,18 +664,14 @@ export async function POST(req: Request) {
             }
 
             // 2. Subject Lock Instructions (Eye Line / Angle)
+            // 2. Subject Lock Instructions (Eye Line / Angle)
             if (refImageUrl && subjectLock) {
-                // OUTFIT LOGIC (Must come first to override visual bias)
-                if (keepOutfit) {
-                    subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
-                } else {
-                    subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
-                }
 
                 // DETECT REMIX MODE (Template + Subject)
+                // We handle this FIRST and exclusively for Nano to avoid ambiguous "Reference Image" terms
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
                     subjectInstruction += " SCENE PRESERVATION: Keep the background, lighting, and composition of Image 1 (The Template) exactly as is. ";
-                    subjectInstruction += " SUBJECT REPLACEMENT: Replace the character in the scene with the person from the Identity Source (Image 2). The first image is just the Background/Structure. ";
+                    subjectInstruction += " SUBJECT REPLACEMENT: Replace the character in the scene with the person from the Identity Source (Image 2). ";
 
                     if (!keepOutfit) {
                         // Face Swap Strategy: Keep Template Body, Swap Face
@@ -686,7 +683,14 @@ export async function POST(req: Request) {
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
                     }
                 } else {
-                    // Standard Single Image Lock
+                    // STANDARD / GENERIC LOGIC (For single image or non-remix)
+                    if (keepOutfit) {
+                        subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
+                    } else {
+                        subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
+                    }
+
+                    // Standard Face Lock
                     subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
                 }
 
