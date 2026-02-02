@@ -223,6 +223,11 @@ async function generateFalImage(
     const isNanoBanana = modelId.includes("nano-banana");
 
     if (isNanoBanana) {
+        console.log("DEBUG: NANO BANANA REMIX LOGIC START");
+        console.log("DEBUG: template_ref:", template_reference_image);
+        console.log("DEBUG: mainImageUrl:", mainImageUrl);
+        console.log("DEBUG: keepOutfit:", keepOutfit);
+
         // REMIX ARCHITECTURE:
         // Base Canvas (image_url) = Template (Background/Scene)
         // Reference (image_urls) = Subject (Identity/Outfit)
@@ -238,23 +243,28 @@ async function generateFalImage(
             // STRENGTH TUNING FOR REMIX
             if (mainImageUrl) {
                 // keepOutfit = TRUE: We need to REPLACE the body in the template with user's outfit.
-                // The base is the Template (Scene). We need significant hallucination to insert the person.
-                // Strength < 0.5 allows the model to diverge from the base pixels (the empty scene).
+                // Strength 0.75 allows insertion while keeping the scene structure.
                 if (keepOutfit) {
-                    payload.strength = 0.45; // Aggressive change to insert detailed subject
+                    payload.strength = 0.75;
                 } else {
                     // keepOutfit = FALSE (Face Swap): We want the TEMPLATE's body/pose.
-                    // We only want to change the face.
-                    // Strength 0.65-0.70 preserves the composition/body but allows face change.
-                    payload.strength = 0.65;
+                    // Strength 0.70-0.75 preserves the composition/body but allows face change.
+                    payload.strength = 0.70;
                 }
             }
+            console.log("DEBUG: Remix Payload Constructed:", {
+                base: payload.image_url,
+                refs: payload.image_urls,
+                strength: payload.strength,
+                aspect: payload.aspect_ratio
+            });
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
             if (mainImageUrl) payload.image_url = mainImageUrl;
             payload.image_urls = []; // No extra refs
             // For direct edit, we usually want to preserve the selfie unless instructed otherwise
             payload.strength = 0.75;
+            console.log("DEBUG: Direct Edit Payload Constructed (No Template)");
         }
 
         // Force 9:16 for Remixes if not square
@@ -663,6 +673,7 @@ export async function POST(req: Request) {
 
                 // DETECT REMIX MODE (Template + Subject)
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
+                    subjectInstruction += " SCENE PRESERVATION: Keep the background, lighting, and composition of Image 1 (The Template) exactly as is. ";
                     subjectInstruction += " SUBJECT REPLACEMENT: Replace the character in the scene with the person from the Identity Source (Image 2). The first image is just the Background/Structure. ";
 
                     if (!keepOutfit) {
