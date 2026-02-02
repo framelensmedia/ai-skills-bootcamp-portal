@@ -247,7 +247,7 @@ async function generateFalImage(
                     // Relies on prompt to force subject insertion.
                     payload.strength = 0.75;
                 } else {
-                    payload.strength = 0.72; // Face Swap needs more rigidity
+                    payload.strength = 0.65; // Lower strength to allow outfit changes while keeping pose
                 }
             }
         } else {
@@ -665,8 +665,9 @@ export async function POST(req: Request) {
                     subjectInstruction += " IGNORE SOURCE BACKGROUND: Completely ignore the background context/environment of Image 2. Only extract the person. ";
 
                     if (!keepOutfit) {
-                        // Face Swap Strategy: Keep Template Body, Swap Face
-                        subjectInstruction += " BODY/OUTFIT SOURCE: Use the outfit, body pose, and clothing from Image 1 (The Template). Do NOT use the clothing from Image 2. ";
+                        // Change Outfit Strategy: Keep Pose, but Allow Outfit Change described in Prompt
+                        subjectInstruction += " BODY/POSE SOURCE: Use the body pose from Image 1 (The Template). ";
+                        subjectInstruction += " OUTFIT INSTRUCTION: Generate the outfit described in the main prompt. Do NOT persist the outfit from Image 1 if it conflicts with the prompt. ";
                         subjectInstruction += " FACE SOURCE: Only use the Face/Head from Image 2 and composite it onto the body in Image 1. ";
                     } else {
                         // Keep Outfit CHECKED: Force User's Outfit (Image 2)
