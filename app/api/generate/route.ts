@@ -235,22 +235,23 @@ async function generateFalImage(
         if (template_reference_image) {
             // Case 1: Remix (Template + Subject)
             payload.image_url = template_reference_image;
-            payload.image_urls = [];
+
+            // CRITICAL: We must include the Template in image_urls so "Image 1" in prompt refers to it.
+            // Payload: Base=Template, Refs=[Template, Subject]
+            payload.image_urls = [template_reference_image];
+
             if (mainImageUrl && mainImageUrl !== template_reference_image) {
                 payload.image_urls.push(mainImageUrl);
             }
 
-            // STRENGTH TUNING FOR REMIX
+            // STRENGTH TUNING
             if (mainImageUrl) {
-                // keepOutfit = TRUE: We need to REPLACE the body in the template with user's outfit.
-                // Strength 0.75 is too high (preserves template body).
-                // Lowering to 0.55 allows the model to overwrite the template pixels with the subject pixels.
                 if (keepOutfit) {
-                    payload.strength = 0.55;
+                    // Strength 0.65: Good balance if references are aligned.
+                    // Now that Image 1/2 are correctly mapped, we can trust the prompt to hold the scene.
+                    payload.strength = 0.65;
                 } else {
-                    // keepOutfit = FALSE (Face Swap): We want the TEMPLATE's body/pose.
-                    // Strength 0.70-0.75 preserves the composition/body but allows face change.
-                    payload.strength = 0.70;
+                    payload.strength = 0.72; // Face Swap needs more rigidity
                 }
             }
             console.log("DEBUG: Remix Payload Constructed:", {
