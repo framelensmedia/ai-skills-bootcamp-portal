@@ -223,10 +223,6 @@ async function generateFalImage(
     const isNanoBanana = modelId.includes("nano-banana");
 
     if (isNanoBanana) {
-        console.log("DEBUG: NANO BANANA REMIX LOGIC START");
-        console.log("DEBUG: template_ref:", template_reference_image);
-        console.log("DEBUG: mainImageUrl:", mainImageUrl);
-        console.log("DEBUG: keepOutfit:", keepOutfit);
 
         // REMIX ARCHITECTURE:
         // Base Canvas (image_url) = Template (Background/Scene)
@@ -254,19 +250,12 @@ async function generateFalImage(
                     payload.strength = 0.72; // Face Swap needs more rigidity
                 }
             }
-            console.log("DEBUG: Remix Payload Constructed:", {
-                base: payload.image_url,
-                refs: payload.image_urls,
-                strength: payload.strength,
-                aspect: payload.aspect_ratio
-            });
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
             if (mainImageUrl) payload.image_url = mainImageUrl;
             payload.image_urls = []; // No extra refs
             // For direct edit, we usually want to preserve the selfie unless instructed otherwise
             payload.strength = 0.75;
-            console.log("DEBUG: Direct Edit Payload Constructed (No Template)");
         }
 
         // Force 9:16 for Remixes if not square
