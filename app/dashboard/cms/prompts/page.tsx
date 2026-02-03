@@ -450,7 +450,7 @@ export default function PromptsCMSPage() {
                     </div>
 
                     <Link
-                        href="/dashboard/cms/prompts/import"
+                        href="/dashboard/cms/upload-prompts"
                         className="flex items-center gap-2 rounded-lg border border-dashed border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
                         <Upload size={16} />
