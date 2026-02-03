@@ -32,17 +32,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid payload: pack.name and templates array required." }, { status: 400 });
         }
 
-        if (!author_id) {
-            console.warn("[Clawdbot] Warning: No author_id provided. Operations might fail if author_id is required.");
-        }
-
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
 
-        // 2. Upload Pack Thumbnail (if URL provided)
-        let packThumbnailPath = null;
-        if (pack.thumbnail_url) {
-            packThumbnailPath = await uploadImageFromUrl(pack.thumbnail_url, `packs/${sanitize(pack.name)}-thumb-${Date.now()}.png`);
-        }
+        // 2. Pack Thumbnail: Use raw URL (Skip Re-upload)
+        const packThumbnailUrl = pack.thumbnail_url || null;
 
         // 3. Create Pack Record
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
@@ -57,7 +50,7 @@ export async function POST(req: NextRequest) {
             access_level: pack.access_level || "free",
             is_published: pack.is_published !== undefined ? pack.is_published : false,
             category: pack.category || "General",
-            thumbnail_url: packThumbnailPath ? getPublicUrl(packThumbnailPath) : null,
+            thumbnail_url: packThumbnailUrl,
         };
 
         const { data: packRecord, error: packError } = await supabase
@@ -70,14 +63,12 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Clawdbot] Created Pack ID: ${packRecord.id}`);
 
-        // 4. Process Templates Parallelly
+        // 4. Process Templates Parallelly (Simplified: No Image Re-upload, No Author ID check)
         const results = await Promise.all(templates.map(async (t: any) => {
             try {
-                let previewPath = null;
-                if (t.image_url) {
-                    // Add timeout logic could be added here if needed
-                    previewPath = await uploadImageFromUrl(t.image_url, `prompts/${sanitize(t.title)}-${Date.now()}.png`);
-                }
+                // SIMPLIFICATION: Skip Image Download/Upload. Use raw URL.
+                const previewUrl = t.image_url || null;
+                const previewPath = null; // No storage path if using external URL
 
                 const promptPayload: any = {
                     template_pack_id: packRecord.id,
@@ -89,9 +80,10 @@ export async function POST(req: NextRequest) {
                     status: "published",
                     media_type: "image",
                     preview_image_storage_path: previewPath,
-                    featured_image_url: previewPath ? getPublicUrl(previewPath) : null,
+                    featured_image_url: previewUrl,
                 };
 
+                // Only add author_id if explicitly provided, otherwise allow DB default (or NULL)
                 if (author_id) {
                     promptPayload.author_id = author_id;
                 }
