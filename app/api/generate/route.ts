@@ -456,7 +456,8 @@ export async function POST(req: Request) {
             if (body.subjectMode) subjectMode = String(body.subjectMode).trim();
             industryIntent = String(body.industry_intent ?? "").trim() || null;
 
-            // New Text Fields
+            // New Text Fields - Extract all text fields from JSON body
+            headline = body.headline ? String(body.headline).trim() : null;
             subheadline = body.subheadline ? String(body.subheadline).trim() : null;
             cta = body.cta ? String(body.cta).trim() : null;
             promotion = body.promotion ? String(body.promotion).trim() : null;
