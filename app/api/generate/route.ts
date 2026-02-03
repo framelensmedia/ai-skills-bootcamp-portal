@@ -240,15 +240,10 @@ async function generateFalImage(
                 payload.image_urls.push(mainImageUrl);
             }
 
-            // STRENGTH TUNING
+            // STRENGTH TUNING - Unified strength for BOTH modes
+            // High strength preserves Template Scene/Text. Prompt handles outfit/face logic.
             if (mainImageUrl) {
-                if (keepOutfit) {
-                    // Strength 0.75: Increased to preserve Scene/Text better. 
-                    // Relies on prompt to force subject insertion.
-                    payload.strength = 0.75;
-                } else {
-                    payload.strength = 0.65; // Lower strength to allow outfit changes while keeping pose
-                }
+                payload.strength = 0.78;
             }
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
@@ -665,15 +660,16 @@ export async function POST(req: Request) {
                     subjectInstruction += " IGNORE SOURCE BACKGROUND: Completely ignore the background context/environment of Image 2. Only extract the person. ";
 
                     if (!keepOutfit) {
-                        // Change Outfit Strategy: Keep Pose, but Allow Outfit Change described in Prompt
-                        subjectInstruction += " BODY/POSE SOURCE: Use the body pose from Image 1 (The Template). ";
-                        subjectInstruction += " OUTFIT INSTRUCTION: Generate the outfit described in the main prompt. Do NOT persist the outfit from Image 1 if it conflicts with the prompt. ";
-                        subjectInstruction += " FACE SOURCE: Only use the Face/Head from Image 2 and composite it onto the body in Image 1. ";
+                        // FACE SWAP MODE: Use Template Body/Outfit + Subject Face
+                        subjectInstruction += " OUTFIT SOURCE: Use the EXACT outfit from Image 1 (The Template). The subject MUST wear the Template's clothing, not their own. ";
+                        subjectInstruction += " BODY/POSE SOURCE: Use the body pose and position from Image 1 (The Template). ";
+                        subjectInstruction += " FACE SOURCE: Only extract the Face/Head from Image 2 and composite it onto the body in Image 1. ";
+                        subjectInstruction += " SCALE & PERSPECTIVE: Resize the face to fit the head in the Template scene. Match the perspective and angle. ";
                     } else {
-                        // Keep Outfit CHECKED: Force User's Outfit (Image 2)
+                        // SUBJECT INSERT MODE: Use Subject's Outfit + Face, Insert into Template Scene
                         subjectInstruction += " OUTFIT SOURCE: Transfer the subject's clothing/outfit from Image 2. ";
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
-                        subjectInstruction += " SCALE & PERSPECTIVE: Resize and fit the subject to match the depth, scale, and perspective of the scene in Image 1. Do NOT preserve the original scale of Image 2 if it doesn't fit the scene. ";
+                        subjectInstruction += " SCALE & PERSPECTIVE: Resize and fit the ENTIRE subject (body + face) to match the depth, scale, and perspective of the scene in Image 1. The subject must fit naturally in the scene, not at their original photo size. ";
                     }
                 } else {
                     // STANDARD / GENERIC LOGIC (For single image or non-remix)
