@@ -184,7 +184,8 @@ async function generateFalImage(
     imageSize: any = "landscape_4_3", // or {width, height}
     mainImageUrl?: string | null,
     template_reference_image?: string | null,
-    keepOutfit: boolean = true
+    keepOutfit: boolean = true,
+    negativePrompt?: string
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -200,6 +201,7 @@ async function generateFalImage(
         prompt,
         image_size: imageSize, // keep this
         safety_tolerance: "2",
+        negative_prompt: negativePrompt || "cartoon, illustration, animation, face distortion, strange anatomy, disfigured, bad art, blurry, pixelated"
     };
 
     // Add Strength for Img2Img (Remix)
@@ -240,8 +242,8 @@ async function generateFalImage(
                 payload.image_urls.push(mainImageUrl);
             }
 
-            // STRENGTH TUNING - High strength for maximum template preservation
-            // 0.85 preserves template layout/text/positioning. Prompt handles face/outfit swap.
+            // STRENGTH TUNING
+            // 0.85 Preserves text better but relies on Strong Negative Prompt for face swap
             if (mainImageUrl) {
                 payload.strength = 0.85;
             }
@@ -296,7 +298,7 @@ async function generateFalImage(
 
     // 2. Poll for Status
     let attempts = 0;
-    while (attempts < 60) { // 60 seconds max polling
+    while (attempts < 300) { // 300 seconds (5 min) max polling for complex edits
         attempts++;
         await new Promise(r => setTimeout(r, 1000)); // 1s wait
 
@@ -549,10 +551,10 @@ export async function POST(req: Request) {
 
         const userCredits = userProfile.credits ?? 0;
         const IMAGE_COST = 3;
+        const isAdmin = userProfile.role === "admin" || userProfile.role === "super_admin";
 
-        // Admins bypass credit check? Maybe for testing. Let's enforce for now unless explicit bypass requested.
-        // If user has 0 credits, fail.
-        if (userCredits < IMAGE_COST) {
+        // Admins bypass credit check
+        if (!isAdmin && userCredits < IMAGE_COST) {
             return NextResponse.json({
                 error: "Insufficient credits. Please upgrade or top up.",
                 required: IMAGE_COST,
@@ -641,6 +643,7 @@ export async function POST(req: Request) {
             // Enhance Prompt for Realism & Subject Consistency
             let finalFalPrompt = rawPrompt;
             let subjectInstruction = "";
+            let remixNegativePrompt: string | undefined;
 
             // 1. Enforce Photorealism (Default) unless style overrides
             const isCartoon = rawPrompt.toLowerCase().includes("cartoon") || rawPrompt.toLowerCase().includes("illustration") || rawPrompt.toLowerCase().includes("anime") || rawPrompt.toLowerCase().includes("sketch");
@@ -656,21 +659,22 @@ export async function POST(req: Request) {
                 // DETECT REMIX MODE (Template + Subject)
                 // We handle this FIRST and exclusively for Nano to avoid ambiguous "Reference Image" terms
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
-                    subjectInstruction += " SCENE PRESERVATION: Keep the background, lighting, text, and composition of Image 1 (The Template) exactly as is. ";
-                    subjectInstruction += " SUBJECT INSERTION: Insert the person from Image 2 into the scene. ";
-                    subjectInstruction += " IGNORE SOURCE BACKGROUND: Completely ignore the background context/environment of Image 2. Only extract the person. ";
+
+                    subjectInstruction += " [SUBJECT LOCK: ACTIVE - STRICT MASKING MODE] ";
+                    subjectInstruction += " 1. ACTION: You act as a professional retoucher using Photoshop. You must REPLACE the face of the subject in the Base Image with the Reference face. ";
+                    subjectInstruction += " 2. SCALE LOCK: Scale the Subject to MATCH the Original Subject in length/width. Fit them into the scene NATURALLY. ";
+                    subjectInstruction += " 3. ANATOMICAL REALISM: Ensure a NATURAL, VISIBLE NECK. Connect the head gracefully to the body. CENTER the face on the original neck. ";
+                    subjectInstruction += " 4. TOP MARGIN PRESERVATION: DO NOT TOUCH the top 20% of the image. The Headline Text MUST remain visible. Do not let the head cover it. ";
+                    subjectInstruction += " 5. COMPOSITING: Apply 'Beauty Dish' lighting to match the scene. Blend edges. ";
+                    subjectInstruction += " 6. TEXT PRESERVATION: The text at the top and bottom of the Base Image MUST remain visible. DO NOT COVER THE TEXT. ";
+
+                    // Specific negative prompts for this mode
+                    remixNegativePrompt = "covering text, blocking text, text overlay, cropping text, short neck, no neck, thick neck, trapezius too high, squashed head, bobblehead, shoulders too high, hunchback, head attached to shoulders, distorted body, bad composition, bad lighting, blurry, low resolution, face too large, head too big, off center";
 
                     if (!keepOutfit) {
-                        // FACE SWAP MODE: Use Template Body/Outfit + Subject Face
-                        subjectInstruction += " OUTFIT SOURCE: Use the EXACT outfit from Image 1 (The Template). The subject MUST wear the Template's clothing, not their own. ";
-                        subjectInstruction += " BODY/POSE SOURCE: Use the body pose and position from Image 1 (The Template). ";
-                        subjectInstruction += " FACE SOURCE: Only extract the Face/Head from Image 2 and composite it onto the body in Image 1. ";
-                        subjectInstruction += " SIZE MATCHING: The resulting person must be the SAME SIZE as the character in Image 1 (Template). Do NOT use the zoom/crop level from Image 2. Match the Template's framing exactly. ";
+                        subjectInstruction += " OUTFIT: Transfer the outfit from the Reference Image onto the Base Image's body pose. ";
                     } else {
-                        // SUBJECT INSERT MODE: Use Subject's Outfit + Face, Insert into Template Scene
-                        subjectInstruction += " OUTFIT SOURCE: Transfer the subject's clothing/outfit from Image 2. ";
-                        subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
-                        subjectInstruction += " SIZE MATCHING: The inserted person must be the SAME SIZE as the character in Image 1 (Template). Scale the subject DOWN or UP to match the Template's character scale. Do NOT use the zoom/crop level from Image 2. Match the Template's framing exactly. ";
+                        subjectInstruction += " OUTFIT: Keep the outfit from the Base Image. ";
                     }
                 } else {
                     // STANDARD / GENERIC LOGIC (For single image or non-remix)
@@ -702,7 +706,7 @@ export async function POST(req: Request) {
             }
 
             try {
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit);
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit, remixNegativePrompt);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB

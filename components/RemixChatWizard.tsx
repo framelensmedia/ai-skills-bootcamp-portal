@@ -191,23 +191,27 @@ export default function RemixChatWizard({
         }
     }, [isOpen, templateConfig]);
 
-    // Fetch Credits
+    // Fetch Credits & Role
     const [userCredits, setUserCredits] = useState<number | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+
     useEffect(() => {
         if (!isOpen) return;
         const fetchCredits = async () => {
             const supabase = createSupabaseBrowserClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("credits").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("credits, role").eq("user_id", user.id).maybeSingle();
                 setUserCredits(profile?.credits ?? 0);
+                const r = String(profile?.role || "").toLowerCase();
+                setIsAdmin(r === "admin" || r === "super_admin");
             }
         };
         fetchCredits();
     }, [isOpen]);
 
     const IMAGE_COST = 3;
-    const hasCredits = (userCredits ?? 0) >= IMAGE_COST;
+    const hasCredits = (userCredits ?? 0) >= IMAGE_COST || isAdmin;
     const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${IMAGE_COST}, have ${userCredits}.` : null;
 
     useEffect(() => {
