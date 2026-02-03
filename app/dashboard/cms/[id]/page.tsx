@@ -391,7 +391,30 @@ export default function CmsPromptEditorPage() {
           {/* Featured Image - Wide & Cinematic */}
           <Card className="relative aspect-video w-full group">
             {featuredImageUrl ? (
-              <Image src={featuredImageUrl} alt="Featured" fill className="object-cover transition-opacity duration-500 group-hover:opacity-75" />
+              <>
+                <Image src={featuredImageUrl} alt="Featured" fill className="object-cover transition-opacity duration-500 group-hover:opacity-75" />
+
+                {/* Warning / Secure Button for External Images */}
+                {!featuredImageUrl.includes("supabase.co") && !featuredImageUrl.startsWith("/") && (
+                  <div className="absolute top-4 right-4 z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSecureAsset(featuredImageUrl).then(url => {
+                          if (url) {
+                            setFeaturedImageUrl(url);
+                            setSuccessMsg("Asset Secured!");
+                          }
+                        });
+                      }}
+                      className="flex items-center gap-2 rounded-lg bg-orange-500 text-white px-3 py-1.5 text-xs font-bold shadow-lg hover:bg-orange-600 transition"
+                    >
+                      <AlertCircle size={12} />
+                      Secure External Asset
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-white/20">
                 <ImageIcon size={48} />
