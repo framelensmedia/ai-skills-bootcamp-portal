@@ -664,12 +664,12 @@ export async function POST(req: Request) {
                         subjectInstruction += " OUTFIT SOURCE: Use the EXACT outfit from Image 1 (The Template). The subject MUST wear the Template's clothing, not their own. ";
                         subjectInstruction += " BODY/POSE SOURCE: Use the body pose and position from Image 1 (The Template). ";
                         subjectInstruction += " FACE SOURCE: Only extract the Face/Head from Image 2 and composite it onto the body in Image 1. ";
-                        subjectInstruction += " SCALE & PERSPECTIVE: Resize the face to fit the head in the Template scene. Match the perspective and angle. ";
+                        subjectInstruction += " SIZE MATCHING: The resulting person must be the SAME SIZE as the character in Image 1 (Template). Do NOT use the zoom/crop level from Image 2. Match the Template's framing exactly. ";
                     } else {
                         // SUBJECT INSERT MODE: Use Subject's Outfit + Face, Insert into Template Scene
                         subjectInstruction += " OUTFIT SOURCE: Transfer the subject's clothing/outfit from Image 2. ";
                         subjectInstruction += " FACE LOCK: Preserve the exact facial identity, eyes, and gaze of the subject from Image 2. ";
-                        subjectInstruction += " SCALE & PERSPECTIVE: Resize and fit the ENTIRE subject (body + face) to match the depth, scale, and perspective of the scene in Image 1. The subject must fit naturally in the scene, not at their original photo size. ";
+                        subjectInstruction += " SIZE MATCHING: The inserted person must be the SAME SIZE as the character in Image 1 (Template). Scale the subject DOWN or UP to match the Template's character scale. Do NOT use the zoom/crop level from Image 2. Match the Template's framing exactly. ";
                     }
                 } else {
                     // STANDARD / GENERIC LOGIC (For single image or non-remix)
