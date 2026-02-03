@@ -195,12 +195,51 @@ export default function CmsPromptEditorPage() {
     boot();
   }, [id]);
 
+  async function handleSecureAsset(currentUrl: string): Promise<string | null> {
+    if (!currentUrl || currentUrl.includes("supabase.co") || currentUrl.startsWith("/")) return currentUrl;
+
+    setSuccessMsg("Securing external asset...");
+    try {
+      const res = await fetch("/api/cms/rehost-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt_id: row?.id, image_url: currentUrl, title: title })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to secure asset");
+      return data.url;
+    } catch (e: any) {
+      console.error("Secure Asset Failed:", e);
+      setError("Failed to secure external asset: " + e.message);
+      return null;
+    }
+  }
+
   async function handleSave(nextStatus?: string) {
     if (!row?.id) return;
     const nextSlug = slug.trim() ? slug.trim() : slugify(title);
     setSaving(true);
+    setError(null);
 
     try {
+      let finalImageUrl = featuredImageUrl;
+
+      // Auto-Secure logic on Publish (or explicit save if needed)
+      // Only do it if we are publishing OR if the user explicitly clicked a "Secure" button (which we can add later)
+      // User asked: "on publish it downloads and re uploads"
+      if (nextStatus === "published" && featuredImageUrl && !featuredImageUrl.includes("supabase.co")) {
+        const securedUrl = await handleSecureAsset(featuredImageUrl);
+        if (securedUrl) {
+          finalImageUrl = securedUrl;
+          setFeaturedImageUrl(securedUrl); // Update UI
+        } else {
+          // If securing failed, should we block publish? 
+          // Maybe warn but proceed? Or block?
+          // Let's block to ensure quality.
+          throw new Error("Could not secure external image. Please upload manually or check URL.");
+        }
+      }
+
       const payload: any = {
         title: title.trim(),
         slug: nextSlug,
@@ -211,7 +250,7 @@ export default function CmsPromptEditorPage() {
         status: nextStatus || status,
         category: category.trim(),
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
-        featured_image_url: featuredImageUrl,
+        featured_image_url: finalImageUrl,
         media_type: mediaType,
         media_url: mediaUrl,
         is_trending: isTrending,
@@ -233,7 +272,7 @@ export default function CmsPromptEditorPage() {
 
       setStatus((nextStatus || status) as any);
       setSlug(nextSlug);
-      setSuccessMsg(nextStatus === "published" ? "Published Successfully!" : "Saved Successfully!");
+      setSuccessMsg(nextStatus === "published" ? "Published & Assets Secured!" : "Saved Successfully!");
       router.refresh();
     } catch (e: any) {
       setError(e.message);
