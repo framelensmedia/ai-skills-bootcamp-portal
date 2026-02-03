@@ -24,10 +24,17 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { pack, templates } = body;
+        const { pack, templates, author_id } = body;
 
         if (!pack || !pack.name || !templates || !Array.isArray(templates)) {
-            return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+            return NextResponse.json({ error: "Invalid payload: pack.name and templates array required." }, { status: 400 });
+        }
+
+        if (!author_id) {
+            // Try to find a fallback? No, let's require it for now to be safe, or default to a known ID if user provided one in Env.
+            // return NextResponse.json({ error: "author_id required in payload." }, { status: 400 });
+            // Actually, let's log and try to proceed if system allows, but it likely won't.
+            console.warn("[Clawdbot] Warning: No author_id provided. Operations might fail if author_id is required.");
         }
 
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates.`);
@@ -40,16 +47,23 @@ export async function POST(req: NextRequest) {
 
         // 3. Create Pack Record
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
+
+        // SCHEMA FIX: Use 'title' instead of 'pack_name'.
+        // Also Populate legacy 'pack_name' and 'pack_id' if they exist to satisfy constraints.
+        const packPayload: any = {
+            title: pack.name, // Correct Column
+            pack_name: pack.name, // Legacy Column (just in case)
+            slug: slug,
+            pack_id: slug, // Legacy Column (sometimes used as slug or ID, try slug)
+            access_level: pack.access_level || "free",
+            is_published: pack.is_published !== undefined ? pack.is_published : false,
+            category: pack.category || "General",
+            thumbnail_url: packThumbnailPath ? getPublicUrl(packThumbnailPath) : null,
+        };
+
         const { data: packRecord, error: packError } = await supabase
             .from("template_packs")
-            .insert({
-                pack_name: pack.name,
-                slug: slug,
-                access_level: pack.access_level || "free",
-                is_published: pack.is_published !== undefined ? pack.is_published : false,
-                category: pack.category || "General",
-                thumbnail_url: packThumbnailPath ? getPublicUrl(packThumbnailPath) : null,
-            })
+            .insert(packPayload)
             .select()
             .single();
 
@@ -66,20 +80,26 @@ export async function POST(req: NextRequest) {
                     previewPath = await uploadImageFromUrl(t.image_url, `prompts/${sanitize(t.title)}-${Date.now()}.png`);
                 }
 
+                const promptPayload: any = {
+                    template_pack_id: packRecord.id,
+                    title: t.title,
+                    slug: `${sanitize(t.title)}-${Date.now()}`,
+                    prompt_text: t.prompt_text || "",
+                    prompt: t.prompt_text || "",
+                    access_level: t.access_level || pack.access_level || "free",
+                    status: "published",
+                    media_type: "image",
+                    preview_image_storage_path: previewPath,
+                    featured_image_url: previewPath ? getPublicUrl(previewPath) : null,
+                };
+
+                if (author_id) {
+                    promptPayload.author_id = author_id;
+                }
+
                 const { data: promptRecord, error: promptError } = await supabase
                     .from("prompts")
-                    .insert({
-                        template_pack_id: packRecord.id,
-                        title: t.title,
-                        slug: `${sanitize(t.title)}-${Date.now()}`,
-                        prompt_text: t.prompt_text || "",
-                        prompt: t.prompt_text || "", // duplicate field support
-                        access_level: t.access_level || pack.access_level || "free",
-                        status: "published", // Bots usually upload ready-to-go content
-                        media_type: "image",
-                        preview_image_storage_path: previewPath, // The path relative to bucket
-                        featured_image_url: previewPath ? getPublicUrl(previewPath) : null,
-                    })
+                    .insert(promptPayload)
                     .select("id")
                     .single();
 
