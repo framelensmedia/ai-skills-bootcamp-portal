@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const maxDuration = 300; // Allow up to 5 minutes (if plan permits)
+
 // Initialize Supabase Admin Client (Service Role)
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,13 +33,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (!author_id) {
-            // Try to find a fallback? No, let's require it for now to be safe, or default to a known ID if user provided one in Env.
-            // return NextResponse.json({ error: "author_id required in payload." }, { status: 400 });
-            // Actually, let's log and try to proceed if system allows, but it likely won't.
             console.warn("[Clawdbot] Warning: No author_id provided. Operations might fail if author_id is required.");
         }
 
-        console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates.`);
+        console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
 
         // 2. Upload Pack Thumbnail (if URL provided)
         let packThumbnailPath = null;
@@ -48,7 +47,7 @@ export async function POST(req: NextRequest) {
         // 3. Create Pack Record
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
 
-        // SCHEMA FIX: Use 'title' instead of 'pack_name'.
+        // SCHEMA FIX: Use 'title' instead of 'pack_name'. 
         // Also Populate legacy 'pack_name' and 'pack_id' if they exist to satisfy constraints.
         const packPayload: any = {
             title: pack.name, // Correct Column
@@ -71,12 +70,12 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Clawdbot] Created Pack ID: ${packRecord.id}`);
 
-        // 4. Process Templates
-        const results = [];
-        for (const t of templates) {
+        // 4. Process Templates Parallelly
+        const results = await Promise.all(templates.map(async (t: any) => {
             try {
                 let previewPath = null;
                 if (t.image_url) {
+                    // Add timeout logic could be added here if needed
                     previewPath = await uploadImageFromUrl(t.image_url, `prompts/${sanitize(t.title)}-${Date.now()}.png`);
                 }
 
@@ -104,13 +103,13 @@ export async function POST(req: NextRequest) {
                     .single();
 
                 if (promptError) throw promptError;
-                results.push({ title: t.title, status: "success", id: promptRecord.id });
+                return { title: t.title, status: "success", id: promptRecord.id };
 
             } catch (err: any) {
                 console.error(`[Clawdbot] Template Error (${t.title}):`, err);
-                results.push({ title: t.title, status: "error", error: err.message });
+                return { title: t.title, status: "error", error: err.message };
             }
-        }
+        }));
 
         return NextResponse.json({
             success: true,
@@ -148,7 +147,7 @@ async function uploadImageFromUrl(url: string, path: string): Promise<string | n
         return path;
     } catch (e) {
         console.error("Image Upload Failed:", e);
-        return null;
+        return null; // Don't block whole process if image fails
     }
 }
 
