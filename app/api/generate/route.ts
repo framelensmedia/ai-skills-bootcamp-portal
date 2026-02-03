@@ -240,10 +240,10 @@ async function generateFalImage(
                 payload.image_urls.push(mainImageUrl);
             }
 
-            // STRENGTH TUNING - Unified strength for BOTH modes
-            // High strength preserves Template Scene/Text. Prompt handles outfit/face logic.
+            // STRENGTH TUNING - High strength for maximum template preservation
+            // 0.85 preserves template layout/text/positioning. Prompt handles face/outfit swap.
             if (mainImageUrl) {
-                payload.strength = 0.78;
+                payload.strength = 0.85;
             }
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
