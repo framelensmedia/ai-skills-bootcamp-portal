@@ -416,9 +416,27 @@ export default function CmsPromptEditorPage() {
                 )}
               </>
             ) : (
-              <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-white/20">
+              <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-white/20 p-8">
                 <ImageIcon size={48} />
                 <span className="text-xs uppercase tracking-widest font-semibold">No Cover Image</span>
+
+                {/* Manual URL Input */}
+                <div className="flex gap-2 w-full max-w-sm mt-2 relative z-10" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    placeholder="Paste External URL..."
+                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#B7FF00]/50 outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.target as HTMLInputElement).value;
+                        if (val) setFeaturedImageUrl(val);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = e.target.value;
+                      if (val) setFeaturedImageUrl(val);
+                    }}
+                  />
+                </div>
               </div>
             )}
 
