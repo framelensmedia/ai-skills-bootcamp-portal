@@ -414,6 +414,10 @@ function StudioContent() {
 
       if (answersToUse) {
         if (answersToUse.headline) payload.headline = answersToUse.headline;
+        if (answersToUse.subheadline) payload.subheadline = answersToUse.subheadline;
+        if (answersToUse.cta) payload.cta = answersToUse.cta;
+        if (answersToUse.promotion) payload.promotion = answersToUse.promotion;
+
         if (answersToUse.subjectLock) payload.subjectLock = answersToUse.subjectLock;
         if (answersToUse.industry_intent) payload.industry_intent = answersToUse.industry_intent;
         if (answersToUse.business_name) payload.business_name = answersToUse.business_name;

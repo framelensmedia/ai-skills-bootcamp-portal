@@ -25,7 +25,12 @@ async function pollOperation(
 
     console.log("Polling via fetchPredictOperation:", url);
 
-    for (let i = 0; i < maxAttempts; i++) {
+    const startTime = Date.now();
+    const TIMEOUT_MS = 290000; // 290s limit
+
+    // Ignore maxAttempts heavily, rely on time
+
+    while (Date.now() - startTime < TIMEOUT_MS) {
         const res = await fetch(url, {
             method: "POST",
             headers: {
@@ -37,8 +42,8 @@ async function pollOperation(
 
         if (!res.ok) {
             const errText = await res.text();
-            console.error(`Poll error (attempt ${i + 1}): ${res.status} - ${errText.slice(0, 200)}`);
-            if (res.status === 404 && i < 5) {
+            console.error(`Poll error: ${res.status} - ${errText.slice(0, 200)}`);
+            if (res.status === 404 && (Date.now() - startTime < 30000)) {
                 await new Promise(r => setTimeout(r, intervalMs));
                 continue;
             }
@@ -46,17 +51,14 @@ async function pollOperation(
         }
 
         const data = await res.json();
-        // console.log(`Poll attempt ${i + 1}: done=${data.done}`);
 
         if (data.done) {
             if (data.error) {
-                // Handle harmless "Service Unavailable" errors gracefully
                 if (data.error.code === 14 || data.error.message?.includes("unavailable")) {
                     throw new Error("Video service is currently busy. Please try again in a moment.");
                 }
                 throw new Error(`Operation failed: ${data.error.message || JSON.stringify(data.error)}`);
             }
-            // Log the raw response to debug "No video" issues
             console.log("Operation Done. Raw Response keys:", Object.keys(data.response || {}));
             if (!data.response?.videos && !data.response?.predictions) {
                 console.error("FULL RAW RESPONSE:", JSON.stringify(data.response, null, 2));
@@ -67,7 +69,7 @@ async function pollOperation(
         await new Promise(r => setTimeout(r, intervalMs));
     }
 
-    throw new Error("Operation timed out");
+    throw new Error("Operation timed out (Server Limit)");
 }
 
 async function describeImage(

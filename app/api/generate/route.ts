@@ -296,10 +296,11 @@ async function generateFalImage(
 
     const { request_id } = await res.json();
 
-    // 2. Poll for Status
-    let attempts = 0;
-    while (attempts < 300) { // 300 seconds (5 min) max polling for complex edits
-        attempts++;
+    // 2. Poll for Status (Time-based to respect Vercel 300s limit)
+    const startTime = Date.now();
+    const TIMEOUT_MS = 290000; // 290s (Leave 10s buffer)
+
+    while (Date.now() - startTime < TIMEOUT_MS) {
         await new Promise(r => setTimeout(r, 1000)); // 1s wait
 
         const statusRes = await fetch(`https://queue.fal.run/${modelId}/requests/${request_id}`, {
@@ -694,13 +695,15 @@ export async function POST(req: Request) {
 
             // 3. Text Rendering Instructions (Crucial for Remix)
             if (headline || subheadline || cta || promotion || businessName) {
-                let textPrompt = " TEXT RENDERING: You must strictly render the following text in the image. Rearrange the layout to fit the 9:16 vertical aspect ratio naturally. ";
+                let textPrompt = " [TEXT REPLACEMENT MANDATE]: You must REPLACE the text in the original image with the new text provided below. Do NOT render the original text. ";
+                textPrompt += " Render the new text clearly and professionally, maintaining the original layout style where possible but adapting to the new length. ";
+
                 if (headline) textPrompt += `Headline: "${headline}". `;
                 if (subheadline) textPrompt += `Subhead: "${subheadline}". `;
                 if (cta) textPrompt += `Button/CTA: "${cta}". `;
                 if (promotion) textPrompt += `Offer: "${promotion}". `;
                 if (businessName) textPrompt += `Business Name: "${businessName}". `;
-                textPrompt += "Typography should be legible, professional, and integrated into the scene. ";
+                textPrompt += "Typography must be legible, sharp, and integrated into the scene. ";
 
                 finalFalPrompt += textPrompt;
             }

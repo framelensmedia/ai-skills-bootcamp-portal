@@ -97,8 +97,8 @@ export default function RemixChatWizard({
 
     // Toggle for Subject Lock
     const [subjectLock, setSubjectLock] = useState(true);
-    const [keepOutfit, setKeepOutfit] = useState(true);
-    const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("non_human");
+    const [keepOutfit, setKeepOutfit] = useState(false); // Default false (User Requested)
+    const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human"); // Default Human
 
     // Steps State
     const [stepIndex, setStepIndex] = useState(0);

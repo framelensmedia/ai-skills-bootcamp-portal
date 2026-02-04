@@ -161,7 +161,7 @@ function CreatorContent() {
     // Subject Settings
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
     const [subjectLock, setSubjectLock] = useState(true);
-    const [keepOutfit, setKeepOutfit] = useState(true); // New Toggle
+    const [keepOutfit, setKeepOutfit] = useState(false); // Default unchecked
 
     // Generation state
     const [generating, setGenerating] = useState(false);

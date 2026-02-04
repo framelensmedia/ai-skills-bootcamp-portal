@@ -212,7 +212,8 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                                     <Paperclip size={18} />
                                 </button>
                                 <button
-                                    type="submit"
+                                    type="button"
+                                    onClick={() => handleSubmit()}
                                     disabled={!input.trim() || isGenerating || !hasCredits}
                                     className="p-2 rounded-lg text-[#B7FF00] hover:bg-[#B7FF00]/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                                 >
