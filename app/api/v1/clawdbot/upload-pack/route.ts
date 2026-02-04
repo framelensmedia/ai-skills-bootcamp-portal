@@ -34,8 +34,19 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
 
-        // 2. Pack Thumbnail: Use raw URL (Skip Re-upload)
-        const packThumbnailUrl = pack.thumbnail_url || null;
+        // 2. Pack Thumbnail: Upload server-side if external
+        // ROBUSTNESS: Check multiple keys
+        let packThumbnailUrl = pack.thumbnail_url || pack.thumbnailUrl || pack.image_url || pack.imageUrl || pack.url || null;
+
+        if (packThumbnailUrl && !packThumbnailUrl.includes("supabase.co")) {
+            console.log(`[Clawdbot] Uploading Pack Thumbnail: ${packThumbnailUrl}`);
+            const path = `packs/cover-${sanitize(pack.name)}-${Date.now()}.png`;
+            // Reuse the existing helper function at the bottom of file
+            const uploadedPath = await uploadImageFromUrl(packThumbnailUrl, path);
+            if (uploadedPath) {
+                packThumbnailUrl = getPublicUrl(uploadedPath);
+            }
+        }
 
         // 3. Create Pack Record
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
