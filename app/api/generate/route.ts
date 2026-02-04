@@ -231,11 +231,10 @@ async function generateFalImage(
         // Reference (image_urls) = Subject (Identity/Outfit)
 
         if (template_reference_image) {
-            // Case 1: Remix (Template + Subject)
-            payload.image_url = template_reference_image;
-
-            // CRITICAL: We must include the Template in image_urls so "Image 1" in prompt refers to it.
-            // Payload: Base=Template, Refs=[Template, Subject]
+            // CLASSIC REMIX CONFIGURATION:
+            // Base Canvas (image_url) = Template
+            // Reference Images (image_urls) = [Template, Subject]
+            // This tells the model: "Here is the scene (Image 1) and here is the Subject (Image 2). Combine them."
             payload.image_urls = [template_reference_image];
 
             if (mainImageUrl && mainImageUrl !== template_reference_image) {
@@ -243,10 +242,10 @@ async function generateFalImage(
             }
 
             // STRENGTH TUNING
-            // 0.85 was causing blending (ghosting) of the new face over the old face.
-            // 0.95 - 1.0 Allows complete replacement of the face while the Control/Reference image holds the style.
+            // 1.0 allows full rewriting, which is what we want for "Replacement"
+            // 0.95 is the sweet spot: It forces the edit but respects the Base Canvas borders and text.
             if (mainImageUrl) {
-                payload.strength = 1.0;
+                payload.strength = 0.95;
             }
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
@@ -658,37 +657,33 @@ export async function POST(req: Request) {
             if (refImageUrl && subjectLock) {
 
                 // DETECT REMIX MODE (Template + Subject)
-                // We handle this FIRST and exclusively for Nano to avoid ambiguous "Reference Image" terms
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
 
-                    subjectInstruction += " [SUBJECT LOCK: ACTIVE - HARD PHOTOSHOP CUTOUT MODE] ";
-                    subjectInstruction += " 1. ACTION: You must perform a digital 'Scissors Cut' of the source identifier face and paste it into the Template. ";
-                    subjectInstruction += " 2. ZERO BLENDING: Do NOT blend the facial features. The Face Geometry must match the Reference Image 100%. ";
-                    subjectInstruction += " 3. SCALE LOCK: Resize the Reference Face to be PROPORTIONAL to the body in the Base Image. Do NOT use the original size of the face if it is too large. ";
-                    subjectInstruction += " 4. ANATOMICAL REALISM: You MUST generate a CLEARLY VISIBLE NECK. Do not squash the head into the shoulders. ";
-                    subjectInstruction += " 5. SHOULDER ALIGNMENT: Lower the shoulders to a natural relaxed position. Do NOT hunch the trapezius muscles. ";
-                    subjectInstruction += " 6. HEAD PROPORTIONS: The head size must be REALISTIC relative to the body width. The jawline must remain distinct from the collarbone. ";
-                    subjectInstruction += " 7. TOP MARGIN PRESERVATION: DO NOT TOUCH the top 20% of the image. The Headline Text MUST remain visible. Do not let the head cover it. ";
-                    subjectInstruction += " 8. COMPOSITING: Apply 'Beauty Dish' lighting to match the scene. Blend edges. ";
-                    subjectInstruction += " 9. TEXT PRESERVATION: The text at the top and bottom of the Base Image MUST remain visible. DO NOT COVER THE TEXT. ";
+                    // CLASSIC REMIX INSTRUCTION
+                    subjectInstruction += " [SUBJECT REPLACEMENT MODE - STRICT LAYOUT LOCK] ";
+                    subjectInstruction += " 1. TASK: Replace the person in the Base Image (Image 1) with the Subject from the Reference Image (Image 2). ";
+                    subjectInstruction += " 2. SCALE LOCK: Resize the Reference Face/Body to fit the EXACT proportions of the Base Image. Do NOT zoom in. Do NOT let the subject fill the screen. ";
+                    subjectInstruction += " 3. TEXT SAFETY: The Base Image contains text at the top and bottom. YOU MUST NOT COVER IT. Keep the subject's head below the top margin. ";
+                    subjectInstruction += " 4. LIKENESS: The face must match the Reference Image (Image 2) exactly. Maintain the exact eye line, gaze, and facial expression. ";
+                    subjectInstruction += " 5. ANATOMY: Ensure the neck transition is natural. Do not squash the head. ";
+                    subjectInstruction += " 6. CAMERA: Match the lighting, depth of field, and camera angle of the Base Image. ";
 
-                    // Specific negative prompts for this mode
-                    remixNegativePrompt = "no neck, short neck, squashed neck, head on shoulders, hunchback, shrugged shoulders, trapezius too high, big head, large head, giant head, bobblehead, distorted proportions, cartoonish, caricature, double face, ghosting, blending faces, morphing, covering text, blocking text, text overlay, cropping text, distorted body, bad composition, bad lighting, blurry, low resolution, face too large, off center, compressed anatomy";
+                    remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint";
 
-                    if (keepOutfit) {
-                        subjectInstruction += " OUTFIT: PRESERVE the outfit from the Reference Image (Subject). Do NOT use the Base Image outfit. ";
-                    } else {
-                        subjectInstruction += " OUTFIT: USE the outfit from the Base Image (Template). The Subject must wear the Base Image's clothing. Replace the Reference outfit. ";
-                    }
-                } else {
-                    // STANDARD / GENERIC LOGIC (For single image or non-remix)
+                    // STANDARD / GENERIC LOGIC
                     if (keepOutfit) {
                         subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
                     } else {
                         subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
                     }
 
-                    // Standard Face Lock
+                } else {
+                    // STANDARD / GENERIC LOGIC
+                    if (keepOutfit) {
+                        subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
+                    } else {
+                        subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
+                    }
                     subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
                 }
 
