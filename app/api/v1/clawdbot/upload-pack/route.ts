@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
         const results = await Promise.all(templates.map(async (t: any) => {
             try {
                 // SIMPLIFICATION: Skip Image Download/Upload. Use raw URL.
-                const previewUrl = t.image_url || null;
+                // ROBUSTNESS: Check multiple common keys
+                const previewUrl = t.image_url || t.imageUrl || t.url || t.featured_image_url || null;
                 const previewPath = null; // No storage path if using external URL
 
                 const promptPayload: any = {
