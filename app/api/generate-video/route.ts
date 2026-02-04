@@ -236,8 +236,10 @@ export async function POST(req: Request) {
 
         const userCredits = userProfile.credits ?? 0;
         const VIDEO_COST = 30;
+        const isAdmin = userProfile.role === "admin" || userProfile.role === "super_admin";
 
-        if (userCredits < VIDEO_COST) {
+        // Admins bypass credit check
+        if (!isAdmin && userCredits < VIDEO_COST) {
             return NextResponse.json({
                 error: "Insufficient credits for video. Please upgrade or top up.",
                 required: VIDEO_COST,
@@ -321,10 +323,12 @@ export async function POST(req: Request) {
                     model: falModelId
                 });
 
-                // DEDUCT CREDITS (Fal)
-                const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
-                if (rpcErr) {
-                    await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+                // DEDUCT CREDITS (Fal) - Exempt Admins
+                if (!isAdmin) {
+                    const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
+                    if (rpcErr) {
+                        await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+                    }
                 }
 
                 return NextResponse.json({ videoUrl, model: falModelId, remainingCredits: userCredits - VIDEO_COST });
@@ -710,10 +714,12 @@ export async function POST(req: Request) {
             is_public: true
         });
 
-        // DEDUCT CREDITS (Veo)
-        const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
-        if (rpcErr) {
-            await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+        // DEDUCT CREDITS (Veo) - Exempt Admins
+        if (!isAdmin) {
+            const { error: rpcErr } = await admin.rpc("decrement_credits", { x: VIDEO_COST, user_id_param: userId });
+            if (rpcErr) {
+                await admin.from("profiles").update({ credits: userCredits - VIDEO_COST }).eq("user_id", userId);
+            }
         }
 
         return NextResponse.json({ videoUrl, model: modelId, remainingCredits: userCredits - VIDEO_COST });

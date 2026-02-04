@@ -126,7 +126,7 @@ function CreatorContent() {
     const IMAGE_COST = 3;
     const isVideo = mediaType === "video";
     const currentCost = isVideo ? VIDEO_COST : IMAGE_COST;
-    const hasCredits = (userCredits ?? 0) >= currentCost;
+    const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
     const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${currentCost}, have ${userCredits}.` : null;
 
 
@@ -902,7 +902,7 @@ function CreatorContent() {
                             ) : (
                                 <span className="flex items-center gap-2">
                                     <Clapperboard size={20} />
-                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"} ({VIDEO_COST} Cr)</span>
+                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"} ({isAdmin ? "∞" : VIDEO_COST} Cr)</span>
                                 </span>
                             )}
                         </button>
@@ -920,7 +920,7 @@ function CreatorContent() {
                                     <LoadingHourglass className="w-5 h-5 text-black" />
                                     <span>Generating...</span>
                                 </span>
-                            ) : `Generate Artwork (${IMAGE_COST} Cr)`}
+                            ) : `Generate Artwork (${isAdmin ? "∞" : IMAGE_COST} Cr)`}
                         </button>
                     )}
 

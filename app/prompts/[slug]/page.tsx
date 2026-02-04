@@ -143,7 +143,7 @@ function PromptContent() {
   }, [aspectRatio]);
 
   const [isLocked, setIsLocked] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // Admin State
+  // Removed duplicate isAdmin/setIsAdmin declaration
   const [lockReason, setLockReason] = useState<"login" | "upgrade" | null>(null);
 
   // Generation state
@@ -176,6 +176,7 @@ function PromptContent() {
 
   // Model Management State
   const [generationsPaused, setGenerationsPaused] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false); // Added Admin State
   const [modelsConfig, setModelsConfig] = useState<any>({});
   const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
 
@@ -209,8 +210,13 @@ function PromptContent() {
         const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
         if (profile) {
           const role = String(profile.role || "").toLowerCase();
-          if (role === "admin" || role === "super_admin") {
+          if (profile?.role === "admin" || profile?.role === "super_admin") {
+            setGenerationsPaused(false); // Admins bypass pause
             setIsAdmin(true);
+          } else {
+            // Re-apply the global pause config we just fetched
+            const isPaused = pausedConfig?.value === true || pausedConfig?.value === "true";
+            setGenerationsPaused(isPaused);
           }
         }
       }
@@ -1510,7 +1516,7 @@ function PromptContent() {
               const VIDEO_COST = 30;
               const IMAGE_COST = 3;
               const currentCost = mediaType === "video" ? VIDEO_COST : IMAGE_COST;
-              const hasCredits = (userCredits ?? 0) >= currentCost;
+              const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
 
               return (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end pt-2">
@@ -1538,9 +1544,9 @@ function PromptContent() {
                           : mediaType === "video" ? (
                             <span className="flex items-center gap-2">
                               <Clapperboard size={18} />
-                              <span>Animate Video (30 Cr)</span>
+                              <span>Animate Video ({isAdmin ? "∞" : "30"} Cr)</span>
                             </span>
-                          ) : "Generate Artwork (3 Cr)"}
+                          ) : `Generate Artwork (${isAdmin ? "∞" : "3"} Cr)`}
                   </button>
                 </div>
               );

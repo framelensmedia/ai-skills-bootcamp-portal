@@ -20,6 +20,7 @@ export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -33,13 +34,14 @@ export default function Nav() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("profile_image, credits")
+        .select("profile_image, credits, role")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (mounted && profile) {
         setAvatarUrl(profile.profile_image);
         setCredits(profile.credits ?? 0);
+        setIsAdmin(profile.role === "admin" || profile.role === "super_admin");
       }
     }
 
@@ -133,7 +135,7 @@ export default function Nav() {
                 {credits !== null && (
                   <div className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs font-semibold text-[#B7FF00]">
                     <Coins size={12} />
-                    <span>{credits}</span>
+                    <span>{isAdmin ? "∞" : credits}</span>
                   </div>
                 )}
                 <UserAvatar />
@@ -251,7 +253,7 @@ export default function Nav() {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-semibold text-white">Edit Profile</span>
-                          {credits !== null && <span className="text-xs text-[#B7FF00] font-mono">{credits} Credits</span>}
+                          {credits !== null && <span className="text-xs text-[#B7FF00] font-mono">{isAdmin ? "∞" : credits} Credits</span>}
                         </div>
                       </Link>
                       <button

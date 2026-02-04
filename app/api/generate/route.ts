@@ -670,11 +670,12 @@ export async function POST(req: Request) {
 
                     remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint";
 
-                    // STANDARD / GENERIC LOGIC
+                    // REMIX SPECIFIC OUTFIT LOGIC
                     if (keepOutfit) {
-                        subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
+                        subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
+                        // We lower strength slightly for outfit preservation to allow composition blending
                     } else {
-                        subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
+                        subjectInstruction += " OUTFIT: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Use the clothing from the Base Image. ";
                     }
 
                 } else {
@@ -727,11 +728,13 @@ export async function POST(req: Request) {
                     return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
                 }
 
-                // DEDUCT CREDITS
-                const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
-                if (rpcErr) {
-                    // Fallback if RPC missing
-                    await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
+                // DEDUCT CREDITS (Exempt Admins)
+                if (!isAdmin) {
+                    const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
+                    if (rpcErr) {
+                        // Fallback if RPC missing
+                        await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
+                    }
                 }
 
                 console.log("Fal Image Saved to DB:", inserted?.id);
@@ -1251,8 +1254,8 @@ Execute the user's instruction precisely.
             // don't fail the request, just log it
         }
 
-        // DEDUCT CREDITS (Vertex)
-        {
+        // DEDUCT CREDITS (Vertex) - Exempt Admins
+        if (!isAdmin) {
             const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
             if (rpcErr) {
                 await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
