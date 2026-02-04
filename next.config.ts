@@ -16,7 +16,16 @@ const nextConfig: NextConfig = {
         hostname: "**.supabase.co",
         pathname: "/storage/v1/object/sign/**",
       },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
     ],
+  },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
 };
 

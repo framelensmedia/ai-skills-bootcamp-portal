@@ -16,7 +16,7 @@ function PricingContent() {
   const canceled = searchParams.get("canceled");
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
       setUserId(data.user?.id ?? null);
     });
   }, [supabase]);
@@ -36,10 +36,15 @@ function PricingContent() {
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
 
       if (!res.ok) {
-        setError(data?.error ?? "Checkout error");
+        setError(data?.error || `Checkout error: ${res.status}`);
         return;
       }
 
@@ -57,7 +62,7 @@ function PricingContent() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10 text-white">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 pb-40 text-white">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Membership</h1>
         <p className="text-white/70">
@@ -115,8 +120,9 @@ function PricingContent() {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-3xl font-semibold whitespace-nowrap">$29</div>
-              <div className="text-sm text-white/60 whitespace-nowrap">per month</div>
+              <div className="text-3xl font-semibold">$39.99</div>
+              <div className="text-sm text-white/60">per month</div>
+              <div className="text-xs text-[#B7FF00] mt-1 font-medium">7-day trial for $1</div>
             </div>
           </div>
 
@@ -132,7 +138,7 @@ function PricingContent() {
             disabled={loading}
             className="mt-8 w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
           >
-            {loading ? "Redirecting..." : "Start Premium"}
+            {loading ? "Redirecting..." : "Start Trial for $1"}
           </button>
 
           <p className="mt-3 text-xs text-white/60">

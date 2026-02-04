@@ -1,10 +1,26 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { compressImage } from "@/lib/compressImage";
+import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
+import EditModeModal, { QueueItem } from "@/components/EditModeModal";
 import GenerationLightbox from "@/components/GenerationLightbox";
+import ImageUploader from "@/components/ImageUploader";
+import { Smartphone, Monitor, Square, RectangleVertical, Clapperboard, Download, Loader2 } from "lucide-react";
+import SelectPill from "@/components/SelectPill";
+import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
+
+import GenerationOverlay from "@/components/GenerationOverlay";
+import { ArrowLeft, TriangleAlert } from "lucide-react";
+import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
+import { Library } from "lucide-react";
+import StudioCommunityFeed from "@/components/StudioCommunityFeed";
+
+import { GenerationFailureNotification } from "@/components/GenerationFailureNotification";
 
 type MediaType = "image" | "video";
 
@@ -13,13 +29,6 @@ type AspectRatio = (typeof ASPECTS)[number];
 
 function normalize(v: any) {
   return String(v ?? "").trim();
-}
-
-function pill(selected: boolean) {
-  const base = "rounded-xl border px-4 py-2 text-sm font-semibold transition";
-  const idle = "border-white/15 bg-black/40 text-white/70 hover:bg-black/55 hover:border-white/25";
-  const on = "border-[#B7FF00]/50 bg-[#B7FF00]/15 text-white hover:bg-[#B7FF00]/20";
-  return [base, selected ? on : idle].join(" ");
 }
 
 async function copyToClipboard(text: string) {
@@ -32,11 +41,6 @@ async function copyToClipboard(text: string) {
   }
 }
 
-function clampUploads(files: File[], max = 10) {
-  if (files.length <= max) return files;
-  return files.slice(0, max);
-}
-
 function StudioContent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
@@ -44,37 +48,97 @@ function StudioContent() {
 
   // Prefill from Remix flow
   const preImg = normalize(sp?.get("img"));
-  const preOriginal = normalize(sp?.get("original"));
-  const preRemix = normalize(sp?.get("remix"));
-  const legacyPrefill = normalize(sp?.get("prefill"));
+  // Legacy params kept for compatibility, but mainly we use the wizard now
 
   // Optional context
   const prePromptId = normalize(sp?.get("promptId"));
   const prePromptSlug = normalize(sp?.get("promptSlug"));
+  const preIntent = normalize(sp?.get("intent")); // "video" or undefined
 
   const [mediaType, setMediaType] = useState<MediaType>("image");
+  const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
+  const [libraryModalOpen, setLibraryModalOpen] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
+
+  // Model Selection
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
+  const [modelsConfig, setModelsConfig] = useState<any>({});
+  const previewRef = useRef<HTMLElement>(null);
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("/orb-neon.gif");
 
-  const [originalPrompt, setOriginalPrompt] = useState<string>("");
-  const [remixAdditions, setRemixAdditions] = useState<string>("");
+  // ✅ New flow state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
+  const [editSummary, setEditSummary] = useState<string>("");
+  const [templateConfig, setTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
+
+  // Remix Extra State
+  const [logo, setLogo] = useState<File | null>(null);
+  const [businessName, setBusinessName] = useState<string>("");
+
+  // Edit Mode State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Video Generator Modal State
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+
+  // Fetch Template Config if promptId is present
+  useEffect(() => {
+    if (prePromptId) {
+      supabase.from("prompts")
+        .select("template_config_json, subject_mode, featured_image_url, aspect_ratios")
+        .eq("id", prePromptId)
+        .maybeSingle()
+        .then(({ data }: { data: any }) => {
+          if (data) {
+            if (data.featured_image_url && !preImg) setPreviewImageUrl(data.featured_image_url);
+
+            // Set Aspect Ratio from template if available
+            if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
+              const validRatios = ["9:16", "16:9", "1:1", "4:5"];
+              if (validRatios.includes(data.aspect_ratios[0])) {
+                setAspectRatio(data.aspect_ratios[0]);
+              }
+            }
+
+            const config = data.template_config_json || {};
+            setTemplateConfig({
+              editable_fields: config.editable_fields || [],
+              editable_groups: config.editable_groups || [],
+              subject_mode: data.subject_mode || config.subject_mode || "non_human"
+            });
+          } else {
+            console.warn("Template not found or access denied:", prePromptId);
+            setTemplateConfig({ editable_fields: [], subject_mode: "non_human" });
+          }
+        });
+    } else {
+      // Scratch mode / No template loaded
+      setTemplateConfig(DEFAULT_CONFIG);
+    }
+  }, [prePromptId, supabase]);
+
+  // Kept for fallback copy? Or should I just use editSummary?
+  // "The prompt field... edit-instruction summary". So editSummary is the source of truth.
+
+  // Interaction State
+  const [manualMode, setManualMode] = useState(true);
 
   // ✅ Uploads (up to 10)
   const [uploads, setUploads] = useState<File[]>([]);
   const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
 
-  const combinedPrompt = useMemo(() => {
-    const a = normalize(originalPrompt);
-    const b = normalize(remixAdditions);
-    return [a, b].filter(Boolean).join("\n\n");
-  }, [originalPrompt, remixAdditions]);
-
   // Output
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
+  const [lastFullQualityUrl, setLastFullQualityUrl] = useState<string | null>(null);
+  // Video State
+  const [animating, setAnimating] = useState(false);
+  const [videoResult, setVideoResult] = useState<string | null>(null);
 
+  // Lightbox
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -84,21 +148,100 @@ function StudioContent() {
   // Copy feedback
   const [copied, setCopied] = useState(false);
 
+  // ✅ Auth State
+  const [user, setUser] = useState<any>(null);
+
+  // Global Pause State
+  const [generationsPaused, setGenerationsPaused] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Fetch Config & User Role
+  useEffect(() => {
+    const fetchConfig = async () => {
+      const supabase = createSupabaseBrowserClient();
+
+      // 1. Fetch Global Config
+      const { data: pausedConfig } = await supabase.from("app_config").select("value").eq("key", "generations_paused").maybeSingle();
+      if (pausedConfig) {
+        setGenerationsPaused(pausedConfig.value === true || pausedConfig.value === "true");
+      }
+
+      // 2. Fetch User Role for Admin Bypass
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+        if (profile) {
+          const role = String(profile.role || "").toLowerCase();
+          if (role === "admin" || role === "super_admin") {
+            setIsAdmin(true);
+          }
+        }
+      }
+
+      // 3. Fetch Model Config
+      const { data: models } = await supabase.from("app_config").select("value").eq("key", "model_availability").maybeSingle();
+      if (models && models.value) {
+        setModelsConfig(models.value);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  // Video Edit State
+  const [inputVideoUrl, setInputVideoUrl] = useState<string | undefined>(undefined);
+
+  // Parse Edit Mode
+  const modeParam = normalize(sp?.get("mode"));
+  const videoUrlParam = normalize(sp?.get("videoUrl"));
+  const promptParam = normalize(sp?.get("prompt"));
+
+  useEffect(() => {
+    if (modeParam === "edit" && videoUrlParam) {
+      setInputVideoUrl(videoUrlParam);
+      setVideoModalOpen(true);
+      if (promptParam) setEditSummary(promptParam);
+    }
+  }, [modeParam, videoUrlParam, promptParam]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
+  }, [supabase]);
+
+  function handleAuthGate(e?: any) {
+    if (!user) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // If it's a focus event (textarea), blur it
+        if (e.target && e.target.blur) e.target.blur();
+      }
+      router.push("/login");
+      return false;
+    }
+    return true;
+  }
+
+  // ✅ Prevent double-fetch in Strict Mode
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => {
     // apply prefill once on mount
-    if (preImg) setPreviewImageUrl(preImg);
-
-    if (preOriginal || preRemix) {
-      setOriginalPrompt(preOriginal);
-      setRemixAdditions(preRemix);
-      return;
+    if (preImg) {
+      setPreviewImageUrl(preImg);
     }
 
-    if (legacyPrefill) {
-      setOriginalPrompt(legacyPrefill);
+    // If we have a remix param or img param, we assume the user wants to start the Remix Wizard
+    // The feed passes 'remix' param with the prompt text usually.
+    if (preImg || sp?.get("remix")) {
+      setWizardOpen(true);
+
+      // ✅ Ported Logic: If preImg exists, Wizard shows it via templatePreviewUrl
+      // We DO NOT auto-fetch into uploads to avoid massive payloads / security errors.
+      if (preImg && uploads.length === 0) {
+        // verifying that previewImageUrl is set above is enough
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [preImg, sp]);
 
   // ✅ Manage preview URLs for uploads
   useEffect(() => {
@@ -115,6 +258,11 @@ function StudioContent() {
   }, [uploads]);
 
   function closeLightbox() {
+    // When closing, we ensure the preview shows the Last Generated Image
+    // This gives the user context of "where their generation went"
+    if (lastImageUrl) {
+      setPreviewImageUrl(lastImageUrl);
+    }
     setLightboxOpen(false);
   }
 
@@ -128,6 +276,8 @@ function StudioContent() {
     remixPromptText: string;
     combinedPromptText: string;
   }) {
+    if (!handleAuthGate()) return;
+
     const href =
       `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
       `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
@@ -138,80 +288,179 @@ function StudioContent() {
   }
 
   async function handleCopyPrompt() {
-    await copyToClipboard(combinedPrompt || originalPrompt);
+    await copyToClipboard(editSummary);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   }
 
-  function onPickUploads(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
+  function handleWizardComplete(summary: string, ans: RemixAnswers, shouldGenerate = false) {
+    setEditSummary(summary);
+    setRemixAnswers(ans);
+    // If wizard returned a modelId, set it as the selected model
+    if (ans.modelId) {
+      setSelectedModel(ans.modelId);
+    }
+    setWizardOpen(false);
+    if (summary) setManualMode(true);
 
-    // append + clamp to 10
-    setUploads((prev) => clampUploads([...prev, ...files], 10));
-
-    // reset input so user can re-pick same file if needed
-    e.target.value = "";
+    if (shouldGenerate) {
+      handleGenerate({ prompt: summary, answers: ans });
+    }
   }
 
-  function removeUpload(idx: number) {
-    setUploads((prev) => prev.filter((_, i) => i !== idx));
-  }
+  async function handleGenerate(overrides?: { prompt?: string; answers?: RemixAnswers }) {
+    if (!handleAuthGate()) return;
 
-  function clearUploads() {
-    setUploads([]);
-  }
-
-  async function handleGenerate() {
     setGenError(null);
+
+    // If video modal is open, we handle it there
+    if (videoModalOpen) return;
 
     if (mediaType === "video") {
       setGenError("Video generation is not wired yet. Switch to Image for now.");
       return;
     }
 
-    const finalPrompt = normalize(combinedPrompt || originalPrompt);
-    if (!finalPrompt) {
-      setGenError("Add an original prompt and optionally remix additions first.");
+    if (generating) return;
+
+    const promptToUse = overrides?.prompt ?? editSummary;
+    const answersToUse = overrides?.answers ?? remixAnswers;
+
+    if (!promptToUse) {
+      setGenError("Please use Remix to create your edit instructions first.");
       return;
     }
 
     setGenerating(true);
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+    // Scroll to preview explicitly
+    if (typeof window !== "undefined" && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 
+    try {
       if (!user?.id) {
-        setGenError("Please log in to generate.");
+        setGenError("Please log in.");
         setGenerating(false);
         return;
       }
 
-      const form = new FormData();
+      // 1. Stage Uploads (Client-Side Compression + Temp Storage) manually
+      // This bypasses Vercel 4.5MB limit by uploading files individually first.
+      const uploadedImageUrls: string[] = [];
 
-      // What Vertex uses
-      form.append("prompt", finalPrompt);
-      form.append("userId", user.id);
-      form.append("aspectRatio", aspectRatio);
+      if (uploads.length > 0) {
+        // notify user of upload phase if needed, currently just showing "generating" spinner
+        // ideally we would show "Processing images..." 
 
-      // ✅ Standardized prompt columns (server should write these to prompt_generations)
-      form.append("original_prompt_text", normalize(originalPrompt));
-      form.append("remix_prompt_text", normalize(remixAdditions));
-      form.append("combined_prompt_text", finalPrompt);
+        for (const file of uploads) {
+          try {
+            // Compress
+            const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
 
-      // ✅ Upload up to 10 images
-      uploads.slice(0, 10).forEach((file) => {
-        form.append("images", file, file.name);
-      });
+            // 1. Get Signed URL
+            const signRes = await fetch("/api/sign-upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                filename: compressed.name,
+                fileType: compressed.type
+              })
+            });
 
-      if (prePromptId) form.append("promptId", prePromptId);
-      if (prePromptSlug) form.append("promptSlug", prePromptSlug);
+            if (!signRes.ok) {
+              const errText = await signRes.text();
+              throw new Error(`Failed to initialize upload: ${signRes.status} ${errText}`);
+            }
+            const { signedUrl, publicUrl } = await signRes.json();
+
+            // 2. Direct Upload to Storage (Bypass Vercel)
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: compressed,
+              headers: {
+                "Content-Type": compressed.type
+              }
+            });
+
+            if (!upRes.ok) {
+              throw new Error(`Storage upload failed: ${upRes.statusText}`);
+            }
+
+            uploadedImageUrls.push(publicUrl);
+          } catch (err: any) {
+            console.error("Failed to stage image:", err);
+            // Continue? Or fail? Let's fail for now to ensure consistency
+            throw new Error(err.message || "Failed to upload one of the images. Please try again.");
+          }
+        }
+      }
+
+      // 2. Build JSON Payload (Not FormData)
+      const payload: any = {
+        prompt: normalize(promptToUse),
+        userId: normalize(user.id),
+        aspectRatio: normalize(aspectRatio),
+        combined_prompt_text: normalize(promptToUse), // Standardized 
+        edit_instructions: normalize(promptToUse),
+        template_reference_image: normalize(previewImageUrl),
+        imageUrls: uploadedImageUrls, // ✅ Pass URLs instead of Files
+        // Files are NOT passed here
+        modelId: answersToUse?.modelId || selectedModel,
+      };
+
+      if (prePromptId) payload.promptId = normalize(prePromptId);
+      if (prePromptSlug) payload.promptSlug = normalize(prePromptSlug);
+
+      if (answersToUse) {
+        if (answersToUse.headline) payload.headline = answersToUse.headline;
+        if (answersToUse.subjectLock) payload.subjectLock = answersToUse.subjectLock;
+        if (answersToUse.industry_intent) payload.industry_intent = answersToUse.industry_intent;
+        if (answersToUse.business_name) payload.business_name = answersToUse.business_name;
+        if (answersToUse.subject_mode) payload.subjectMode = answersToUse.subject_mode;
+      }
+
+      // Handle Logo Separately (Also Stage?)
+      // For now, let's keep logo simple or stage it too if it's large. 
+      // Usually logos are small. But let's stay safe and stage it if present.
+      if (logo) {
+        try {
+          const logoCompressed = await compressImage(logo, { maxWidth: 1024, quality: 0.9 });
+
+          // Use signed URL like other uploads
+          const signRes = await fetch("/api/sign-upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: logoCompressed.name,
+              fileType: logoCompressed.type
+            })
+          });
+
+          if (signRes.ok) {
+            const { signedUrl, publicUrl } = await signRes.json();
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: logoCompressed,
+              headers: { "Content-Type": logoCompressed.type }
+            });
+            if (upRes.ok) {
+              payload.logo_image = publicUrl;
+            }
+          }
+        } catch (e) {
+          console.warn("Logo upload failed:", e);
+        }
+      }
+      if (businessName) payload.business_name = businessName;
+
 
       const res = await fetch("/api/generate", {
         method: "POST",
-        body: form,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload),
       });
 
       const json = await res.json();
@@ -223,6 +472,8 @@ function StudioContent() {
       }
 
       const imageUrl = normalize(json?.imageUrl);
+      const fullQualityUrl = normalize(json?.fullQualityUrl);
+
       if (!imageUrl) {
         setGenError("No imageUrl returned.");
         setGenerating(false);
@@ -230,251 +481,756 @@ function StudioContent() {
       }
 
       setLastImageUrl(imageUrl);
+      setLastFullQualityUrl(fullQualityUrl);
       setLightboxOpen(true);
+
+      // Auto-Switch for Video Intent -> Open Modal
+      if (preIntent === "video") {
+        setMediaType("video");
+        setVideoModalOpen(true);
+      }
     } catch (e: any) {
-      setGenError(e?.message || "Failed to generate.");
+      console.error("Generation error:", e);
+      const msg = e?.message || "";
+      if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
+        setGenError("BROWSER_SECURITY"); // Special flag for UI
+      } else {
+        setGenError(msg || "Failed to generate.");
+      }
     } finally {
       setGenerating(false);
     }
   }
 
+  async function handleEditGenerate(prompt: string, images: File[] = [], modelId?: string) {
+    if (!lastFullQualityUrl) return;
+    setGenerating(true);
+    setGenError(null);
+
+    try {
+      // 1. Convert Source URL to Blob via server-side proxy (bypasses CORS)
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(lastFullQualityUrl)}`;
+
+      let srcBlob: Blob;
+      let srcFile: File;
+
+      try {
+        const srcRes = await fetch(proxyUrl);
+
+        if (!srcRes.ok) {
+          const errorText = await srcRes.text();
+          throw new Error(`Failed to load image: ${errorText}`);
+        }
+
+        srcBlob = await srcRes.blob();
+        srcFile = new File([srcBlob], "source_image", { type: srcBlob.type || "image/png" });
+      } catch (fetchError: any) {
+        console.error('Failed to fetch image for editing:', fetchError);
+        throw new Error(`Cannot load image for editing: ${fetchError.message}`);
+      }
+
+      // 2. STAGE UPLOADS (Direct to Storage)
+      // Upload the Canvas Image (Source)
+      let canvasUrl: string | null = null;
+      try {
+        // Sign
+        const sRes = await fetch("/api/sign-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: "canvas_source.png", fileType: srcBlob.type || "image/png" })
+        });
+        if (!sRes.ok) throw new Error("Sign failed");
+        const { signedUrl, publicUrl } = await sRes.json();
+
+        // Upload
+        const cRes = await fetch(signedUrl, { method: "PUT", body: srcBlob, headers: { "Content-Type": srcBlob.type || "image/png" } });
+        if (!cRes.ok) throw new Error("Upload failed");
+
+        canvasUrl = publicUrl;
+      } catch (err) {
+        throw new Error("Failed to upload base image. Please try again.");
+      }
+
+      // Upload Subject Refs (if any)
+      const uploadedImageUrls: string[] = [];
+      if (uploads.length > 0) {
+        for (const file of uploads) {
+          try {
+            // Compress
+            const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+
+            // Sign
+            const sRes = await fetch("/api/sign-upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ filename: compressed.name, fileType: compressed.type })
+            });
+            if (!sRes.ok) {
+              const errText = await sRes.text();
+              throw new Error(`Sign failed: ${sRes.status} ${errText}`);
+            }
+            const { signedUrl, publicUrl } = await sRes.json();
+
+            // Upload
+            const upRes = await fetch(signedUrl, {
+              method: "PUT",
+              body: compressed,
+              headers: { "Content-Type": compressed.type }
+            });
+
+            if (upRes.ok) {
+              uploadedImageUrls.push(publicUrl);
+            } else {
+              throw new Error(await upRes.text());
+            }
+          } catch (e: any) {
+            console.error("Failed to stage upload in edit mode", e);
+            // Keep consistent error format
+            throw new Error(`Upload failed: ${e.message}`);
+          }
+        }
+      }
+
+      // 3. Build JSON Payload
+      const supabase = createSupabaseBrowserClient();
+      const { data: { user } = {} } = await supabase.auth.getUser();
+      if (!user) throw new Error("Please log in to edit.");
+
+      const payload: any = {
+        userId: user.id,
+        prompt: prompt,
+        edit_instructions: prompt,
+        canvas_image: canvasUrl, // ✅ Send URL
+        imageUrls: uploadedImageUrls, // ✅ Send URLs
+        subjectLock: remixAnswers?.subjectLock ? "true" : "false", // Ensure boolean string or bool? API uses string check usually.
+        // subjectLock logic in API: String(form.get("subjectLock") ?? "false").trim() === "true"; OR body.subjectLock
+        modelId: modelId || selectedModel, // Use passed model, fallback to studio selection
+      };
+
+      // Add Meta
+      if (businessName) payload.business_name = businessName;
+      if (remixAnswers?.subjectLock) payload.subjectLock = remixAnswers.subjectLock;
+
+
+      // 4. Call API (JSON)
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const imageUrl = data.imageUrl;
+      const fullQualityUrl = data.full_quality_url || imageUrl;
+
+      setLastImageUrl(imageUrl);
+      setLastFullQualityUrl(fullQualityUrl);
+      setLightboxOpen(true);
+      setEditModalOpen(false);
+
+      // Auto-Switch for Video Intent
+      if (preIntent === "video") {
+        setMediaType("video");
+        setVideoModalOpen(true);
+      }
+
+    } catch (e: any) {
+      console.error("Edit Generation Error:", e);
+      setGenError(e.message || "Failed to appply edits.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleAnimate() {
+    if (!handleAuthGate()) return;
+    if (animating) return;
+
+    const promptText = editSummary.trim();
+    if (!promptText) {
+      setGenError("Please describe the motion or scene you want to create.");
+      return;
+    }
+
+    setAnimating(true);
+    setGenError(null);
+    setVideoResult(null);
+
+    // Scroll to preview
+    if (typeof window !== "undefined" && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    try {
+      let sourceImage: string | undefined;
+      let subjectImageBase64: string | undefined;
+
+      if (videoSubMode === "image_to_video") {
+        sourceImage = (lastImageUrl && lastImageUrl !== "/orb-neon.gif")
+          ? lastImageUrl
+          : (previewImageUrl !== "/orb-neon.gif" ? previewImageUrl : undefined);
+
+        // Use first upload as either start frame OR subject reference
+        if (uploads.length > 0) {
+          const file = uploads[0];
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+
+          subjectImageBase64 = undefined; // Force Start Frame (no Subject)
+
+          // If no generated image yet, use this as the start frame
+          if (!sourceImage || sourceImage.startsWith("blob:")) {
+            sourceImage = base64;
+          }
+        }
+
+        if (!sourceImage) {
+          setGenError("Please generate or upload an image first for Image-to-Video.");
+          setAnimating(false);
+          return;
+        }
+      } else {
+        // Text to Video
+        sourceImage = undefined;
+      }
+
+      const res = await fetch("/api/generate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: sourceImage,
+          mainSubjectBase64: subjectImageBase64,
+          prompt: promptText,
+          userId: user?.id,
+          aspectRatio: aspectRatio,
+          sourceImageId: prePromptId || undefined,
+          modelId: selectedModel
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Video generation failed");
+
+      if (data.videoUrl) {
+        setVideoResult(data.videoUrl);
+      } else {
+        throw new Error("No video URL returned from server");
+      }
+    } catch (err: any) {
+      console.error("Video Generation Error:", err);
+      const msg = err.message || "";
+      if (msg.includes("violates Vertex AI's usage guidelines")) {
+        setGenError("SAFETY_POLICY_VIOLATION"); // Special flag
+      } else {
+        setGenError(msg || "Failed to animate");
+      }
+    } finally {
+      setAnimating(false);
+    }
+  }
+
+  // Deprecated inline animation function
+
+
+  function handleRemixFromLightbox() {
+    if (!handleAuthGate()) return;
+
+    // Check if the current generation result is a video
+    if (mediaType === "video" || (lastImageUrl && lastImageUrl.startsWith("http") && lastImageUrl.includes("video"))) { // Weak check
+      // Actually, if we just generated a video, we might want to extend it.
+      // But here we are "Remixing".
+      // If mediaType is video, open Video Modal?
+      // Current UI has "Video" pill but disabled. We only generate Images in Studio for now.
+      // So Lightbox in Studio is ONLY for images.
+
+      // Wait, the user said "remix video option". This refers to the Community Remixes grid.
+      // Those don't open lightbox. They have hover buttons.
+    }
+    setWizardOpen(true);
+    setLightboxOpen(false);
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
+      <RemixChatWizard
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onComplete={handleWizardComplete}
+        templatePreviewUrl={previewImageUrl}
+        initialValues={remixAnswers}
+        uploads={uploads}
+        onUploadsChange={setUploads}
+        logo={logo}
+        onLogoChange={setLogo}
+        businessName={businessName}
+        onBusinessNameChange={setBusinessName}
+        templateConfig={templateConfig}
+        isGuest={!user}
+        onGuestInteraction={() => handleAuthGate()}
+      />
+      <EditModeModal
+        isOpen={editModalOpen}
+        onClose={() => !generating && setEditModalOpen(false)}
+        sourceImageUrl={lastFullQualityUrl || lastImageUrl || previewImageUrl || ""}
+        onGenerate={handleEditGenerate}
+        isGenerating={generating}
+      />
       <GenerationLightbox
         open={lightboxOpen}
-        url={lastImageUrl}
+        url={lastImageUrl || previewImageUrl}
+        videoUrl={mediaType === "video" ? videoResult : undefined}
+        mediaType={mediaType}
         onClose={closeLightbox}
-        originalPromptText={originalPrompt}
-        remixPromptText={remixAdditions}
-        combinedPromptText={normalize(combinedPrompt || originalPrompt)}
         onShare={handleShare}
         onRemix={handleRemix}
+        originalPromptText={editSummary}
+        remixPromptText={remixAnswers ? JSON.stringify(remixAnswers) : ""}
+        combinedPromptText={editSummary}
+        onAnimate={handleAnimate} // Uses inline animation for fresh generation
+        onEdit={() => {
+          setLightboxOpen(false);
+          setEditModalOpen(true);
+        }}
+      />
+
+      {/* Video Modal remains for other flows, but Studio uses inline generation */}
+      <VideoGeneratorModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        sourceImage={lastImageUrl || ""}
+        sourceVideo={inputVideoUrl} // ✅ Pass Video
+        initialPrompt={editSummary}
       />
 
       <div className="mb-6">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 inline-flex items-center gap-2 text-sm text-lime-400 hover:text-lime-300 transition-colors font-bold uppercase tracking-wide"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Prompt Studio</h1>
         <p className="mt-2 text-sm text-white/70 sm:text-base">
           Remix an existing prompt or build from scratch. Generate, save, and reuse winners.
         </p>
+        <GenerationFailureNotification
+          error={genError}
+          onClose={() => setGenError(null)}
+          onRetry={() => handleGenerate()}
+        />
+
+        {/* GLOBAL PAUSE BANNER */}
+        {generationsPaused && (
+          <div className={`mt-4 rounded-2xl border p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 ${isAdmin ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+            }`}>
+            <div className={`p-2 rounded-full ${isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+              <TriangleAlert size={24} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-bold ${isAdmin ? "text-amber-200" : "text-red-200"}`}>
+                {isAdmin ? "Generations Paused (Admin Bypass Active)" : "Generations Paused"}
+              </h3>
+              <p className={`text-sm ${isAdmin ? "text-amber-200/70" : "text-red-200/70"}`}>
+                {isAdmin
+                  ? "System is paused for users, but you can still generate as an Admin."
+                  : "System upgrades in progress. Please check back shortly."}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2" ref={previewRef}>
         {/* LEFT: Prompt Tool */}
-        <div className="order-2 lg:order-1 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-lg font-semibold">Prompt Tool</div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={handleCopyPrompt}
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60"
-              >
-                {copied ? "Copied" : "Copy Prompt"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating}
-                className={[
-                  "inline-flex items-center justify-center rounded-xl px-5 py-2 text-sm font-semibold text-black transition",
-                  generating ? "cursor-not-allowed bg-[#B7FF00]/50" : "bg-[#B7FF00] hover:opacity-90",
-                ].join(" ")}
-              >
-                {generating ? "Generating..." : "Generate"}
-              </button>
-            </div>
+        <div className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <div className="text-xl font-bold tracking-tight text-white">Prompt Tool</div>
+            <div className="text-xs font-semibold text-lime-400 uppercase tracking-widest">AI Studio</div>
           </div>
 
-          {/* View full prompt */}
-          <button
-            type="button"
-            onClick={() => setShowFullPrompt((v) => !v)}
-            className="mt-5 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-4 text-left hover:border-white/20"
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-white/80">
-                View full prompt <span className="ml-2 text-xs font-normal text-white/40">(click to expand)</span>
-              </div>
-              <div className="text-xs text-white/50">{showFullPrompt ? "Hide" : "Show"}</div>
+          {/* Edit Summary Display */}
+          <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="text-sm font-bold text-white/90">Prompt Instructions</div>
             </div>
 
-            {showFullPrompt ? (
-              <div className="mt-3 whitespace-pre-wrap text-sm text-white/75">
-                {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
-              </div>
-            ) : null}
-          </button>
+            <div className="relative transition-all duration-500">
+              <textarea
+                onClick={handleAuthGate}
+                onFocus={handleAuthGate}
+                onChange={(e) => setEditSummary(e.target.value)}
+                className="w-full rounded-2xl rounded-tl-none border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                rows={6}
+                placeholder="Describe your image..."
+                value={editSummary}
+              />
 
-          {/* Remix */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">Remix</div>
-            <p className="mt-2 text-sm text-white/55">
-              Describe what you want to change. We’ll use this to auto-remix the prompt.
-            </p>
-
-            <textarea
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none placeholder:text-white/35 focus:border-white/25"
-              rows={6}
-              placeholder="Example: Make this 9:16 TikTok style, neon accent lighting, more urgency, include a CTA..."
-              value={remixAdditions}
-              onChange={(e) => setRemixAdditions(e.target.value)}
-            />
-          </div>
-
-          {/* ✅ Upload reference images */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Upload images</div>
-              <div className="text-xs text-white/45">{uploads.length}/10</div>
-            </div>
-
-            <p className="mt-2 text-sm text-white/55">
-              Optional. Upload up to 10 reference images to guide the generation.
-            </p>
-
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-black/40 px-4 py-2 text-sm font-semibold text-white/85 hover:bg-black/60">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={onPickUploads}
-                />
-                Upload images
-              </label>
-
-              <button
-                type="button"
-                onClick={clearUploads}
-                className={[
-                  "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition",
-                  uploads.length
-                    ? "border-white/15 bg-black/40 text-white/80 hover:bg-black/60"
-                    : "cursor-not-allowed border-white/10 bg-black/20 text-white/35",
-                ].join(" ")}
-                disabled={!uploads.length}
-              >
-                Clear
-              </button>
-            </div>
-
-            {uploadPreviews.length ? (
-              <div className="mt-4 grid grid-cols-5 gap-2">
-                {uploadPreviews.map((src, idx) => (
-                  <div key={src} className="group relative overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                    <div className="relative aspect-square w-full">
-                      <Image src={src} alt={`Upload ${idx + 1}`} fill className="object-cover" />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeUpload(idx)}
-                      className="absolute right-1 top-1 rounded-lg border border-white/15 bg-black/60 px-2 py-1 text-[11px] text-white/80 opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
-                      title="Remove"
-                    >
-                      Remove
-                    </button>
+              {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
+                <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
+                    {mediaType === "video" ? "Start Frame" : "Reference Images"}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-4 text-xs text-white/45">No images uploaded.</div>
-            )}
+
+                  <button
+                    type="button"
+                    onClick={() => setLibraryModalOpen(true)}
+                    className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                  >
+                    <Library size={18} className="transition-transform group-hover:scale-110" />
+                    <span>PICK FROM YOUR LIBRARY</span>
+                  </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-white/5"></div>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                      <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                    </div>
+                  </div>
+
+                  <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Generator Settings */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Generator Settings</div>
-              <div className="text-xs text-white/45">
-                Selected: {mediaType.toUpperCase()} · {aspectRatio}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-bold text-white/90">Settings</div>
+              </div>
+              <div className="text-xs font-mono text-lime-400/80">
+                {mediaType.toUpperCase()} / {aspectRatio}
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className={pill(mediaType === "image")} onClick={() => setMediaType("image")}>
-                Image
-              </button>
-              <button type="button" className={pill(mediaType === "video")} onClick={() => setMediaType("video")}>
-                Video
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectPill
+                label="Image"
+                selected={mediaType === "image"}
+                onClick={() => { setMediaType("image"); setSelectedModel(DEFAULT_MODEL_ID); }}
+                disabled={generating || animating}
+              />
+              <SelectPill
+                label="Video"
+                selected={mediaType === "video"}
+                onClick={() => { setMediaType("video"); setSelectedModel(DEFAULT_VIDEO_MODEL_ID); }}
+                disabled={generating || animating}
+              />
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {ASPECTS.map((a) => (
-                <button key={a} type="button" className={pill(aspectRatio === a)} onClick={() => setAspectRatio(a)}>
-                  {a}
-                </button>
-              ))}
+            {/* Model Selector (Only show if multiple options) */}
+            {mediaType === "image" && GENERATION_MODELS.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {GENERATION_MODELS.map((model) => (
+                    <SelectPill
+                      key={model.id}
+                      label={model.label}
+                      description={model.description}
+                      selected={selectedModel === model.id}
+                      onClick={() => setSelectedModel(model.id)}
+                      disabled={modelsConfig && modelsConfig[model.id] === false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Video Model Selector - Only show if multiple models */}
+            {mediaType === "video" && VIDEO_MODELS.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {VIDEO_MODELS.map((model) => (
+                    <SelectPill
+                      key={model.id}
+                      label={model.label}
+                      description={model.description}
+                      selected={selectedModel === model.id}
+                      onClick={() => setSelectedModel(model.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {mediaType === "video" && (
+              <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <SelectPill
+                  label="Image to Video"
+                  description="Start Frame"
+                  selected={videoSubMode === "image_to_video"}
+                  onClick={() => setVideoSubMode("image_to_video")}
+                  disabled={generating || animating}
+                />
+                <SelectPill
+                  label="Text to Video"
+                  description="Words only"
+                  selected={videoSubMode === "text_to_video"}
+                  onClick={() => setVideoSubMode("text_to_video")}
+                  disabled={generating || animating}
+                />
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="grid grid-cols-4 gap-2">
+                <SelectPill
+                  label="9:16"
+                  description="Vertical"
+                  icon={<Smartphone size={16} />}
+                  selected={aspectRatio === "9:16"}
+                  onClick={() => setAspectRatio("9:16")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="16:9"
+                  description="Wide"
+                  icon={<Monitor size={16} />}
+                  selected={aspectRatio === "16:9"}
+                  onClick={() => setAspectRatio("16:9")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="1:1"
+                  description="Square"
+                  icon={<Square size={16} />}
+                  selected={aspectRatio === "1:1"}
+                  onClick={() => setAspectRatio("1:1")}
+                  disabled={generating}
+                />
+                <SelectPill
+                  label="4:5"
+                  description="Rect"
+                  icon={<RectangleVertical size={16} />}
+                  selected={aspectRatio === "4:5"}
+                  onClick={() => setAspectRatio("4:5")}
+                  disabled={generating}
+                />
+              </div>
             </div>
           </div>
 
           {/* Remixes placeholder */}
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Remixes</div>
-              <div className="text-xs text-white/45">0</div>
+              <div className="text-sm font-bold text-white/90">Remixes</div>
+              <div className="text-xs font-mono text-white/40">0</div>
             </div>
-            <p className="mt-2 text-sm text-white/55">No remixes yet. Generate one to start building your library.</p>
+            <p className="mt-2 text-sm text-white/40">No remixes yet. Generate one to start building your library.</p>
             <button
               type="button"
-              className="mt-4 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white/80 hover:border-white/20 hover:bg-black/55"
+              className="mt-4 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-bold text-white/80 hover:bg-black/60 transition-all hover:scale-[1.01]"
               onClick={() => router.push("/library")}
             >
               View all remixes
             </button>
           </div>
 
-          {genError ? (
-            <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+          {genError === "BROWSER_SECURITY" ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg flex flex-col gap-3">
+              <div>Browser security prevented processing. Please turn off Private/Incognito Mode or try resetting your session.</div>
+              <button
+                onClick={async () => { await supabase.auth.signOut(); window.location.href = "/login"; }}
+                className="self-start rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-red-100 hover:bg-red-500/30 transition"
+              >
+                Reset Session
+              </button>
+            </div>
+          ) : genError === "SAFETY_POLICY_VIOLATION" ? (
+            <div className="rounded-2xl border border-orange-500/30 bg-orange-950/30 p-4 text-sm text-orange-200 shadow-lg border-l-4 border-l-orange-500">
+              <strong>Usage Prevention:</strong> This image triggered Google's Safety Filters (likely due to a detected face or public figure).
+              <br /><br />
+              Veo (the video model) is stricter than the image model. Try using a different subject or a non-human image.
+            </div>
+          ) : genError ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg">
               {genError}
             </div>
           ) : null}
 
-          {/* Original prompt (kept) */}
-          <div className="mt-6">
-            <div className="text-xs font-semibold text-white/55">Original prompt</div>
-            <textarea
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/85 outline-none placeholder:text-white/35 focus:border-white/25"
-              rows={5}
-              placeholder="Paste the original prompt here..."
-              value={originalPrompt}
-              onChange={(e) => setOriginalPrompt(e.target.value)}
-            />
+          {/* ACTION BUTTONS */}
+          <div className="space-y-4 pt-4 border-t border-white/5">
+
+            {/* VIDEO RESULT ACTION */}
+            {videoResult ? (
+              <a
+                href={videoResult}
+                download={`video-${Date.now()}.mp4`}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-5 text-base font-bold tracking-tight bg-white text-black hover:bg-white/90 transition-all shadow-lg shadow-white/10"
+              >
+                <Download size={20} />
+                Download Video
+              </a>
+            ) : mediaType === "video" ? (
+              /* ANIMATE BUTTON */
+              <button
+                type="button"
+                onClick={handleAnimate}
+                disabled={animating || (generationsPaused && !isAdmin)}
+                className={[
+                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-white transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                  animating ? "cursor-not-allowed bg-zinc-700" : "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500",
+                ].join(" ")}
+              >
+                {animating ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    <span>Animating...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Clapperboard size={20} />
+                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"}</span>
+                  </span>
+                )}
+              </button>
+            ) : (
+              /* GENERATE BUTTON */
+              <button
+                type="button"
+                onClick={() => handleGenerate()}
+                disabled={generating || (generationsPaused && !isAdmin)}
+                className={[
+                  "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                  generating ? "cursor-not-allowed bg-lime-400/60" : "bg-lime-400 hover:bg-lime-300",
+                ].join(" ")}
+              >
+                {generating ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 text-black animate-spin" />
+                    <span>Generating...</span>
+                  </span>
+                ) : "Generate Artwork"}
+              </button>
+            )}
+
+            {/* Secondary Actions Row */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold tracking-tight text-white/60 hover:text-white hover:bg-white/10 transition-all"
+              >
+                {copied ? "Copied" : "Copy Prompt Only"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { if (handleAuthGate()) setWizardOpen(true); }}
+                className="inline-flex items-center justify-center rounded-2xl border border-lime-400/20 bg-lime-400/5 px-4 py-3 text-sm font-bold tracking-tight text-lime-200 hover:bg-lime-400/10 transition-all"
+              >
+                Remix Again
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <StudioCommunityFeed />
           </div>
         </div>
+
+
 
         {/* RIGHT: Preview */}
-        <div className="order-1 lg:order-2 rounded-3xl border border-white/10 bg-black/40 p-4 sm:p-6">
-          <div className="text-sm font-semibold">Preview</div>
-
-          <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-            <div className="relative aspect-[4/5] w-full bg-black">
-              <Image
-                src={lastImageUrl || previewImageUrl}
-                alt="Preview"
-                fill
-                className="object-cover"
-                priority={false}
-              />
+        < div className="order-1 lg:order-2 space-y-4" >
+          <div className="group relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]">
+            {/* Generating Overlay */}
+            {(generating || animating) && (
+              <GenerationOverlay label={animating ? "CREATING VIDEO" : "GENERATING ARTWORK"} />
+            )}
+            <div
+              className="relative aspect-[9/16] w-full cursor-pointer"
+              onClick={() => setLightboxOpen(true)}
+            >
+              {videoResult ? (
+                <video
+                  src={videoResult}
+                  className="absolute inset-0 w-full h-full object-contain"
+                  autoPlay
+                  loop
+                  controls
+                  playsInline
+                />
+              ) : (
+                <Image
+                  src={lastImageUrl || previewImageUrl}
+                  alt="Preview"
+                  fill
+                  className="object-contain"
+                  priority={false}
+                  unoptimized
+                />
+              )}
             </div>
+            {/* Expand Icon Overlay - Subtle */}
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white/50 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-black/60 group-hover:text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
+
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4">
-            <div className="text-xs font-semibold text-white/70">Combined prompt</div>
-            <div className="mt-2 whitespace-pre-wrap text-sm text-white/80">
-              {normalize(combinedPrompt || originalPrompt) || "Nothing yet."}
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {mediaType.toUpperCase()}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {aspectRatio}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-wide text-white/50 backdrop-blur-md">
+              {uploads.length} REFS
+            </span>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/50">
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Type: {mediaType}</div>
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Aspect: {aspectRatio}</div>
-            <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1">Uploads: {uploads.length}/10</div>
-          </div>
-        </div>
-      </section>
+
+        </div >
+      </section >
+      {/* Video Modal remains for other flows, but Studio uses inline generation */}
+      <VideoGeneratorModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        sourceImage={lastImageUrl || previewImageUrl || ""}
+        sourceVideo={inputVideoUrl}
+        initialPrompt={editSummary}
+        initialModelId={selectedModel}
+      />
+      <LibraryImagePickerModal
+        isOpen={libraryModalOpen}
+        onClose={() => setLibraryModalOpen(false)}
+        onSelect={async (url) => {
+          setPreviewImageUrl(url);
+          try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
+            try {
+              file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+            } catch (e) { console.warn(e); }
+            setUploads((prev) => [...prev, file]);
+          } catch (err) {
+            console.error("Failed to fetch library img:", err);
+          }
+        }}
+      />
     </main>
   );
 }

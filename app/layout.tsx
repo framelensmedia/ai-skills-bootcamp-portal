@@ -3,10 +3,45 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import Header from "@/components/Header";
+import AIAssistant from "@/components/AIAssistant";
+import BackToTop from "@/components/BackToTop";
+import { ToastContextProvider } from "@/context/ToastContext";
+import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "AI Skills Bootcamp",
+  metadataBase: new URL("https://aiskills.studio"),
+  title: "AI Skills Studio",
   description: "Learn high-value AI skills and build real projects.",
+  openGraph: {
+    title: "AI Skills Studio",
+    description: "Learn high-value AI skills and build real projects.",
+    url: "https://aiskills.studio",
+    siteName: "AI Skills Studio",
+    images: [
+      {
+        url: "https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png",
+        width: 1200,
+        height: 630,
+        alt: "AI Skills Studio",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Skills Studio",
+    description: "Learn high-value AI skills and build real projects.",
+    images: ["https://storage.googleapis.com/msgsndr/nzEfDvWm1wGE4UGpfNvM/media/693ffb99ab25946479fa34ba.png"],
+  },
+};
+export const viewport = {
+  themeColor: "black",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -16,37 +51,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-black text-white" suppressHydrationWarning={true}>
-        {/* Header */}
-        <header className="bg-black">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-            {/* Logo / Brand */}
-            <Link href="/" className="flex min-w-0 items-center gap-3">
-              <Image
-                src="/logo-symbol.png"
-                alt="AI Skills Bootcamp"
-                width={36}
-                height={36}
-                priority
-                className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
-              />
+      <body className="min-h-[100dvh] bg-black text-white overflow-x-hidden" suppressHydrationWarning={true}>
+        <AuthProvider>
+          <ToastContextProvider>
+            {/* Header */}
+            <Header />
 
-              {/* Prevent wrapping + allow graceful truncation if space is extremely tight */}
-              <span className="min-w-0 whitespace-nowrap truncate text-base font-semibold tracking-tight sm:text-lg">
-                <span className="text-lime-400">AI Skills</span>{" "}
-                <span className="text-white">Bootcamp</span>
-              </span>
-            </Link>
+            {/* Main Content */}
+            <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-24">{children}</main>
 
-            {/* Navigation */}
-            <div className="shrink-0">
-              <Nav />
-            </div>
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="mx-auto w-full max-w-6xl px-4 py-8">{children}</main>
+            {/* AI Assistant Chat Bubble */}
+            <AIAssistant />
+            <BackToTop />
+          </ToastContextProvider>
+        </AuthProvider>
       </body>
     </html>
   );

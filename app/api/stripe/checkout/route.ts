@@ -3,7 +3,9 @@ import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function POST() {
-  if (!process.env.STRIPE_SECRET_KEY) throw new Error("Missing STRIPE_SECRET_KEY");
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
+  }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const supabase = await createSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -44,12 +46,53 @@ export async function POST() {
       .eq("user_id", user.id);
   }
 
+  const { data: referral } = await supabase
+    .from("referrals")
+    .select("ambassador_id")
+    .eq("referred_user_id", user.id)
+    .maybeSingle();
+
+  // Also check cookie as fallback
+  let ambassadorId = referral?.ambassador_id;
+  if (!ambassadorId) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const refCode = cookieStore.get("ref_code")?.value;
+    if (refCode) {
+      const { data: amb } = await supabase.from("ambassadors").select("id").eq("referral_code", refCode).maybeSingle();
+      if (amb) ambassadorId = amb.id;
+    }
+  }
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    metadata: {
+      supabase_user_id: user.id,
+      ambassador_id: ambassadorId || null
+    },
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: "7-Day Trial Access",
+            description: "Instant access for 7 days",
+          },
+          unit_amount: 100, // $1.00
+        },
+      },
+    ],
+    subscription_data: {
+      trial_period_days: 7,
+    },
     success_url: `${siteUrl}/dashboard?paid=1`,
     cancel_url: `${siteUrl}/pricing?canceled=1`,
     allow_promotion_codes: true,

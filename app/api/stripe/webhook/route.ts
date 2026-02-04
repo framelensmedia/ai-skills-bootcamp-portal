@@ -10,7 +10,7 @@ function getStripe() {
     throw new Error("STRIPE_SECRET_KEY is missing");
   }
   return new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-12-15.clover" as any, // suppressed type error for custom version
+    apiVersion: "2024-10-28.acacia" as any,
   });
 }
 
@@ -64,6 +64,60 @@ export async function POST(req: Request) {
       if (error) throw error;
     };
 
+    const processCommission = async (customerId: string, amountPaidCents: number, type: 'trial_bonus' | 'monthly_recurring', eventId: string) => {
+      // 1. Find profile to get User ID
+      const { data: profile } = await supabaseAdmin.from("profiles").select("user_id").eq("stripe_customer_id", customerId).single();
+      if (!profile) return;
+
+      // 2. Find Referral
+      const { data: referral } = await supabaseAdmin.from("referrals").select("id, ambassador_id").eq("referred_user_id", profile.user_id).single();
+      if (!referral) return;
+
+      // 3. Find Ambassador to get Stripe Account
+      const { data: ambassador } = await supabaseAdmin.from("ambassadors").select("stripe_account_id").eq("id", referral.ambassador_id).single();
+      if (!ambassador || !ambassador.stripe_account_id) return;
+
+      // 4. Calculate Commission Amount (Active Pro = $10 (1000 cents), Trial = $0.50 (50 cents))
+      // Logic: passed in via arguments to keep this generic
+      const commissionAmount = type === 'trial_bonus' ? 50 : 1000;
+
+      // 5. Create Transfer
+      // Use transfer_group to group payments? Or just direct transfer?
+      // Using "destination" charge is better for Platform fees, but here we are paying OUT of our own funds effectively (or splitting).
+      // Since we already collected payment, we use separate transfer.
+      try {
+        const transfer = await stripe.transfers.create({
+          amount: commissionAmount,
+          currency: "usd",
+          destination: ambassador.stripe_account_id,
+          description: `Commission for ${type === 'trial_bonus' ? 'Trial' : 'Pro'} Signup`,
+          metadata: {
+            referral_id: referral.id,
+            event_id: eventId
+          }
+        });
+
+        // 6. Log Commission
+        await supabaseAdmin.from("commissions").insert({
+          ambassador_id: referral.ambassador_id,
+          referral_id: referral.id,
+          amount: commissionAmount,
+          type: type,
+          stripe_transfer_id: transfer.id,
+          status: "paid"
+        });
+      } catch (err: any) {
+        console.error("Commission Transfer Failed:", err);
+        await supabaseAdmin.from("commissions").insert({
+          ambassador_id: referral.ambassador_id,
+          referral_id: referral.id,
+          amount: commissionAmount,
+          type: type,
+          status: "failed" // Needs manual retry
+        });
+      }
+    };
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -73,7 +127,11 @@ export async function POST(req: Request) {
         const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
-        // ✅ retrieve() returns the Subscription object directly (no .data)
+        // Check for Ambassador Metadata from Checkout
+        // If we missed attribution during signup, we can catch it here via metadata if set (but we prefer DB source of truth)
+        // Actually, we use the DB mainly.
+
+        // Retrieve Subscription
         const sub = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ["items.data.price"],
         });
@@ -89,7 +147,24 @@ export async function POST(req: Request) {
           current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
+          credits: 200, // Pro: $10.00 worth (200 credits)
         });
+
+        // COMMISSION LOGIC:
+        // Identify if this is a "Trial" start ($1) or direct Pro.
+        // The price checks can tell us.
+        // Trial = $1.00 (100 cents)
+        const amountTotal = session.amount_total || 0;
+
+        if (amountTotal === 100) {
+          // It's the $1 Trial
+          await processCommission(customerId, amountTotal, 'trial_bonus', event.id);
+        } else if (amountTotal >= 2900) {
+          // Direct to Pro (if applicable) or subsequent payment caught here?
+          // Usually subsequent payments are invoice.payment_succeeded.
+          // But if initial checkout was full price, we assume commission.
+          await processCommission(customerId, amountTotal, 'monthly_recurring', event.id);
+        }
 
         break;
       }
@@ -102,6 +177,11 @@ export async function POST(req: Request) {
 
         const isActive = sub.status === "active" || sub.status === "trialing";
 
+        // Determine credits based on new plan status
+        // If becoming active premium -> 200
+        // If not active (free) -> 40
+        const credits = isActive ? 200 : 40;
+
         await updateByCustomerId(customerId, {
           plan: isActive ? "premium" : "free",
           stripe_subscription_id: sub.id,
@@ -109,8 +189,29 @@ export async function POST(req: Request) {
           current_period_end: getCurrentPeriodEndISO(sub),
           price_id: priceId,
           updated_at: new Date().toISOString(),
+          credits: credits,
         });
 
+        break;
+      }
+
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+
+        // Refill credits on successful payment (monthly renewal)
+        if ((invoice as any).subscription) {
+          await updateByCustomerId(customerId, {
+            credits: 200,
+            updated_at: new Date().toISOString(),
+          });
+
+          // RECURRING COMMISSION
+          // If amount_paid > 100 (more than $1), assume it's the monthly fee ($29+)
+          if (invoice.amount_paid > 500) {
+            await processCommission(customerId, invoice.amount_paid, 'monthly_recurring', event.id);
+          }
+        }
         break;
       }
 
@@ -123,6 +224,7 @@ export async function POST(req: Request) {
           subscription_status: sub.status,
           current_period_end: null,
           updated_at: new Date().toISOString(),
+          credits: 40, // Reset to Free default
         });
 
         break;
