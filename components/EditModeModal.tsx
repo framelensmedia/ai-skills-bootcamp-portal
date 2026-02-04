@@ -31,6 +31,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
     const [images, setImages] = useState<File[]>([]);
     const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL_ID);
     const [userCredits, setUserCredits] = useState<number | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
     // Fetch User Credits
@@ -40,8 +41,10 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
             const supabase = createSupabaseBrowserClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("credits").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("credits, role").eq("user_id", user.id).maybeSingle();
                 if (profile) {
+                    const r = String(profile.role || "").toLowerCase();
+                    setIsAdmin(r === "admin" || r === "super_admin");
                     setUserCredits(profile.credits ?? 0);
                 }
             }
@@ -52,10 +55,10 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
     if (!isOpen) return null;
 
     const IMAGE_COST = 3;
-    const hasCredits = (userCredits ?? 0) >= IMAGE_COST;
+    const hasCredits = isAdmin || (userCredits ?? 0) >= IMAGE_COST;
     const placeholder = !hasCredits && userCredits !== null
         ? `Insufficient credits. Need ${IMAGE_COST} Cr.`
-        : isGenerating ? "Processing..." : `Type instruction... (${IMAGE_COST} Cr)`;
+        : isGenerating ? "Processing..." : `Type instruction... (${isAdmin ? "∞" : IMAGE_COST} Cr)`;
 
     const handleSubmit = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -115,7 +118,7 @@ export default function EditModeModal({ isOpen, onClose, sourceImageUrl, onGener
                         <div className="flex items-center gap-2">
                             <Sparkles size={16} className="text-[#B7FF00]" />
                             <span className="text-sm font-bold text-white">Refine & Edit</span>
-                            {hasCredits && <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/50">{IMAGE_COST} Cr</span>}
+                            {hasCredits && <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/50">{isAdmin ? "∞" : IMAGE_COST} Cr</span>}
                         </div>
                         <button onClick={onClose} disabled={isGenerating} className="text-white/50 hover:text-white transition-colors">
                             <X size={20} />

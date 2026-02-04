@@ -73,7 +73,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     }, []);
 
     const VIDEO_COST = 30;
-    const hasCredits = (userCredits ?? 0) >= VIDEO_COST;
+    const hasCredits = isAdmin || (userCredits ?? 0) >= VIDEO_COST;
     // Admins bypass credit check? API might check it differently, but for UX let's warn.
     // Actually API logic enforces credits for everyone unless explicit admin bypass was coded in API (which I didn't see explicitly).
     // Let's assume admins have infinite credits or check needs to happen.
@@ -325,7 +325,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                             ) : (
                                 <>
                                     <Wand2 size={18} />
-                                    {sourceVideo ? "Generate Edit" : "Generate Remix"} (30 Cr)
+                                    {sourceVideo ? "Generate Edit" : "Generate Remix"} ({isAdmin ? "∞" : VIDEO_COST} Cr)
                                 </>
                             )}
                         </button>

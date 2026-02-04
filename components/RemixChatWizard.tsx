@@ -437,7 +437,7 @@ export default function RemixChatWizard({
                                     disabled={!hasCredits}
                                     className={`w-full rounded-xl py-4 text-base font-bold text-black md:py-4 shadow-lg transition-all ${!hasCredits ? "bg-white/10 text-white/20 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300 shadow-lime-400/20 transform hover:scale-[1.02]"}`}
                                 >
-                                    ✨ Generate Artwork ({IMAGE_COST} Cr)
+                                    ✨ Generate Artwork ({isAdmin ? "∞" : IMAGE_COST} Cr)
                                 </button>
                             </div>
                         ) : (

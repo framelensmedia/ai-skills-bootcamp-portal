@@ -412,7 +412,7 @@ function CreatorContent() {
 
             // Use AbortController with 120s timeout for better mobile handling
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000);
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
 
             const res = await fetch("/api/generate", {
                 method: "POST",
