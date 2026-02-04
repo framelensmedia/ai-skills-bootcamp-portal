@@ -34,21 +34,8 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
 
-        // 2. Pack Thumbnail: Upload server-side if external
-        // ROBUSTNESS: Check multiple keys
-        let packThumbnailUrl = pack.thumbnail_url || pack.thumbnailUrl || pack.image_url || pack.imageUrl || pack.url || null;
-
-        if (packThumbnailUrl && !packThumbnailUrl.includes("supabase.co")) {
-            console.log(`[Clawdbot] Uploading Pack Thumbnail: ${packThumbnailUrl}`);
-            const path = `packs/cover-${sanitize(pack.name)}-${Date.now()}.png`;
-            // Reuse the existing helper function at the bottom of file
-            const uploadedPath = await uploadImageFromUrl(packThumbnailUrl, path);
-            if (uploadedPath) {
-                packThumbnailUrl = getPublicUrl(uploadedPath);
-            }
-        }
-
-        // 3. Create Pack Record
+        // 2. Prep Pack Record (Use External URL initially)
+        const packThumbnailUrl = pack.thumbnail_url || pack.thumbnailUrl || pack.image_url || pack.imageUrl || pack.url || null;
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
 
         // SCHEMA FIX: Use 'title' instead of 'pack_name'. 
@@ -61,9 +48,10 @@ export async function POST(req: NextRequest) {
             access_level: pack.access_level || "free",
             is_published: pack.is_published !== undefined ? pack.is_published : false,
             category: pack.category || "General",
-            thumbnail_url: packThumbnailUrl,
+            thumbnail_url: packThumbnailUrl, // Use the external URL initially
         };
 
+        // 3. Insert Pack Immediately
         const { data: packRecord, error: packError } = await supabase
             .from("template_packs")
             .insert(packPayload)
@@ -72,10 +60,30 @@ export async function POST(req: NextRequest) {
 
         if (packError) throw new Error(`Pack creation failed: ${packError.message}`);
 
-        console.log(`[Clawdbot] Created Pack ID: ${packRecord.id}`);
+        console.log(`[Clawdbot] Created Pack ID: ${packRecord.id} (Starting parallel processing)`);
 
-        // 4. Process Templates Parallelly (Simplified: No Image Re-upload, No Author ID check)
-        const results = await Promise.all(templates.map(async (t: any) => {
+        // 4. Parallel Process: Templates AND Thumbnail Upload
+        // This prevents the Image Upload from blocking the Template Processing, reducing total latency.
+
+        const thumbnailPromise = (async () => {
+            if (packThumbnailUrl && !packThumbnailUrl.includes("supabase.co")) {
+                try {
+                    console.log(`[Clawdbot] Re-hosting Thumbnail: ${packThumbnailUrl}`);
+                    const path = `packs/cover-${packRecord.id}-${Date.now()}.png`;
+                    const uploadedPath = await uploadImageFromUrl(packThumbnailUrl, path);
+                    if (uploadedPath) {
+                        const publicUrl = getPublicUrl(uploadedPath);
+                        await supabase.from("template_packs").update({ thumbnail_url: publicUrl }).eq("id", packRecord.id);
+                        return publicUrl;
+                    }
+                } catch (e) {
+                    console.error("[Clawdbot] Thumbnail Rehost Failed:", e);
+                }
+            }
+            return packThumbnailUrl; // Return original URL if no rehost or rehost failed
+        })();
+
+        const templatesPromise = Promise.all(templates.map(async (t: any) => {
             try {
                 // SIMPLIFICATION: Skip Image Download/Upload. Use raw URL.
                 // ROBUSTNESS: Check multiple common keys
@@ -115,10 +123,13 @@ export async function POST(req: NextRequest) {
             }
         }));
 
+        const [finalThumbnail, results] = await Promise.all([thumbnailPromise, templatesPromise]);
+
         return NextResponse.json({
             success: true,
             pack_id: packRecord.id,
             slug: packRecord.slug,
+            thumbnail_url: finalThumbnail,
             results
         });
 
