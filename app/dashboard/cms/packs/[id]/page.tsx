@@ -115,9 +115,42 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
         }
     }
 
+    async function handleSecureAsset(currentUrl: string): Promise<string | null> {
+        if (!currentUrl || currentUrl.includes("supabase.co") || currentUrl.startsWith("/")) return currentUrl;
+
+        try {
+            const { id } = await params;
+            showToast("Securing external asset...", "success"); // Using success style for info
+            const res = await fetch("/api/cms/rehost-pack-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pack_id: id, image_url: currentUrl })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "Failed to secure asset");
+            return data.url;
+        } catch (e: any) {
+            console.error(e);
+            showToast("Secure Failed: " + e.message, "error");
+            return null;
+        }
+    }
+
     async function handleSave() {
         setSaving(true);
         try {
+            let finalThumbUrl = thumbnailUrl;
+
+            // Auto-Secure on Save (if published or just explicitly saving)
+            // Users want automation.
+            if (thumbnailUrl && !thumbnailUrl.includes("supabase.co") && !thumbnailUrl.startsWith("/")) {
+                const secured = await handleSecureAsset(thumbnailUrl);
+                if (secured) {
+                    finalThumbUrl = secured;
+                    setThumbnailUrl(secured);
+                }
+            }
+
             const { id } = await params;
             const { error } = await supabase.from("template_packs").update({
                 pack_name: name,
@@ -126,11 +159,12 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                 category: category,
                 access_level: accessLevel,
                 is_published: isPublished,
-                thumbnail_url: thumbnailUrl,
+                thumbnail_url: finalThumbUrl,
                 updated_at: new Date().toISOString()
             }).eq("id", id);
 
             if (error) throw error;
+            // ... (rest of handleSave logic)
 
             if (isPublished) {
                 // Auto-publish all templates in this pack
@@ -157,6 +191,8 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
             setSaving(false);
         }
     }
+
+    // ... handleSave ends above
 
     async function handleAddSelected() {
         if (selectedToAdd.size === 0) return;
@@ -193,7 +229,10 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
         if (!file) return;
         setUploading(true);
         try {
-            const path = `packs/cover-${pack.id}-${Date.now()}.${file.name.split(".").pop()}`;
+            const { id } = await params; // Ensure params is awaited or used if pack.id is available
+            // Use pack.id or params id
+            const pid = pack?.id || (await params).id;
+            const path = `packs/cover-${pid}-${Date.now()}.${file.name.split(".").pop()}`;
             await supabase.storage.from("bootcamp-assets").upload(path, file);
             const { data: { publicUrl } } = supabase.storage.from("bootcamp-assets").getPublicUrl(path);
             setThumbnailUrl(publicUrl);
@@ -225,6 +264,7 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                             </div>
                         </div>
                     </div>
+                    {/* Save Button */}
                     <button
                         disabled={saving}
                         onClick={() => handleSave()}
@@ -253,7 +293,7 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                             <Plus size={14} /> Add Templates
                         </button>
                     </div>
-
+                    {/* ... Template Map Logic Re-Used ... */}
                     <div className="flex flex-col gap-2">
                         {templates.map((t, i) => (
                             <div key={t.id} className="group relative flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition-all hover:border-white/10 hover:bg-white/[0.04]">
@@ -294,11 +334,6 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                                 </div>
                             </div>
                         ))}
-                        {templates.length === 0 && (
-                            <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center text-white/30">
-                                No templates in this pack yet.
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -308,11 +343,50 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                     {/* Cover Image */}
                     <Card className="group relative aspect-square w-full overflow-hidden bg-black">
                         {thumbnailUrl ? (
-                            <img src={thumbnailUrl} alt="Cover" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                            <>
+                                <img src={thumbnailUrl} alt="Cover" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                                {/* Secure Button */}
+                                {!thumbnailUrl.includes("supabase.co") && !thumbnailUrl.startsWith("/") && (
+                                    <div className="absolute top-4 right-4 z-20">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSecureAsset(thumbnailUrl).then(url => {
+                                                    if (url) {
+                                                        setThumbnailUrl(url);
+                                                        showToast("Asset Secured!");
+                                                    }
+                                                });
+                                            }}
+                                            className="flex items-center gap-2 rounded-lg bg-orange-500 text-white px-3 py-1.5 text-xs font-bold shadow-lg hover:bg-orange-600 transition"
+                                        >
+                                            <AlertCircle size={12} />
+                                            Secure
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         ) : (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/20">
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/20 p-8">
                                 <Layers size={48} />
                                 <span className="text-xs font-bold uppercase tracking-widest">No Cover</span>
+                                {/* Manual Input */}
+                                <div className="flex gap-2 w-full mt-2 relative z-10" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        placeholder="Paste URL..."
+                                        className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#B7FF00]/50 outline-none"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                const val = (e.target as HTMLInputElement).value;
+                                                if (val) setThumbnailUrl(val);
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            const val = e.target.value;
+                                            if (val) setThumbnailUrl(val);
+                                        }}
+                                    />
+                                </div>
                             </div>
                         )}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
@@ -361,46 +435,48 @@ export default function PackEditorPage({ params }: { params: Promise<{ id: strin
                         </div>
                     </Card>
 
-                </div>
-            </main>
+                </div >
+            </main >
 
             {/* ADD COMPONENT MODAL */}
-            {showAddModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
-                    <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-white">Add Templates</h3>
-                            <button onClick={() => setShowAddModal(false)}><X size={20} className="text-white/50 hover:text-white" /></button>
-                        </div>
-                        <div className="p-4 border-b border-white/5">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-2.5 text-white/30" size={16} />
-                                <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search library..." className="w-full rounded-xl bg-white/5 py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#B7FF00]" />
+            {
+                showAddModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+                        <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl">
+                            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-white">Add Templates</h3>
+                                <button onClick={() => setShowAddModal(false)}><X size={20} className="text-white/50 hover:text-white" /></button>
+                            </div>
+                            <div className="p-4 border-b border-white/5">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 text-white/30" size={16} />
+                                    <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search library..." className="w-full rounded-xl bg-white/5 py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#B7FF00]" />
+                                </div>
+                            </div>
+                            <div className="max-h-[50vh] overflow-y-auto p-2">
+                                {filteredAvailable.map(t => (
+                                    <div key={t.id} onClick={() => { const s = new Set(selectedToAdd); if (s.has(t.id)) s.delete(t.id); else s.add(t.id); setSelectedToAdd(s); }} className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors ${selectedToAdd.has(t.id) ? 'bg-[#B7FF00]/10' : 'hover:bg-white/5'}`}>
+                                        <div className={`flex h-5 w-5 items-center justify-center rounded border ${selectedToAdd.has(t.id) ? 'border-[#B7FF00] bg-[#B7FF00]' : 'border-white/20'}`}>
+                                            {selectedToAdd.has(t.id) && <CheckCircle size={12} className="text-black" />}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-medium text-white">{t.title}</div>
+                                            <div className="text-[10px] text-white/40">{t.status}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredAvailable.length === 0 && <div className="p-8 text-center text-xs text-white/30">No available templates found.</div>}
+                            </div>
+                            <div className="flex justify-end gap-3 border-t border-white/10 bg-white/[0.02] px-6 py-4">
+                                <button onClick={() => setShowAddModal(false)} className="text-xs font-bold text-white/50 hover:text-white">CANCEL</button>
+                                <button onClick={handleAddSelected} disabled={selectedToAdd.size === 0} className="rounded-lg bg-[#B7FF00] px-6 py-2 text-xs font-bold text-black hover:bg-[#a3e600] disabled:opacity-50">
+                                    ADD SELECTED ({selectedToAdd.size})
+                                </button>
                             </div>
                         </div>
-                        <div className="max-h-[50vh] overflow-y-auto p-2">
-                            {filteredAvailable.map(t => (
-                                <div key={t.id} onClick={() => { const s = new Set(selectedToAdd); if (s.has(t.id)) s.delete(t.id); else s.add(t.id); setSelectedToAdd(s); }} className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors ${selectedToAdd.has(t.id) ? 'bg-[#B7FF00]/10' : 'hover:bg-white/5'}`}>
-                                    <div className={`flex h-5 w-5 items-center justify-center rounded border ${selectedToAdd.has(t.id) ? 'border-[#B7FF00] bg-[#B7FF00]' : 'border-white/20'}`}>
-                                        {selectedToAdd.has(t.id) && <CheckCircle size={12} className="text-black" />}
-                                    </div>
-                                    <div>
-                                        <div className="text-sm font-medium text-white">{t.title}</div>
-                                        <div className="text-[10px] text-white/40">{t.status}</div>
-                                    </div>
-                                </div>
-                            ))}
-                            {filteredAvailable.length === 0 && <div className="p-8 text-center text-xs text-white/30">No available templates found.</div>}
-                        </div>
-                        <div className="flex justify-end gap-3 border-t border-white/10 bg-white/[0.02] px-6 py-4">
-                            <button onClick={() => setShowAddModal(false)} className="text-xs font-bold text-white/50 hover:text-white">CANCEL</button>
-                            <button onClick={handleAddSelected} disabled={selectedToAdd.size === 0} className="rounded-lg bg-[#B7FF00] px-6 py-2 text-xs font-bold text-black hover:bg-[#a3e600] disabled:opacity-50">
-                                ADD SELECTED ({selectedToAdd.size})
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

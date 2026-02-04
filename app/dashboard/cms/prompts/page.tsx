@@ -363,6 +363,95 @@ export default function PromptsCMSPage() {
         }
     }
 
+    async function handleSecurePrompt(id: string, url: string, title?: string) {
+        if (!url || url.includes("supabase.co") || url.startsWith("/")) return;
+        if (!confirm("Secure this external image (Client-Side)?")) return;
+
+        try {
+            // 1. Client-Side Fetch (Bypasses Server Block)
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Failed to fetch image in browser");
+            const blob = await res.blob();
+
+            // 2. Upload to Supabase
+            const ext = blob.type.split("/")[1] || "jpg";
+            const filename = `prompts/${slugify(title || "prompt")}-${Date.now()}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from("bootcamp-assets")
+                .upload(filename, blob, { upsert: true });
+
+            if (uploadError) throw new Error("Storage Upload Failed: " + uploadError.message);
+
+            // 3. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from("bootcamp-assets")
+                .getPublicUrl(filename);
+
+            // 4. Update DB
+            const { error: dbError } = await supabase
+                .from("prompts")
+                .update({
+                    featured_image_url: publicUrl,
+                    preview_image_storage_path: filename
+                })
+                .eq("id", id);
+
+            if (dbError) throw new Error("DB Update Failed");
+
+            // Refresh
+            if (me?.id) loadRows(me.id, role);
+            alert("Image secured successfully!");
+        } catch (e: any) {
+            console.error(e);
+            alert("Secure Failed: " + e.message + ". Try manual upload.");
+        }
+    }
+
+    async function handleSecurePack(id: string, url: string, name?: string) {
+        if (!url || url.includes("supabase.co") || url.startsWith("/")) return;
+        if (!confirm("Secure this external pack cover (Client-Side)?")) return;
+
+        try {
+            // 1. Client-Side Fetch
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Failed to fetch image in browser");
+            const blob = await res.blob();
+
+            // 2. Upload
+            const ext = blob.type.split("/")[1] || "jpg";
+            const filename = `packs/cover-${id}-${Date.now()}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from("bootcamp-assets")
+                .upload(filename, blob, { upsert: true });
+
+            if (uploadError) throw new Error("Upload Failed: " + uploadError.message);
+
+            // 3. Get URL
+            const { data: { publicUrl } } = supabase.storage
+                .from("bootcamp-assets")
+                .getPublicUrl(filename);
+
+            // 4. Update DB
+            const { error: dbError } = await supabase
+                .from("template_packs")
+                .update({ thumbnail_url: publicUrl })
+                .eq("id", id);
+
+            if (dbError) throw new Error("DB Update Failed");
+
+            // Refresh
+            loadPacks();
+            alert("Pack cover secured!");
+        } catch (e: any) {
+            console.error(e);
+            alert("Failed: " + e.message);
+        }
+    }
+
+
+
     if (loading) return <Loading />;
 
     if (!isStaffPlus) {
@@ -601,9 +690,23 @@ export default function PromptsCMSPage() {
                                     className="col-span-4 flex items-center gap-4 cursor-pointer"
                                     onClick={() => router.push(`/dashboard/cms/packs/${pack.id}`)}
                                 >
-                                    <div className="relative h-12 w-16 overflow-hidden rounded-lg bg-black/40 border border-white/10 flex-shrink-0">
+                                    <div className="relative h-12 w-16 overflow-hidden rounded-lg bg-black/40 border border-white/10 flex-shrink-0 group/thumb">
                                         {pack.thumbnail_url ? (
-                                            <img src={pack.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                                            <>
+                                                <img src={pack.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                                                {!pack.thumbnail_url.includes("supabase.co") && !pack.thumbnail_url.startsWith("/") && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSecurePack(pack.id, pack.thumbnail_url!);
+                                                        }}
+                                                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition text-orange-500 font-bold text-xs"
+                                                        title="Secure External Image"
+                                                    >
+                                                        <AlertCircle size={16} />
+                                                    </button>
+                                                )}
+                                            </>
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-white/20">
                                                 <Layers size={20} />
@@ -691,12 +794,24 @@ export default function PromptsCMSPage() {
                                             className="col-span-4 flex items-center gap-3 min-w-0 cursor-pointer"
                                             onClick={() => router.push(`/dashboard/cms/${r.id}`)}
                                         >
-                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-black/40 flex-shrink-0">
+                                            <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-black/40 flex-shrink-0 group/thumb">
                                                 <img
                                                     src={getImageUrl(r)}
                                                     alt={r.title}
                                                     className="w-full h-full object-cover"
                                                 />
+                                                {getImageUrl(r) && !getImageUrl(r).includes("supabase.co") && !getImageUrl(r).startsWith("/") && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSecurePrompt(r.id, getImageUrl(r));
+                                                        }}
+                                                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition text-orange-500 font-bold text-xs"
+                                                        title="Secure External Image"
+                                                    >
+                                                        <AlertCircle size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="font-medium text-white truncate group-hover:text-[#B7FF00] transition">

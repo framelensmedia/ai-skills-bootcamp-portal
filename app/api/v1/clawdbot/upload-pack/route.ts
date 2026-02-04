@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
                     prompt_text: t.prompt_text || "",
                     prompt: t.prompt_text || "",
                     access_level: t.access_level || pack.access_level || "free",
-                    status: "published",
+                    status: pack.is_published ? "published" : "draft",
                     media_type: "image",
                     preview_image_storage_path: previewPath,
                     featured_image_url: previewUrl,
@@ -147,8 +147,19 @@ function sanitize(str: string) {
 
 async function uploadImageFromUrl(url: string, path: string): Promise<string | null> {
     try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+        const res = await fetch(url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
         const buffer = await res.arrayBuffer();
 
         const { error } = await supabase.storage

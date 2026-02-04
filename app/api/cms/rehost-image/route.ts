@@ -26,22 +26,24 @@ export async function POST(req: NextRequest) {
 
         // 2. Fetch Image
         console.log(`[Rehost] Fetching image for prompt ${prompt_id}: ${image_url}`);
-        const res = await fetch(image_url);
-        if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
+        const res = await fetch(image_url, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            }
+        });
+        if (!res.ok) throw new Error(`Failed to fetch external image: ${res.status} ${res.statusText}`);
         const buffer = await res.arrayBuffer();
         const contentType = res.headers.get("content-type") || "image/png";
 
         // 3. Upload to Storage
-        // Use Service Role to ensure we can overwrite/write if RLS is tricky for storage
-        const adminSupabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+        // Use standard authenticated client (same as pack route) to avoid Service Key issues
+        // and because authenticated Staff users should have write access.
 
         const filename = `${sanitize(title || "prompt")}-${Date.now()}.png`;
         const path = `prompts/${filename}`;
 
-        const { error: uploadError } = await adminSupabase.storage
+        const { error: uploadError } = await supabase.storage
             .from("bootcamp-assets")
             .upload(path, buffer, {
                 contentType: contentType,

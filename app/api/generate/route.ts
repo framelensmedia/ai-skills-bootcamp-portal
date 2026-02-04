@@ -243,9 +243,10 @@ async function generateFalImage(
             }
 
             // STRENGTH TUNING
-            // 0.85 Preserves text better but relies on Strong Negative Prompt for face swap
+            // 0.85 was causing blending (ghosting) of the new face over the old face.
+            // 0.95 - 1.0 Allows complete replacement of the face while the Control/Reference image holds the style.
             if (mainImageUrl) {
-                payload.strength = 0.85;
+                payload.strength = 1.0;
             }
         } else {
             // Case 2: Direct Edit (No Template, just Selfie)
@@ -660,21 +661,24 @@ export async function POST(req: Request) {
                 // We handle this FIRST and exclusively for Nano to avoid ambiguous "Reference Image" terms
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
 
-                    subjectInstruction += " [SUBJECT LOCK: ACTIVE - STRICT MASKING MODE] ";
-                    subjectInstruction += " 1. ACTION: You act as a professional retoucher using Photoshop. You must REPLACE the face of the subject in the Base Image with the Reference face. ";
-                    subjectInstruction += " 2. SCALE LOCK: Scale the Subject to MATCH the Original Subject in length/width. Fit them into the scene NATURALLY. ";
-                    subjectInstruction += " 3. ANATOMICAL REALISM: Ensure a NATURAL, VISIBLE NECK. Connect the head gracefully to the body. CENTER the face on the original neck. ";
-                    subjectInstruction += " 4. TOP MARGIN PRESERVATION: DO NOT TOUCH the top 20% of the image. The Headline Text MUST remain visible. Do not let the head cover it. ";
-                    subjectInstruction += " 5. COMPOSITING: Apply 'Beauty Dish' lighting to match the scene. Blend edges. ";
-                    subjectInstruction += " 6. TEXT PRESERVATION: The text at the top and bottom of the Base Image MUST remain visible. DO NOT COVER THE TEXT. ";
+                    subjectInstruction += " [SUBJECT LOCK: ACTIVE - HARD PHOTOSHOP CUTOUT MODE] ";
+                    subjectInstruction += " 1. ACTION: You must perform a digital 'Scissors Cut' of the source identifier face and paste it into the Template. ";
+                    subjectInstruction += " 2. ZERO BLENDING: Do NOT blend the facial features. The Face Geometry must match the Reference Image 100%. ";
+                    subjectInstruction += " 3. SCALE LOCK: Resize the Reference Face to be PROPORTIONAL to the body in the Base Image. Do NOT use the original size of the face if it is too large. ";
+                    subjectInstruction += " 4. ANATOMICAL REALISM: You MUST generate a CLEARLY VISIBLE NECK. Do not squash the head into the shoulders. ";
+                    subjectInstruction += " 5. SHOULDER ALIGNMENT: Lower the shoulders to a natural relaxed position. Do NOT hunch the trapezius muscles. ";
+                    subjectInstruction += " 6. HEAD PROPORTIONS: The head size must be REALISTIC relative to the body width. The jawline must remain distinct from the collarbone. ";
+                    subjectInstruction += " 7. TOP MARGIN PRESERVATION: DO NOT TOUCH the top 20% of the image. The Headline Text MUST remain visible. Do not let the head cover it. ";
+                    subjectInstruction += " 8. COMPOSITING: Apply 'Beauty Dish' lighting to match the scene. Blend edges. ";
+                    subjectInstruction += " 9. TEXT PRESERVATION: The text at the top and bottom of the Base Image MUST remain visible. DO NOT COVER THE TEXT. ";
 
                     // Specific negative prompts for this mode
-                    remixNegativePrompt = "covering text, blocking text, text overlay, cropping text, short neck, no neck, thick neck, trapezius too high, squashed head, bobblehead, shoulders too high, hunchback, head attached to shoulders, distorted body, bad composition, bad lighting, blurry, low resolution, face too large, head too big, off center";
+                    remixNegativePrompt = "no neck, short neck, squashed neck, head on shoulders, hunchback, shrugged shoulders, trapezius too high, big head, large head, giant head, bobblehead, distorted proportions, cartoonish, caricature, double face, ghosting, blending faces, morphing, covering text, blocking text, text overlay, cropping text, distorted body, bad composition, bad lighting, blurry, low resolution, face too large, off center, compressed anatomy";
 
-                    if (!keepOutfit) {
-                        subjectInstruction += " OUTFIT: Transfer the outfit from the Reference Image onto the Base Image's body pose. ";
+                    if (keepOutfit) {
+                        subjectInstruction += " OUTFIT: PRESERVE the outfit from the Reference Image (Subject). Do NOT use the Base Image outfit. ";
                     } else {
-                        subjectInstruction += " OUTFIT: Keep the outfit from the Base Image. ";
+                        subjectInstruction += " OUTFIT: USE the outfit from the Base Image (Template). The Subject must wear the Base Image's clothing. Replace the Reference outfit. ";
                     }
                 } else {
                     // STANDARD / GENERIC LOGIC (For single image or non-remix)

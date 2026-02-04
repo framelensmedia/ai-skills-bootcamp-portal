@@ -392,28 +392,9 @@ export default function CmsPromptEditorPage() {
           <Card className="relative aspect-video w-full group">
             {featuredImageUrl ? (
               <>
-                <Image src={featuredImageUrl} alt="Featured" fill className="object-cover transition-opacity duration-500 group-hover:opacity-75" />
+                <img src={featuredImageUrl} alt="Featured" className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-75" />
 
-                {/* Warning / Secure Button for External Images */}
-                {!featuredImageUrl.includes("supabase.co") && !featuredImageUrl.startsWith("/") && (
-                  <div className="absolute top-4 right-4 z-20">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSecureAsset(featuredImageUrl).then(url => {
-                          if (url) {
-                            setFeaturedImageUrl(url);
-                            setSuccessMsg("Asset Secured!");
-                          }
-                        });
-                      }}
-                      className="flex items-center gap-2 rounded-lg bg-orange-500 text-white px-3 py-1.5 text-xs font-bold shadow-lg hover:bg-orange-600 transition"
-                    >
-                      <AlertCircle size={12} />
-                      Secure External Asset
-                    </button>
-                  </div>
-                )}
+
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-white/20 p-8">
@@ -440,11 +421,34 @@ export default function CmsPromptEditorPage() {
               </div>
             )}
 
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/60 backdrop-blur-sm">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-black/60 backdrop-blur-sm z-10">
               <button onClick={() => fileRef.current?.click()} className="rounded-full bg-white px-5 py-2 text-xs font-bold text-black hover:scale-105 transition-transform">
                 {uploading ? 'Uploading...' : 'Change Cover'}
               </button>
             </div>
+
+            {/* Warning / Secure Button for External Images - MOVED TO TOP & HIGH Z-INDEX */}
+            {featuredImageUrl && !featuredImageUrl.includes("supabase.co") && !featuredImageUrl.startsWith("/") && (
+              <div className="absolute top-4 right-4 z-50">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleSecureAsset(featuredImageUrl).then(url => {
+                      if (url) {
+                        setFeaturedImageUrl(url);
+                        setSuccessMsg("Asset Secured!");
+                      }
+                    });
+                  }}
+                  className="flex items-center gap-2 rounded-lg bg-orange-500 text-white px-3 py-1.5 text-xs font-bold shadow-lg hover:class-orange-600 transition cursor-pointer hover:bg-orange-600"
+                >
+                  <AlertCircle size={12} />
+                  Secure External Asset
+                </button>
+              </div>
+            )}
+
             <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*" />
           </Card>
 
