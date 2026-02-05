@@ -55,6 +55,32 @@ export default function SubjectControls({
                 </div>
 
                 {/* Keep Outfit Toggle */}
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                    <input
+                        type="checkbox"
+                        checked={keepOutfit}
+                        onChange={(e) => setKeepOutfit(e.target.checked)}
+                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
+                        id="studio-keep-outfit-inline"
+                    />
+                    <label htmlFor="studio-keep-outfit-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
+                        <span className="font-bold">Keep Outfit</span>
+                        <span className="text-[9px] text-white/50">Preserve subject's clothing</span>
+                    </label>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                    <input
+                        type="checkbox"
+                        checked={keepOutfit}
+                        onChange={(e) => setKeepOutfit(e.target.checked)}
+                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
+                        id="studio-keep-outfit-inline"
+                    />
+                    <label htmlFor="studio-keep-outfit-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
+                        <span className="font-bold">Keep Outfit</span>
+                        <span className="text-[9px] text-white/50">Preserve subject's clothing</span>
+                    </label>
+                </div>
 
             </div>
         </div>

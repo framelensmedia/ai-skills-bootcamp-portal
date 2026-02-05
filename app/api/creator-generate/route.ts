@@ -237,7 +237,7 @@ export async function POST(req: Request) {
         const refImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
         // Subject Lock Logic
-        if (refImageUrl && (subjectLock === "true" || subjectLock === true)) {
+        if (refImageUrl && subjectLock === "true") {
             const isNano = true;
 
             // DETECT REMIX MODE (Template + Subject)
@@ -253,7 +253,7 @@ export async function POST(req: Request) {
 
                 remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint";
 
-                if (keepOutfit === "true" || keepOutfit === true) {
+                if (keepOutfit === "true") {
                     subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
                 } else {
                     subjectInstruction += " OUTFIT: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Use the clothing from the Base Image. ";
@@ -261,7 +261,7 @@ export async function POST(req: Request) {
 
             } else {
                 // STANDARD / GENERIC LOGIC
-                if (keepOutfit === "true" || keepOutfit === true) {
+                if (keepOutfit === "true") {
                     subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
                 } else {
                     subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
