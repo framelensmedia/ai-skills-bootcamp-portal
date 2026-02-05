@@ -294,7 +294,17 @@ async function generateFalImage(
         throw new Error(`Fal.ai Request Failed: ${res.status} ${err}`);
     }
 
-    const { request_id } = await res.json();
+    const initialJson = await res.json();
+
+    // Check for direct completion (Sync response)
+    if (initialJson.images?.[0]?.url) {
+        return initialJson.images[0].url;
+    }
+
+    const request_id = initialJson.request_id;
+    if (!request_id) {
+        throw new Error(`Fal.ai returned no request_id and no images: ${JSON.stringify(initialJson)}`);
+    }
 
     // 2. Poll for Status (Time-based to respect Vercel 300s limit)
     const startTime = Date.now();
