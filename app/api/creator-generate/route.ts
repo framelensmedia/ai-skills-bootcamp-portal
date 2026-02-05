@@ -28,14 +28,8 @@ async function generateFalImage(
     const payload: any = {
         prompt,
         image_size: imageSize,
-        safety_tolerance: "2",
-        negative_prompt: negativePrompt || "cartoon, illustration, animation, face distortion, strange anatomy, disfigured, bad art, blurry, pixelated"
+        // No safety_tolerance, no negative_prompt override
     };
-
-    // Strength Tuning
-    if (mainImageUrl) {
-        payload.strength = keepOutfit ? 0.85 : 0.70;
-    }
 
     // Ratio Fallback
     if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
@@ -47,39 +41,46 @@ async function generateFalImage(
     if (isNanoBanana) {
         // Nano Banana Pro Logic
         if (template_reference_image) {
-            // Remix Mode
+            // Remix Mode: Base = Template, Ref = Subject
             payload.image_urls = [template_reference_image];
             if (mainImageUrl && mainImageUrl !== template_reference_image) {
                 payload.image_urls.push(mainImageUrl);
             }
             if (mainImageUrl) {
+                // High strength for remix to ensure face swap
                 payload.strength = 0.95;
             }
         } else {
             // Direct Edit / Selfie Mode
-            if (mainImageUrl) payload.image_url = mainImageUrl;
-            payload.image_urls = [];
-            payload.strength = 0.75;
+            if (mainImageUrl) {
+                payload.image_url = mainImageUrl;
+                payload.image_urls = [mainImageUrl]; // REQUIRED: Matches input for single image
+            } else {
+                payload.image_urls = [];
+            }
+            // Standard strength for selfie edit
+            payload.strength = keepOutfit ? 0.85 : 0.75;
         }
 
         // Force 9:16 for Remixes if not square
         if (!payload.aspect_ratio) {
             if (imageSize === "portrait_16_9") payload.aspect_ratio = "9:16";
             else if (imageSize === "landscape_16_9") payload.aspect_ratio = "16:9";
+            else payload.aspect_ratio = "9:16"; // Default
         }
     } else {
-        // Fallback for other models
         if (mainImageUrl) payload.image_url = mainImageUrl;
     }
 
     // Use /edit endpoint if image provided
-    const actualEndpoint = isNanoBanana && (payload.image_url || payload.image_urls?.length)
+    const actualEndpoint = isNanoBanana && payload.image_url
         ? `https://queue.fal.run/${modelId}/edit`
         : endpoint;
 
     console.log(`CREATOR GEN (${modelId}):`, {
         prompt: prompt.slice(0, 50),
-        endpoint: actualEndpoint
+        endpoint: actualEndpoint,
+        payload: JSON.stringify(payload)
     });
 
     // 1. Submit Request
@@ -98,6 +99,7 @@ async function generateFalImage(
     }
 
     const initialJson = await res.json();
+    console.log("CREATOR GEN: Initial Response:", JSON.stringify(initialJson));
 
     // Check for direct completion (Sync response)
     if (initialJson.images?.[0]?.url) {
@@ -113,19 +115,27 @@ async function generateFalImage(
     // 2. Poll
     const startTime = Date.now();
     const TIMEOUT_MS = 290000; // 290s
+    let attempts = 0;
 
     while (Date.now() - startTime < TIMEOUT_MS) {
-        await new Promise(r => setTimeout(r, 1000));
+        attempts++;
+        await new Promise(r => setTimeout(r, 2000));
 
-        const statusRes = await fetch(`https://queue.fal.run/${modelId}/requests/${request_id}`, {
+        const statusUrl = `https://queue.fal.run/${modelId}/requests/${request_id}`;
+        const statusRes = await fetch(statusUrl, {
             headers: {
                 "Authorization": `Key ${falKey}`,
             },
         });
 
-        if (!statusRes.ok) continue;
+        if (!statusRes.ok) {
+            const errText = await statusRes.text();
+            console.warn(`Attempt ${attempts}: Status Check Failed (${statusRes.status}) - URL: ${statusUrl} - Err: ${errText}`);
+            continue;
+        }
 
         const statusJson = await statusRes.json();
+        console.log(`Attempt ${attempts}: Status=${statusJson.status}`);
 
         if (statusJson.images?.[0]?.url) {
             return statusJson.images[0].url;
@@ -141,27 +151,30 @@ async function generateFalImage(
             continue;
         }
 
+        console.error("Unknown Status:", JSON.stringify(statusJson));
         throw new Error(`Fal.ai Generation Failed: ${JSON.stringify(statusJson)}`);
     }
 
-    throw new Error("Fal.ai Generation Timed Out");
+    console.error("TIMEOUT REACHED. Last known status:", attempts);
+    throw new Error("Fal.ai Generation Timed Out (Backend 290s limit)");
 }
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
+        const formData = await req.formData();
 
-        // 1. Extract Payload
-        const {
-            prompt,
-            userId,
-            aspectRatio = "9:16",
-            imageUrls = [],
-            subjectLock,
-            keepOutfit,
-            template_reference_image,
-            headline, subheadline, cta, promotion, business_name
-        } = body;
+        const prompt = formData.get("prompt") as string;
+        const userId = formData.get("userId") as string;
+        const aspectRatio = formData.get("aspectRatio") as string || "9:16";
+        const subjectLock = formData.get("subjectLock");
+        const keepOutfit = formData.get("keepOutfit");
+        const template_reference_image = formData.get("template_reference_image") as string;
+
+        const headline = formData.get("headline") as string;
+        const subheadline = formData.get("subheadline") as string;
+        const cta = formData.get("cta") as string;
+        const promotion = formData.get("promotion") as string;
+        const business_name = formData.get("business_name") as string;
 
         if (!prompt || !userId) return NextResponse.json({ error: "Missing prompt or user" }, { status: 400 });
 
@@ -185,6 +198,28 @@ export async function POST(req: Request) {
 
         if (!isAdmin && (userProfile.credits ?? 0) < IMAGE_COST) {
             return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
+        }
+
+        // 3. Handle Image Uploads (Server Side)
+        const imageFiles = formData.getAll("image") as File[];
+        const imageUrls: string[] = [];
+
+        if (imageFiles.length > 0) {
+            const firstFile = imageFiles[0];
+            const ab = await firstFile.arrayBuffer();
+            const buffer = Buffer.from(ab);
+            const filePath = `fal-uploads/${userId}/${Date.now()}.jpg`;
+
+            const { error: uploadErr } = await admin.storage
+                .from("generations")
+                .upload(filePath, buffer, { contentType: firstFile.type || "image/jpeg", upsert: false });
+
+            if (!uploadErr) {
+                const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                imageUrls.push(pubUrl.publicUrl);
+            } else {
+                console.warn("Failed to upload reference image for Fal:", uploadErr);
+            }
         }
 
         // 3. Prepare Prompt Engine
@@ -255,15 +290,14 @@ export async function POST(req: Request) {
             finalPrompt += textPrompt;
         }
 
-        // 4. Generate
         const imageUrl = await generateFalImage(model, finalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit === "true", remixNegativePrompt);
 
         // 5. Save & Deduct
         const { data: inserted } = await admin.from("prompt_generations").insert({
             user_id: userId,
             image_url: imageUrl,
-            combined_prompt_text: finalPrompt,
-            settings: { model, provider: "fal-creator" }
+            combined_prompt_text: prompt,
+            settings: { model, provider: "fal-creator-basic" }
         }).select().single();
 
         if (!isAdmin) {

@@ -302,122 +302,60 @@ function CreatorContent() {
                 return;
             }
 
-            // 1. Stage images via signed URL uploads (bypasses Vercel 4.5MB limit)
-            const uploadedImageUrls: string[] = [];
+            // 1. Build FormData Payload
+            const formData = new FormData();
 
-            if (imageUploads.length > 0) {
-                for (const file of imageUploads.slice(0, 10)) {
-                    try {
-                        // Compress first
-                        const compressed = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
-
-                        // Get signed URL
-                        const signRes = await fetch("/api/sign-upload", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                filename: compressed.name,
-                                fileType: compressed.type
-                            })
-                        });
-
-                        if (!signRes.ok) {
-                            throw new Error(`Upload init failed: ${signRes.status}`);
-                        }
-                        const { signedUrl, publicUrl } = await signRes.json();
-
-                        // Direct upload to storage
-                        const upRes = await fetch(signedUrl, {
-                            method: "PUT",
-                            body: compressed,
-                            headers: { "Content-Type": compressed.type }
-                        });
-
-                        if (!upRes.ok) {
-                            throw new Error(`Storage upload failed`);
-                        }
-
-                        uploadedImageUrls.push(publicUrl);
-                    } catch (e: any) {
-                        console.error("Image staging failed:", e);
-                        throw new Error("Failed to upload image. Please try again.");
-                    }
-                }
-            }
-
-            // 2. Handle logo separately
-            let logoUrl: string | null = null;
-            if (options.logoFile) {
-                try {
-                    const logoCompressed = await compressImage(options.logoFile, { maxWidth: 512, quality: 0.8 });
-                    const signRes = await fetch("/api/sign-upload", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            filename: logoCompressed.name,
-                            fileType: logoCompressed.type
-                        })
-                    });
-                    if (signRes.ok) {
-                        const { signedUrl, publicUrl } = await signRes.json();
-                        const upRes = await fetch(signedUrl, {
-                            method: "PUT",
-                            body: logoCompressed,
-                            headers: { "Content-Type": logoCompressed.type }
-                        });
-                        if (upRes.ok) {
-                            logoUrl = publicUrl;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Logo upload failed:", e);
-                }
-            }
-
-            // 3. Build JSON payload (not FormData)
             const stylePrompt = stylePreset ? STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt : "";
-            const finalPrompt = stylePrompt ? `${prompt}, ${stylePrompt}` : prompt; // Natural append
+            const finalPrompt = stylePrompt ? `${prompt}, ${stylePrompt}` : prompt;
 
-            const payload: any = {
-                prompt: finalPrompt,
-                userId: user.id,
-                aspectRatio: aspectRatio,
-                combined_prompt_text: prompt,
-                imageUrls: uploadedImageUrls,
-                modelId: selectedModel,
-                keepOutfit: keepOutfit, // Pass to API
-            };
+            formData.append("prompt", finalPrompt);
+            formData.append("userId", user.id);
+            formData.append("aspectRatio", aspectRatio);
+            formData.append("combined_prompt_text", prompt);
+            formData.append("modelId", selectedModel);
+            formData.append("keepOutfit", String(keepOutfit));
+
+            // Append Images
+            imageUploads.forEach((file) => {
+                formData.append("image", file);
+            });
+
+            if (options.logoFile) {
+                formData.append("logo_image", options.logoFile);
+            }
 
             // Subject Settings
             const effectiveSubjectLock = options.subjectLock !== undefined ? options.subjectLock : subjectLock;
             if (effectiveSubjectLock) {
-                payload.subjectLock = "true";
+                formData.append("subjectLock", "true");
                 if (subjectMode === "human") {
-                    payload.forceCutout = "true";
+                    formData.append("forceCutout", "true");
                 }
             } else {
-                payload.subjectLock = "false";
+                formData.append("subjectLock", "false");
             }
-            payload.subjectMode = subjectMode === "human" ? "human" : "object";
+            formData.append("subjectMode", subjectMode === "human" ? "human" : "object");
 
-            if (logoUrl) {
-                payload.logo_image = logoUrl;
-            }
-
-            // Template reference
+            // Remix Params
             const remixImg = searchParams?.get("img");
-            if (remixImg) {
-                payload.template_reference_image = remixImg;
+            if (remixImg) formData.append("template_reference_image", remixImg);
+
+            // Text params (from remixAnswers if available)
+            if (remixAnswers) {
+                if (remixAnswers.headline) formData.append("headline", remixAnswers.headline);
+                if (remixAnswers.subheadline) formData.append("subheadline", remixAnswers.subheadline);
+                if (remixAnswers.cta) formData.append("cta", remixAnswers.cta);
+                if (remixAnswers.promotion) formData.append("promotion", remixAnswers.promotion);
+                if (remixAnswers.business_name) formData.append("business_name", remixAnswers.business_name);
             }
 
-            // Use AbortController with 120s timeout for better mobile handling
+            // Use AbortController with 300s timeout
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 300000);
 
-            const res = await fetch("/api/generate", {
+            const res = await fetch("/api/creator-generate", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: formData, // Send FormData
                 signal: controller.signal,
             });
 
