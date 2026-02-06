@@ -118,8 +118,8 @@ export default function PromptCard({
   const promptPath =
     safeSlug.length > 0 ? `/prompts/${encodeURIComponent(safeSlug)}` : "/prompts";
 
-  const loginPath = `/login?redirectTo=${encodeURIComponent(promptPath)}`;
-  const href = isAuthed ? promptPath : loginPath;
+  // Allow everyone to view the prompt page. The page itself handles locking logic.
+  const href = promptPath;
 
   const fallbackOrb = "/orb-neon.gif";
   const isPro = String(accessLevel).toLowerCase() === "premium";

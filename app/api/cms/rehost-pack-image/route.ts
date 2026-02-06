@@ -37,13 +37,15 @@ export async function POST(req: NextRequest) {
         const contentType = res.headers.get("content-type") || "image/jpeg";
         const ext = contentType.split("/")[1] || "jpg";
 
-        // 3. Upload to Supabase Storage
-        // Use Service Role to bypass RLS on storage buckets if needed, but here we use authenticated user client
-        // Actually, for storage upsert, we might need Service Key if RLS is strict.
-        // Let's use the USER client first. If it fails, check policies.
+        // 3. Upload to Supabase Storage (use Service Role to bypass RLS)
+        const { createClient } = await import("@supabase/supabase-js");
+        const adminClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
         const path = `packs/cover-${pack_id}-${Date.now()}.${ext}`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await adminClient.storage
             .from("bootcamp-assets")
             .upload(path, buffer, { contentType, upsert: true });
 

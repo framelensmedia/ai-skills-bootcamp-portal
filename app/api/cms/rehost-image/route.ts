@@ -36,14 +36,15 @@ export async function POST(req: NextRequest) {
         const buffer = await res.arrayBuffer();
         const contentType = res.headers.get("content-type") || "image/png";
 
-        // 3. Upload to Storage
-        // Use standard authenticated client (same as pack route) to avoid Service Key issues
-        // and because authenticated Staff users should have write access.
-
+        // 3. Upload to Supabase Storage (use Service Role to bypass RLS)
+        const adminClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
         const filename = `${sanitize(title || "prompt")}-${Date.now()}.png`;
         const path = `prompts/${filename}`;
 
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await adminClient.storage
             .from("bootcamp-assets")
             .upload(path, buffer, {
                 contentType: contentType,

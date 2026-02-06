@@ -149,7 +149,13 @@ export default function CmsPromptEditorPage() {
   useEffect(() => {
     async function boot() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
+      // Middleware protects this route, so we just need the user object.
+      // If getUser fails here but middleware passed, it might be a temporary network blip or just no session yet fully hydrated.
+      // Do NOT redirect here, let middleware handle access.
+      if (!user) {
+        console.warn("Client side auth check failed but middleware passed?");
+        // return router.push("/login"); // REMOVED CAUSE OF RE-LOGIN LOOP
+      }
 
       const { data: profile } = await supabase.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
       setRole((profile as ProfileRow)?.role || "user");

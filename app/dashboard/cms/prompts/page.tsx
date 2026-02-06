@@ -365,35 +365,31 @@ export default function PromptsCMSPage() {
 
     async function handleSecurePrompt(id: string, url: string, title?: string) {
         if (!url || url.includes("supabase.co") || url.startsWith("/")) return;
-        if (!confirm("Secure this external image (Client-Side)?")) return;
+        if (!confirm("Secure this external image?")) return;
 
         try {
-            // 1. Client-Side Fetch (Bypasses Server Block)
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch image in browser");
-            const blob = await res.blob();
+            // Use server-side API to bypass CORS
+            const res = await fetch("/api/secure-asset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    url,
+                    folder: "prompts",
+                    filename: `${slugify(title || "prompt")}-${Date.now()}`
+                })
+            });
 
-            // 2. Upload to Supabase
-            const ext = blob.type.split("/")[1] || "jpg";
-            const filename = `prompts/${slugify(title || "prompt")}-${Date.now()}.${ext}`;
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to secure image");
+            }
 
-            const { error: uploadError } = await supabase.storage
-                .from("bootcamp-assets")
-                .upload(filename, blob, { upsert: true });
-
-            if (uploadError) throw new Error("Storage Upload Failed: " + uploadError.message);
-
-            // 3. Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from("bootcamp-assets")
-                .getPublicUrl(filename);
-
-            // 4. Update DB
+            // Update DB with secured URL
             const { error: dbError } = await supabase
                 .from("prompts")
                 .update({
-                    featured_image_url: publicUrl,
-                    preview_image_storage_path: filename
+                    featured_image_url: data.url,
+                    preview_image_storage_path: data.path
                 })
                 .eq("id", id);
 
@@ -410,33 +406,29 @@ export default function PromptsCMSPage() {
 
     async function handleSecurePack(id: string, url: string, name?: string) {
         if (!url || url.includes("supabase.co") || url.startsWith("/")) return;
-        if (!confirm("Secure this external pack cover (Client-Side)?")) return;
+        if (!confirm("Secure this external pack cover?")) return;
 
         try {
-            // 1. Client-Side Fetch
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Failed to fetch image in browser");
-            const blob = await res.blob();
+            // Use server-side API to bypass CORS
+            const res = await fetch("/api/secure-asset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    url,
+                    folder: "packs",
+                    filename: `cover-${id}-${Date.now()}`
+                })
+            });
 
-            // 2. Upload
-            const ext = blob.type.split("/")[1] || "jpg";
-            const filename = `packs/cover-${id}-${Date.now()}.${ext}`;
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to secure image");
+            }
 
-            const { error: uploadError } = await supabase.storage
-                .from("bootcamp-assets")
-                .upload(filename, blob, { upsert: true });
-
-            if (uploadError) throw new Error("Upload Failed: " + uploadError.message);
-
-            // 3. Get URL
-            const { data: { publicUrl } } = supabase.storage
-                .from("bootcamp-assets")
-                .getPublicUrl(filename);
-
-            // 4. Update DB
+            // Update DB
             const { error: dbError } = await supabase
                 .from("template_packs")
-                .update({ thumbnail_url: publicUrl })
+                .update({ thumbnail_url: data.url })
                 .eq("id", id);
 
             if (dbError) throw new Error("DB Update Failed");
@@ -804,7 +796,7 @@ export default function PromptsCMSPage() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleSecurePrompt(r.id, getImageUrl(r));
+                                                            handleSecurePrompt(r.id, getImageUrl(r), r.title);
                                                         }}
                                                         className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover/thumb:opacity-100 transition text-orange-500 font-bold text-xs"
                                                         title="Secure External Image"
