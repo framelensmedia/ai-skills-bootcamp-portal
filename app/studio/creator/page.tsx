@@ -911,12 +911,15 @@ function CreatorContent() {
                                 src={previewImage}
                                 alt="Preview"
                                 fill
-                                className="object-cover opacity-80"
+                                className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
                                 unoptimized
                             />
                         )}
 
-                        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                        {/* Only show overlay for actual images, not the placeholder */}
+                        {previewImage !== "/orb-neon.gif" && !videoResult && (
+                            <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                        )}
 
                         {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">

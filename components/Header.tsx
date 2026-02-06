@@ -75,6 +75,54 @@ export default function Header() {
     }, [user]);
 
 
+    // For logged out users: show full navbar at top, transition to floating button when scrolled
+    if (!user) {
+        return (
+            <header className="fixed top-0 left-0 right-0 z-50">
+                {/* Full Navbar - visible at top */}
+                <div
+                    className={`bg-black/90 border-b border-white/10 backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
+                        }`}
+                >
+                    <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+                        <Link href="/" className="flex min-w-0 items-center gap-3">
+                            <Image
+                                src="/logo-symbol.png"
+                                alt="AI Skills Studio"
+                                width={36}
+                                height={36}
+                                priority
+                                className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+                            />
+                            <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
+                                <span className="text-lime-400">AI Skills</span>{" "}
+                                <span className="text-white">Studio</span>
+                            </span>
+                        </Link>
+                        <div className="shrink-0">
+                            <Nav />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Floating Sign Up Button - visible when scrolled */}
+                <div
+                    className={`absolute top-0 left-0 right-0 bg-black/90 border-b border-white/10 backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-0 -translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'
+                        }`}
+                >
+                    <div className="flex justify-center py-4">
+                        <Link
+                            href="/signup"
+                            className="inline-flex items-center justify-center rounded-full bg-lime-400 px-6 py-3 text-sm font-bold tracking-wider text-black uppercase hover:bg-lime-300 shadow-lg shadow-lime-400/20 transition-all hover:scale-105"
+                        >
+                            Sign Up Free
+                        </Link>
+                    </div>
+                </div>
+            </header>
+        );
+    }
+
     return (
         <header
             className={`fixed top-0 left-0 right-0 z-50 bg-black/90 border-b border-white/10 backdrop-blur-md transition-transform duration-300 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
