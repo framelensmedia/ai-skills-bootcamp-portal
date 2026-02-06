@@ -194,6 +194,22 @@ export default function MissionStudioPage({ params }: Props) {
             form.append("edit_instructions", promptToUse);
             form.append("template_reference_image", previewImageUrl);
 
+            // Subject settings - default to human mode with lock for missions
+            form.append("subjectLock", "true");
+            form.append("subjectMode", "human");
+            form.append("keepOutfit", "true");
+
+            // Include wizard answers if available
+            if (wizardAnswers) {
+                if (wizardAnswers.headline) form.append("headline", wizardAnswers.headline);
+                if (wizardAnswers.subheadline) form.append("subheadline", wizardAnswers.subheadline);
+                if (wizardAnswers.cta) form.append("cta", wizardAnswers.cta);
+                if (wizardAnswers.promotion) form.append("promotion", wizardAnswers.promotion);
+                if (wizardAnswers.business_name) form.append("business_name", wizardAnswers.business_name);
+                if (wizardAnswers.industry_intent) form.append("industry_intent", wizardAnswers.industry_intent);
+                if (wizardAnswers.instructions) form.append("instructions", wizardAnswers.instructions);
+            }
+
             // Include uploads (Compressed)
             const imagesToProcess = uploads.slice(0, 10);
             const compressedImages = await Promise.all(
@@ -217,6 +233,11 @@ export default function MissionStudioPage({ params }: Props) {
             }
             if (missionData?.template?.slug) {
                 form.append("promptSlug", missionData.template.slug);
+            }
+
+            // Include logo if uploaded
+            if (logo) {
+                form.append("logo_image", logo);
             }
 
             const res = await fetch("/api/generate", {
