@@ -696,11 +696,12 @@ function PromptContent() {
       if (!session?.access_token) throw new Error("Not authenticated");
 
       const payload = {
-        template_reference_image: refUrl, // Send URL
+        canvas_image: refUrl, // Use canvas_image for Edit Mode (avoids treating it as a locked Remix)
         prompt: instruction,
         edit_instructions: instruction,
         userId,
-        imageUrls // Send URLs
+        imageUrls, // Send URLs
+        modelId: "fal-ai/nano-banana-pro" // Explicitly use Fal to avoid Vertex 404s
       };
 
       const res = await fetch("/api/generate", {
@@ -933,6 +934,8 @@ function PromptContent() {
 
         industry_intent: answersToUse?.industry_intent,
         subjectLock: answersToUse?.subjectLock,
+        keepOutfit: answersToUse?.keepOutfit, // NEW
+        subjectOutfit: answersToUse?.subjectOutfit, // NEW
 
         // Pass Selected Model
         modelId: selectedModel

@@ -158,10 +158,11 @@ function CreatorContent() {
         { id: "cartoon", label: "Cartoon", icon: "🎨", prompt: "3D Animation style by Pixar. Vibrant colors, expressive lighting, soft shading, cute characters." }
     ];
 
-    // Subject Settings
+    // Subject Settings (Parity with Studio)
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
     const [subjectLock, setSubjectLock] = useState(true);
     const [subjectOutfit, setSubjectOutfit] = useState("");
+    const [keepOutfit, setKeepOutfit] = useState(true);
 
     // Generation state
     const [generating, setGenerating] = useState(false);
@@ -344,6 +345,7 @@ function CreatorContent() {
                 formData.append("subjectLock", "false");
             }
             formData.append("subjectMode", subjectMode === "human" ? "human" : "object");
+            formData.append("keepOutfit", keepOutfit ? "true" : "false");
 
             // Remix Params
             const remixImg = searchParams?.get("img");
@@ -356,6 +358,8 @@ function CreatorContent() {
                 if (remixAnswers.cta) formData.append("cta", remixAnswers.cta);
                 if (remixAnswers.promotion) formData.append("promotion", remixAnswers.promotion);
                 if (remixAnswers.business_name) formData.append("business_name", remixAnswers.business_name);
+                if (remixAnswers.industry_intent) formData.append("industry_intent", remixAnswers.industry_intent);
+                if (remixAnswers.instructions) formData.append("instructions", remixAnswers.instructions);
             }
 
             // Use AbortController with 300s timeout
@@ -792,7 +796,6 @@ function CreatorContent() {
 
                                     <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
 
-                                    {/* Subject Settings (Only if uploads exist) */}
                                     {uploads.length > 0 && (
                                         <SubjectControls
                                             subjectMode={subjectMode}
@@ -801,6 +804,8 @@ function CreatorContent() {
                                             setSubjectLock={setSubjectLock}
                                             subjectOutfit={subjectOutfit}
                                             setSubjectOutfit={setSubjectOutfit}
+                                            keepOutfit={keepOutfit}
+                                            setKeepOutfit={setKeepOutfit}
                                         />
                                     )}
                                 </div>

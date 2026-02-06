@@ -114,8 +114,13 @@ function StudioContent() {
           }
         });
     } else {
-      // Scratch mode / No template loaded
-      setTemplateConfig(DEFAULT_CONFIG);
+      // Community Remix / Scratch mode - Use minimal flow (skip industry/business steps)
+      // This creates a simpler wizard for remixing community images
+      const isCommunityRemix = !!preImg && !prePromptId;
+      setTemplateConfig({
+        ...DEFAULT_CONFIG,
+        force_minimal_flow: isCommunityRemix // Simplified flow for community remixes
+      });
     }
   }, [prePromptId, supabase]);
 
@@ -527,7 +532,11 @@ function StudioContent() {
         }
 
         srcBlob = await srcRes.blob();
-        srcFile = new File([srcBlob], "source_image", { type: srcBlob.type || "image/png" });
+        // Compress canvas image to reduce file size and prevent timeouts
+        const rawFile = new File([srcBlob], "source_image", { type: srcBlob.type || "image/png" });
+        srcFile = await compressImage(rawFile, { maxWidth: 1280, quality: 0.85 });
+        console.log(`Canvas image compressed: ${(srcBlob.size / 1024).toFixed(1)}KB -> ${(srcFile.size / 1024).toFixed(1)}KB`);
+
       } catch (fetchError: any) {
         console.error('Failed to fetch image for editing:', fetchError);
         throw new Error(`Cannot load image for editing: ${fetchError.message}`);

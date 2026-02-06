@@ -185,7 +185,8 @@ async function generateFalImage(
     mainImageUrl?: string | null,
     template_reference_image?: string | null,
     keepOutfit: boolean = true,
-    negativePrompt?: string
+    negativePrompt?: string,
+    strengthOverride?: number
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -197,34 +198,60 @@ async function generateFalImage(
     // Let's rely on the fact that we are passing `imageSize` which might be "landscape_16_9".
     // BUT we also want to send "aspectRatio": "16:9" just in case.
 
-    const payload: any = {
-        prompt,
-        image_size: imageSize, // keep this
-        safety_tolerance: "2",
-        negative_prompt: negativePrompt || "cartoon, illustration, animation, face distortion, strange anatomy, disfigured, bad art, blurry, pixelated"
-    };
-
-    // Add Strength for Img2Img (Remix)
-    if (mainImageUrl) {
-        // If keeping outfit, we need high fidelity (0.85-0.9).
-        // If changing outfit, we need more freedom (lower strength), but not too low or face is lost.
-        // For Nano Banana (Edit), this might be less critical than Flux, but good to tune.
-        payload.strength = keepOutfit ? 0.85 : 0.70;
-    }
-
-    // Attempt to parse ratio string from imageSize if it's a known enum, or just pass it if provided
-    // Actually, let's just add it if we can infer it. 
-    // "landscape_16_9" -> "16:9"
-    if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
-    if (typeof imageSize === 'string' && imageSize.includes('9_16')) payload.aspect_ratio = "9:16";
-    if (typeof imageSize === 'string' && imageSize.includes('square')) payload.aspect_ratio = "1:1";
-    if (typeof imageSize === 'string' && imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
-    if (typeof imageSize === 'string' && imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
-
-    // Handle Nano Banana Pro specifically (uses image_urls array and /edit endpoint)
+    // Handle Nano Banana Pro specifically (uses different API schema)
     const isNanoBanana = modelId.includes("nano-banana");
 
+    let payload: any;
+
     if (isNanoBanana) {
+        // Nano Banana Pro/Edit API schema:
+        // - prompt (required)
+        // - image_urls (array) - for editing
+        // - aspect_ratio (enum: auto, 9:16, 16:9, 1:1, etc.)
+        // - resolution (enum: 1K, 2K, 4K)
+        // - safety_tolerance (enum: 1-6)
+        // Does NOT support: image_size, strength, negative_prompt
+        payload = {
+            prompt,
+            safety_tolerance: "4", // 4 is default, less strict
+            resolution: "1K"
+        };
+
+        // Set aspect_ratio based on imageSize
+        if (typeof imageSize === 'string') {
+            if (imageSize.includes('9_16') || imageSize.includes('portrait')) payload.aspect_ratio = "9:16";
+            else if (imageSize.includes('16_9') || imageSize.includes('landscape')) payload.aspect_ratio = "16:9";
+            else if (imageSize.includes('square') || imageSize.includes('1_1')) payload.aspect_ratio = "1:1";
+            else if (imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
+            else if (imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
+            else payload.aspect_ratio = "auto"; // Let model decide
+        } else {
+            payload.aspect_ratio = "9:16"; // Default to portrait
+        }
+    } else {
+        // Other Fal models (Flux, etc.)
+        payload = {
+            prompt,
+            image_size: imageSize,
+            safety_tolerance: "2",
+            negative_prompt: negativePrompt || "cartoon, illustration, animation, face distortion, strange anatomy, disfigured, bad art, blurry, pixelated"
+        };
+
+        // Add Strength for Img2Img (Remix) - only for non-nano-banana
+        if (mainImageUrl) {
+            payload.strength = keepOutfit ? 0.85 : 0.70;
+        }
+
+        // Set aspect_ratio
+        if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
+        if (typeof imageSize === 'string' && imageSize.includes('9_16')) payload.aspect_ratio = "9:16";
+        if (typeof imageSize === 'string' && imageSize.includes('square')) payload.aspect_ratio = "1:1";
+        if (typeof imageSize === 'string' && imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
+        if (typeof imageSize === 'string' && imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
+    }
+
+    if (isNanoBanana) {
+
 
         // REMIX ARCHITECTURE:
         // Base Canvas (image_url) = Template (Background/Scene)
@@ -241,19 +268,24 @@ async function generateFalImage(
                 payload.image_urls.push(mainImageUrl);
             }
 
-            // STRENGTH TUNING
-            // 1.0 allows full rewriting, which is what we want for "Replacement"
-            // 0.95 is the sweet spot: It forces the edit but respects the Base Canvas borders and text.
-            if (mainImageUrl) {
-                payload.strength = 0.95;
-            }
+            // NOTE: nano-banana-pro/edit does NOT support "strength" parameter
+            // Outfit/edit control is done entirely through the prompt text
+
         } else {
-            // Case 2: Direct Edit (No Template, just Selfie)
-            if (mainImageUrl) payload.image_url = mainImageUrl;
-            payload.image_urls = []; // No extra refs
-            // For direct edit, we usually want to preserve the selfie unless instructed otherwise
-            payload.strength = 0.75;
+            // Case 2: Direct Edit (No Template, just the canvas image)
+            // nano-banana-pro/edit uses image_urls (array), not image_url
+            if (mainImageUrl) {
+                payload.image_urls = [mainImageUrl];
+            } else {
+                payload.image_urls = [];
+            }
+            // For direct edit, do NOT send strength - let the model handle it naturally
+            // The nano-banana-pro/edit API doesn't use strength parameter
+            if (strengthOverride) {
+                payload.strength = strengthOverride;
+            }
         }
+
 
         // Force 9:16 for Remixes if not square
         if (!payload.aspect_ratio) {
@@ -313,11 +345,14 @@ async function generateFalImage(
     while (Date.now() - startTime < TIMEOUT_MS) {
         await new Promise(r => setTimeout(r, 1000)); // 1s wait
 
-        const statusRes = await fetch(`https://queue.fal.run/${modelId}/requests/${request_id}`, {
+        // Use the actual endpoint path for polling (includes /edit if we submitted to /edit)
+        const basePath = actualEndpoint.replace('https://queue.fal.run/', '').replace('/edit', '');
+        const statusRes = await fetch(`https://queue.fal.run/${basePath}/requests/${request_id}`, {
             headers: {
                 "Authorization": `Key ${falKey}`,
             },
         });
+
 
         if (!statusRes.ok) continue; // retry polling
 
@@ -376,6 +411,8 @@ export async function POST(req: Request) {
         let industryIntent: string | null = null;
         let intentQueue: any[] = [];
         let subjectMode: string = "non_human"; // Default
+
+        let subjectOutfit: string | null = null; // NEW: Custom outfit description
 
         let imageUrls: string[] = [];
         let logoUrl: string | null = null;
@@ -445,6 +482,7 @@ export async function POST(req: Request) {
             forceCutout = String(form.get("forceCutout") ?? "false").trim() === "true";
             requestedModel = String(form.get("modelId") ?? "").trim() || null;
             keepOutfit = String(form.get("keepOutfit") ?? "true").trim() === "true";
+            subjectOutfit = String(form.get("subjectOutfit") ?? "").trim() || null;
         } else {
             // JSON Handling
             const body = await req.json();
@@ -493,6 +531,7 @@ export async function POST(req: Request) {
             // ✅ Read modelId from JSON payload
             requestedModel = body.modelId ? String(body.modelId).trim() || null : null;
             if (body.keepOutfit !== undefined) keepOutfit = String(body.keepOutfit) === "true";
+            subjectOutfit = body.subjectOutfit ? String(body.subjectOutfit).trim() : null;
         }
 
         // 2. Validation
@@ -532,13 +571,16 @@ export async function POST(req: Request) {
         }
 
         // 2.5 Model Resolution (before credentials - so we can branch early)
-        let model = requestedModel || process.env.VERTEX_MODEL_ID || "gemini-3-pro-image-preview";
+        // DEFAULT TO Fal (Nano Banana) for all image gen if not specified, as Vertex Gemini Preview is unstable/404ing
+        let model = requestedModel || process.env.VERTEX_MODEL_ID || "fal-ai/nano-banana-pro";
 
         console.log(`GENERATE: requestedModel=${requestedModel}, resolved model=${model}`);
 
         // Handle "Nano Banana Pro" -> Fal mapping if client sends friendly name
+        // Note: /edit suffix is added by generateFalImage when image_url is provided
         if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
         if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
+
 
         console.log(`GENERATE: final model after mapping=${model}`);
 
@@ -598,8 +640,32 @@ export async function POST(req: Request) {
             }
 
             // Prepare image URL if reference image provided
+            // PRIORITY: canvasFile/canvasUrl (Edit Mode) > imageFiles > imageUrls > template_reference_image
             let refImageUrl: string | null = null;
-            if (imageFiles.length > 0) {
+
+            // 1. Check for Canvas Image (Edit Mode) - HIGHEST PRIORITY
+            if (canvasFile) {
+                // Upload canvasFile to get a public URL for Fal
+                const ab = await canvasFile.arrayBuffer();
+                const buffer = Buffer.from(ab);
+                const filePath = `fal-uploads/${userId}/canvas-${Date.now()}.jpg`;
+
+                const { error: uploadErr } = await admin.storage
+                    .from("generations")
+                    .upload(filePath, buffer, { contentType: canvasFile.type || "image/jpeg", upsert: false });
+
+                if (!uploadErr) {
+                    const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                    refImageUrl = pubUrl.publicUrl;
+                    console.log("FAL: Using uploaded canvasFile as base image:", refImageUrl);
+                } else {
+                    console.warn("Failed to upload canvas image for Fal:", uploadErr);
+                }
+            } else if (canvasUrl) {
+                // Canvas URL already provided (Studio flow)
+                refImageUrl = canvasUrl;
+                console.log("FAL: Using canvasUrl as base image:", refImageUrl);
+            } else if (imageFiles.length > 0) {
                 // Upload first image to Supabase to get a public URL for Fal
                 const firstFile = imageFiles[0];
                 const ab = await firstFile.arrayBuffer();
@@ -622,6 +688,7 @@ export async function POST(req: Request) {
                 // Fallback: Use string passed from Remix/Edit flows
                 refImageUrl = template_reference_image;
             }
+
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
             // Flux models (Pro) require explicit dimensions to guarantee ratio in remix mode
@@ -663,9 +730,28 @@ export async function POST(req: Request) {
                 finalFalPrompt += ", shot on Canon 5D Mk IV, 85mm lens, f/1.8, sharp focus, cinematic lighting, photorealistic, hyper-realistic, 8k, master photography";
             }
 
+            // 1.5 Context/Industry Shift (CRITICAL)
+            if (industryIntent) {
+                finalFalPrompt += ` [CONTEXT SHIFT]: Change the background and environment to match the industry: '${industryIntent}'. The scene must clearly represent a '${industryIntent}' business.`;
+
+                // Aggressive Outfit Logic for blanks
+                if (!subjectOutfit) {
+                    finalFalPrompt += ` [AUTO-OUTFIT]: The subject's outfit is unspecified. You MUST generate professional attire appropriate for a '${industryIntent}'. Do NOT default to casual clothes.`;
+                }
+            }
+
             // 2. Subject Lock Instructions (Eye Line / Angle)
-            // 2. Subject Lock Instructions (Eye Line / Angle)
-            if (refImageUrl && subjectLock) {
+            // FIRST: Check for SIMPLIFIED EDIT MODE (Library/Studio Edit)
+            // If canvas_image is provided with no template, this is a simple edit - skip all complex logic
+            const isSimplifiedEdit = isNano && !template_reference_image && (canvasFile || canvasUrl);
+
+            if (isSimplifiedEdit) {
+                console.log("Using Simplified Direct Edit Prompt");
+                finalFalPrompt = rawPrompt + ". Update this image based on the instruction but keep everything else exactly the same. Do not change the composition or background.";
+                // No subjectInstruction, no FACE LOCK, no remix logic
+                subjectInstruction = "";
+                remixNegativePrompt = "";
+            } else if (refImageUrl && subjectLock) {
 
                 // DETECT REMIX MODE (Template + Subject)
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
@@ -684,42 +770,104 @@ export async function POST(req: Request) {
                     // REMIX SPECIFIC OUTFIT LOGIC
                     if (keepOutfit) {
                         subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
-                        // We lower strength slightly for outfit preservation to allow composition blending
+                    } else if (subjectOutfit) {
+                        // When changing outfit, REINFORCE face lock to prevent drift
+                        subjectInstruction += ` [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify, age, or stylize the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally, and hands should interact with any props in the scene. Match the CAMERA SETTINGS of Image 1: lighting, depth of field, and camera angle. `;
+                        subjectInstruction += ` OUTFIT CHANGE: The Subject MUST be wearing: "${subjectOutfit}". Replace the clothing while keeping the face and expression identical to Image 2. `;
                     } else {
-                        subjectInstruction += " OUTFIT: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Use the clothing from the Base Image. ";
+                        // Matching template outfit - reinforce face lock
+                        subjectInstruction += " [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally, and hands should interact with any props in the scene. Match the CAMERA SETTINGS of Image 1: lighting, depth of field, and camera angle. ";
+                        subjectInstruction += " OUTFIT MATCH: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Match the clothing while keeping the face and expression identical to Image 2. ";
                     }
+
+
+
+
 
                 } else {
                     // STANDARD / GENERIC LOGIC
                     if (keepOutfit) {
                         subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
-                    } else {
-                        subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
+                    } else if (subjectOutfit) {
+                        subjectInstruction += ` OUTFIT: The Subject MUST be wearing: "${subjectOutfit}". `;
                     }
                     subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
                 }
 
-                // Prepend instructions
+            } else if (refImageUrl) {
+                // For non-subject-lock flows with a reference, add FACE LOCK
+                subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
+            }
+
+            // Prepend instructions (only if we have any)
+            if (subjectInstruction) {
                 finalFalPrompt = subjectInstruction + finalFalPrompt;
             }
 
+
+
+
             // 3. Text Rendering Instructions (Crucial for Remix)
             if (headline || subheadline || cta || promotion || businessName) {
-                let textPrompt = " [TEXT REPLACEMENT MANDATE]: You must REPLACE the text in the original image with the new text provided below. Do NOT render the original text. ";
-                textPrompt += " Render the new text clearly and professionally, maintaining the original layout style where possible but adapting to the new length. ";
+
+                let textPrompt = " [TEXT & LOGO REPLACEMENT MANDATE]: You must REPLACE the text in the original image with the new text provided below. Do NOT render the original text. ";
+                textPrompt += " Render the new text clearly and professionally, using MODERN SANS-SERIF FONTS, High Contrast, and Professional Graphic Design principles. The text must be legible and stand out against the background. ";
 
                 if (headline) textPrompt += `Headline: "${headline}". `;
                 if (subheadline) textPrompt += `Subhead: "${subheadline}". `;
                 if (cta) textPrompt += `Button/CTA: "${cta}". `;
                 if (promotion) textPrompt += `Offer: "${promotion}". `;
                 if (businessName) textPrompt += `Business Name: "${businessName}". `;
+
+                // LOGO LOGIC FOR FAL
+                if (logoFile || logoUrl) {
+                    // If we had a way to pass logo as 3rd image to Fal, we would. 
+                    // For now, Flux is good at hallucinating a "Logo for X". 
+                    // If we have a file, we might have mapped it to 'logoInstruction' for Vertex, but Fal handles prompts.
+                    // IMPORTANT: If we strictly want the uploaded logo, we need to composite it. 
+                    // Fal's "Subject Reference" is usually for the Person. 
+                    // We will trust the model to "Generate a logo" if no file, or "Insert Logo" if described.
+                } else if (businessName) {
+                    textPrompt += ` LOGO GENERATION: Generate a modern, professional logo icon for '${businessName}' and place it in the designated logo area (usually top or corner). `;
+                }
+
                 textPrompt += "Typography must be legible, sharp, and integrated into the scene. ";
 
                 finalFalPrompt += textPrompt;
+            } else if (industryIntent) {
+                // User changed industry but didn't provide new text - auto-update text to match
+                let autoTextPrompt = ` [AUTO-TEXT FOR INDUSTRY CHANGE]: The business type has changed to '${industryIntent}'. `;
+                autoTextPrompt += ` You MUST update any visible text, headlines, and logos in the image to match the new '${industryIntent}' industry. `;
+                autoTextPrompt += ` Generate a professional headline, business name, and logo that fits the '${industryIntent}' context. `;
+                autoTextPrompt += ` Do NOT keep the original template's text - replace it with text appropriate for '${industryIntent}'. `;
+                autoTextPrompt += ` Typography must be legible, sharp, and match the new industry aesthetic. `;
+                finalFalPrompt += autoTextPrompt;
             }
 
+
             try {
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit, remixNegativePrompt);
+                // Strength Logic: If Industry Intent (Background Change) is active, lower strength to allow Hallucination
+                let falStrength = undefined;
+                let finalKeepOutfit = keepOutfit;
+
+                if (industryIntent) {
+                    falStrength = 0.85;
+                    // CRITICAL: If changing industry (e.g. to Chef), we MUST allow outfit changes.
+                    // If we strictly keep outfit, they will wear a t-shirt in a kitchen.
+                    // So we disable strict outfit lock, and trust the prompt "ADAPT OUTFIT" which we added above.
+                    finalKeepOutfit = false;
+
+                    // Add explicit instruction if not already there
+                    if (!finalFalPrompt.includes("ADAPT OUTFIT") && !finalFalPrompt.includes("AUTO-OUTFIT")) {
+                        finalFalPrompt += ` [OUTFIT ADAPTATION]: The subject's clothing should remain similar in style but ADAPT to fit the '${industryIntent}' profession/vibe. If the new industry implies a uniform (e.g. Chef, Doctor, Firefighter), you MUST change the outfit to match.`;
+                    }
+                }
+
+                // RESOLVE MAIN IMAGE (Prioritize Canvas for Edit Mode)
+                const falMainImage = canvasUrl || refImageUrl;
+                console.log("FAL GENERATION INPUTS:", { model, falMainImage, template_reference_image, falStrength, finalKeepOutfit });
+
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, falMainImage, template_reference_image, finalKeepOutfit, remixNegativePrompt, falStrength);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
@@ -1058,112 +1206,49 @@ Execute the user's instruction precisely.
         let res;
         let json;
 
-        // FAL.AI BRANCH
-        if (model.startsWith("fal-ai/")) {
-            console.log(`Using Fal.ai Provider for model: ${model}`);
+        // VERTEX BRANCH (Original Logic)
+        // 6. Call Vertex with Retry Logic (Backoff)
+        let attempts = 0;
+        const maxAttempts = 2; // Strict limit to avoid Vercel 60s timeout
+
+        while (attempts < maxAttempts) {
             try {
-                // Determine aspect ratio for Fal with explicit dimensions (More robust for Flux/Edit)
-                let falSize: any = { width: 1024, height: 768 }; // Default 4:3
+                const apiEndpoint = location === "global"
+                    ? "aiplatform.googleapis.com"
+                    : `${location}-aiplatform.googleapis.com`;
 
-                if (ar === "1:1") falSize = { width: 1024, height: 1024 };
-                if (ar === "16:9") falSize = { width: 1216, height: 832 }; // Flux Optimized
-                if (ar === "9:16") falSize = { width: 832, height: 1216 }; // Flux Optimized
-                if (ar === "3:4") falSize = { width: 768, height: 1024 };
-                if (ar === "4:5") falSize = { width: 832, height: 1024 };
+                const vertexUrl = `https://${apiEndpoint}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
-                // Construct Prompt (Simplified for Fal, it doesn't need system instructions as prefix typically, but we can include)
-                // Actually Flux follows prompt well. Let's send the "finalPrompt" text but maybe strip system headers if needed.
-                // For now, sending the full prompt is safer to preserve instructions.
+                res = await fetch(vertexUrl, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token.token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                });
 
-                // Resolve Main Image for Fal (Img2Img)
-                let falMainImage = null;
-                if (canvasUrl) falMainImage = canvasUrl;
-                else if (template_reference_image) falMainImage = template_reference_image;
-                else if (imageUrls && imageUrls.length > 0) falMainImage = imageUrls[0];
-
-                const falImageUrl = await generateFalImage(model, finalPrompt, falSize, falMainImage);
-
-                // Fal returns a URL. We need to download it to process it as we do for Vertex (upload to our storage)
-                // Use urlToBase64 or similar logic?
-                // Actually, step 7 expects 'res' and 'json'. We should restructure or just mock the response structure?
-                // Or better: Handle Fal success here and jump to Step 9 (Insert History).
-
-                // Let's refactor:
-                // We'll return early for Fal for now to avoid breaking the Vertex flow below.
-
-                // ... But we want to reuse the "Upload to Storage" and "Insert History" logic (Step 8 & 9).
-                // So lets adapt the data to match "inline" format expected by Step 7/8.
-
-                const { data: falBase64, mimeType: falMime } = await urlToBase64(falImageUrl);
-
-                // Mock Vertex-like response structure so downstream code works?
-                // Or just set variables and skip Vertex block.
-
-                json = {
-                    candidates: [{
-                        content: {
-                            parts: [{
-                                inlineData: {
-                                    mimeType: falMime,
-                                    data: falBase64
-                                }
-                            }]
-                        }
-                    }]
-                };
-
-                // Mock 'res' as ok
-                res = { ok: true, status: 200 };
-
-            } catch (falErr: any) {
-                console.error("FAL ERROR:", falErr);
-                return NextResponse.json({ error: falErr.message || "Fal.ai generation failed" }, { status: 500 });
-            }
-
-        } else {
-            // VERTEX BRANCH (Original Logic)
-            // 6. Call Vertex with Retry Logic (Backoff)
-            let attempts = 0;
-            const maxAttempts = 2; // Strict limit to avoid Vercel 60s timeout
-
-            while (attempts < maxAttempts) {
-                try {
-                    const apiEndpoint = location === "global"
-                        ? "aiplatform.googleapis.com"
-                        : `${location}-aiplatform.googleapis.com`;
-
-                    const vertexUrl = `https://${apiEndpoint}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
-
-                    res = await fetch(vertexUrl, {
-                        method: "POST",
-                        headers: {
-                            Authorization: `Bearer ${token.token}`,
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(payload),
-                    });
-
-                    if (res.status === 429) {
-                        console.warn(`VERTEX RATE LIMIT (429): Attempt ${attempts + 1}/${maxAttempts}. Retrying...`);
-                        attempts++;
-                        if (attempts < maxAttempts) {
-                            // Wait 2s before retry
-                            await new Promise(r => setTimeout(r, 2000));
-                            continue;
-                        }
+                if (res.status === 429) {
+                    console.warn(`VERTEX RATE LIMIT (429): Attempt ${attempts + 1}/${maxAttempts}. Retrying...`);
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        // Wait 2s before retry
+                        await new Promise(r => setTimeout(r, 2000));
+                        continue;
                     }
-
-                    // If success or other error, break
-                    break;
-                } catch (networkErr) {
-                    console.error("Network Error during fetch:", networkErr);
-                    throw networkErr;
                 }
-            }
 
-            if (!res) throw new Error("Fetch failed to initialize");
-            json = await res.json();
+                // If success or other error, break
+                break;
+            } catch (networkErr) {
+                console.error("Network Error during fetch:", networkErr);
+                throw networkErr;
+            }
         }
+
+        if (!res) throw new Error("Fetch failed to initialize");
+        json = await res.json();
+
 
         // Common Error Handling (Vertex Only mostly, but Fal handled above)
         if (!res.ok) {

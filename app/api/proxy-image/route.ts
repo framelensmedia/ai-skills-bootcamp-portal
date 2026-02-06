@@ -18,10 +18,20 @@ export async function GET(req: Request) {
         console.log("[Image Proxy] Fetching:", imageUrl);
 
         // Validate URL is from Supabase (security check)
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        if (supabaseUrl && !imageUrl.includes(supabaseUrl.replace('https://', ''))) {
-            console.error("[Image Proxy] Invalid URL - not from Supabase:", imageUrl);
-            return NextResponse.json({ error: "Invalid image URL - must be from Supabase" }, { status: 400 });
+        // Validate URL is from Supabase or Fal (security check)
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+        const allowedDomains = [
+            supabaseUrl.replace('https://', ''),
+            "fal.media",
+            "v3.fal.media",
+            "v3b.fal.media"
+        ];
+
+        const isAllowed = allowedDomains.some(domain => imageUrl.includes(domain));
+
+        if (!isAllowed) {
+            console.error("[Image Proxy] Invalid URL - not allowed:", imageUrl);
+            return NextResponse.json({ error: "Invalid image URL - domain not allowed" }, { status: 400 });
         }
 
         // Fetch the image server-side (no CORS restrictions)

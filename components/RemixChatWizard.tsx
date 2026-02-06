@@ -99,6 +99,7 @@ export default function RemixChatWizard({
     const [subjectLock, setSubjectLock] = useState(true);
     const [subjectOutfit, setSubjectOutfit] = useState(""); // Default empty
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human"); // Default Human
+    const [keepOutfit, setKeepOutfit] = useState(true);
 
     // Steps State
     const [stepIndex, setStepIndex] = useState(0);
@@ -111,14 +112,19 @@ export default function RemixChatWizard({
         const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo" | "review", data?: any }[] = [];
         const minimal = templateConfig.force_minimal_flow;
 
-        // 1. Intro (Photo Upload)
+        // 1. Intro (Photo Upload) - Always show
         list.push({ type: "intro" });
 
-        // 2. Industry Intent (Skip if minimal)
-        if (!minimal) list.push({ type: "industry_intent" });
+        // Both template and community remixes use the same full flow
+        // Users can skip to instructions if they want
 
-        // 3. Business Name (Skip if minimal)
-        if (!minimal) list.push({ type: "business" });
+
+        // FULL FLOW: Show all steps for template remixes
+        // 2. Industry Intent
+        list.push({ type: "industry_intent" });
+
+        // 3. Business Name
+        list.push({ type: "business" });
 
         // 4. Logo
         list.push({ type: "logo" });
@@ -169,6 +175,7 @@ export default function RemixChatWizard({
 
         return list;
     }, [templateConfig]);
+
 
     useEffect(() => {
         if (isOpen && templateConfig) {
@@ -292,7 +299,7 @@ export default function RemixChatWizard({
 
             botText = `${g.label}:\n` + lines.join("\n");
         } else if (nextStep.type === "instructions") {
-            botText = "Any SPECIAL INSTRUCTIONS? (e.g. 'Make it dark mode', 'Add fire effects')";
+            botText = "🔥 THE SECRET SAUCE! Describe what you want to see in the image. Add your business info, text changes, vibe adjustments, or special effects.";
         } else if (nextStep.type === "industry_intent") {
             botText = "What kind of business is this for? (e.g. 'Coffee Shop', 'Tree Removal')";
         } else if (nextStep.type === "business") {
@@ -310,6 +317,20 @@ export default function RemixChatWizard({
                 role: "system",
                 text: botText
             }
+        ]);
+    }
+
+    // Skip directly to Instructions step
+    function skipToInstructions() {
+        const instructionsIdx = steps.findIndex(s => s.type === "instructions");
+        if (instructionsIdx === -1) return;
+
+        setStepIndex(instructionsIdx);
+        setInputVal("");
+        setMessages([
+            ...messages,
+            { id: `skip-${Date.now()}`, role: "user", text: "→ Jumping to Special Instructions" },
+            { id: `bot-instructions`, role: "system", text: "🔥 THE SECRET SAUCE! Describe what you want to see in the image. Add your business info, text changes, vibe adjustments, or special effects." }
         ]);
     }
 
@@ -386,6 +407,8 @@ export default function RemixChatWizard({
                                                 setSubjectOutfit={setSubjectOutfit}
                                                 subjectMode={subjectMode}
                                                 setSubjectMode={setSubjectMode}
+                                                keepOutfit={keepOutfit}
+                                                setKeepOutfit={setKeepOutfit}
                                             />
                                         </div>
                                     )}
@@ -488,23 +511,42 @@ export default function RemixChatWizard({
                                     className="md:hidden w-full rounded-xl bg-lime-400 py-4 text-base font-bold text-black hover:bg-lime-300 shadow-lg shadow-lime-400/10">
                                     Next
                                 </button>
-                                <div className="flex gap-2 justify-end">
-                                    <button
-                                        onClick={() => {
-                                            if (isGuest && onGuestInteraction) {
-                                                onGuestInteraction();
-                                                return;
-                                            }
-                                            advanceStep(true);
-                                        }}
-                                        className="px-4 py-3 text-sm font-semibold text-white/50 hover:text-white transition">
-                                        Skip / Keep Original
-                                    </button>
-                                    {showRemove && (
-                                        <button onClick={() => advanceStep(false, true)} className="px-4 py-3 text-sm font-semibold text-red-400/60 hover:text-red-400 transition">
-                                            Remove from design
+                                <div className="flex gap-2 justify-between items-center">
+                                    <div>
+                                        {/* Skip to Instructions - Only show before instructions step */}
+                                        {activeStep?.type !== "instructions" && (
+                                            <button
+                                                onClick={() => {
+                                                    if (isGuest && onGuestInteraction) {
+                                                        onGuestInteraction();
+                                                        return;
+                                                    }
+                                                    skipToInstructions();
+                                                }}
+                                                className="px-4 py-3 text-sm font-semibold text-lime-400/80 hover:text-lime-400 transition"
+                                            >
+                                                🔥 Skip to Secret Sauce
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                if (isGuest && onGuestInteraction) {
+                                                    onGuestInteraction();
+                                                    return;
+                                                }
+                                                advanceStep(true);
+                                            }}
+                                            className="px-4 py-3 text-sm font-semibold text-white/50 hover:text-white transition">
+                                            Skip / Keep Original
                                         </button>
-                                    )}
+                                        {showRemove && (
+                                            <button onClick={() => advanceStep(false, true)} className="px-4 py-3 text-sm font-semibold text-red-400/60 hover:text-red-400 transition">
+                                                Remove from design
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -554,7 +596,9 @@ function UploadStepWrapper({
     subjectOutfit,
     setSubjectOutfit,
     subjectMode,
-    setSubjectMode
+    setSubjectMode,
+    keepOutfit,
+    setKeepOutfit
 }: {
     files: File[],
     setFiles: (f: File[]) => void,
@@ -563,7 +607,9 @@ function UploadStepWrapper({
     subjectOutfit: string,
     setSubjectOutfit: (v: string) => void,
     subjectMode: "human" | "non_human",
-    setSubjectMode: (v: "human" | "non_human") => void
+    setSubjectMode: (v: "human" | "non_human") => void,
+    keepOutfit: boolean,
+    setKeepOutfit: (v: boolean) => void
 }) {
     return (
         <div className="w-full min-w-0">
@@ -576,6 +622,8 @@ function UploadStepWrapper({
                     setSubjectLock={setSubjectLock}
                     subjectOutfit={subjectOutfit}
                     setSubjectOutfit={setSubjectOutfit}
+                    keepOutfit={keepOutfit}
+                    setKeepOutfit={setKeepOutfit}
                 />
             )}
         </div>

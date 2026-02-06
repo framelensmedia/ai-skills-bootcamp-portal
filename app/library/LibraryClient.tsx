@@ -260,7 +260,11 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 }
 
                 blob = await res.blob();
-                file = new File([blob], "source_image", { type: blob.type || "image/png" });
+                // Compress canvas image to reduce file size and prevent timeouts
+                const rawFile = new File([blob], "source_image", { type: blob.type || "image/png" });
+                file = await compressImage(rawFile, { maxWidth: 1280, quality: 0.85 });
+                console.log(`Canvas image compressed: ${(blob.size / 1024).toFixed(1)}KB -> ${(file.size / 1024).toFixed(1)}KB`);
+
             } catch (fetchError: any) {
                 console.error('Failed to fetch image for editing:', fetchError);
                 throw new Error(`Cannot load image for editing: ${fetchError.message}`);
