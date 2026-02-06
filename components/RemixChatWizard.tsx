@@ -97,7 +97,7 @@ export default function RemixChatWizard({
 
     // Toggle for Subject Lock
     const [subjectLock, setSubjectLock] = useState(true);
-    const [keepOutfit, setKeepOutfit] = useState(false); // Default false (User Requested)
+    const [subjectOutfit, setSubjectOutfit] = useState(""); // Default empty
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human"); // Default Human
 
     // Steps State
@@ -316,7 +316,7 @@ export default function RemixChatWizard({
     function completeWorkflow(currentMsgs: Message[], finalAnswers: RemixAnswers, shouldGenerate = false) {
         // Include subjectLock and subjectMode in answers
         finalAnswers.subjectLock = String(subjectLock);
-        finalAnswers.keepOutfit = String(keepOutfit);
+        if (subjectOutfit) finalAnswers.subjectOutfit = subjectOutfit;
         finalAnswers.subjectMode = subjectMode;
         finalAnswers.modelId = selectedModel;
 
@@ -382,8 +382,8 @@ export default function RemixChatWizard({
                                                 setFiles={onUploadsChange}
                                                 subjectLock={subjectLock}
                                                 setSubjectLock={setSubjectLock}
-                                                keepOutfit={keepOutfit}
-                                                setKeepOutfit={setKeepOutfit}
+                                                subjectOutfit={subjectOutfit}
+                                                setSubjectOutfit={setSubjectOutfit}
                                                 subjectMode={subjectMode}
                                                 setSubjectMode={setSubjectMode}
                                             />
@@ -551,8 +551,8 @@ function UploadStepWrapper({
     setFiles,
     subjectLock,
     setSubjectLock,
-    keepOutfit,
-    setKeepOutfit,
+    subjectOutfit,
+    setSubjectOutfit,
     subjectMode,
     setSubjectMode
 }: {
@@ -560,8 +560,8 @@ function UploadStepWrapper({
     setFiles: (f: File[]) => void,
     subjectLock: boolean,
     setSubjectLock: (v: boolean) => void,
-    keepOutfit: boolean,
-    setKeepOutfit: (v: boolean) => void,
+    subjectOutfit: string,
+    setSubjectOutfit: (v: string) => void,
     subjectMode: "human" | "non_human",
     setSubjectMode: (v: "human" | "non_human") => void
 }) {
@@ -574,8 +574,8 @@ function UploadStepWrapper({
                     setSubjectMode={setSubjectMode}
                     subjectLock={subjectLock}
                     setSubjectLock={setSubjectLock}
-                    keepOutfit={keepOutfit}
-                    setKeepOutfit={setKeepOutfit}
+                    subjectOutfit={subjectOutfit}
+                    setSubjectOutfit={setSubjectOutfit}
                 />
             )}
         </div>

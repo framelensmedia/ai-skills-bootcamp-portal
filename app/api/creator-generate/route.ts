@@ -17,7 +17,7 @@ async function generateFalImage(
     imageSize: any,
     mainImageUrl?: string | null,
     template_reference_image?: string | null,
-    keepOutfit: boolean = false,
+    strength?: number,
     negativePrompt?: string
 ) {
     const falKey = process.env.FAL_KEY;
@@ -42,25 +42,33 @@ async function generateFalImage(
         // Nano Banana Pro Logic
         if (template_reference_image) {
             // Remix Mode: Base = Template, Ref = Subject
-            payload.image_urls = [template_reference_image];
+            // CRITICAL FIX: The base canvas must be the TEMPLATE, not the Selfie.
+            payload.image_url = template_reference_image;
+
+            // The reference is the Subject (Main Image)
+            // We do NOT include the template in image_urls, as it is already the base.
             if (mainImageUrl && mainImageUrl !== template_reference_image) {
-                payload.image_urls.push(mainImageUrl);
+                payload.image_urls = [mainImageUrl];
+            } else {
+                payload.image_urls = []; // Fallback (shouldn't happen in remix)
             }
-            if (mainImageUrl) {
-                // High strength for remix to ensure face swap
-                payload.strength = 0.95;
-            }
+
+
         } else {
             // Direct Edit / Selfie Mode
+            // Here, the Selfie IS the base.
             if (mainImageUrl) {
                 payload.image_url = mainImageUrl;
                 payload.image_urls = [mainImageUrl]; // REQUIRED: Matches input for single image
             } else {
                 payload.image_urls = [];
             }
-            // Standard strength for selfie edit
-            payload.strength = keepOutfit ? 0.85 : 0.75;
+            // Use passed strength or default
+            payload.strength = strength || 0.75;
         }
+
+        // Apply override if provided (covers Remix case too)
+        if (strength) payload.strength = strength;
 
         // Force 9:16 for Remixes if not square
         if (!payload.aspect_ratio) {
@@ -166,8 +174,11 @@ export async function POST(req: Request) {
         const prompt = formData.get("prompt") as string;
         const userId = formData.get("userId") as string;
         const aspectRatio = formData.get("aspectRatio") as string || "9:16";
-        const subjectLock = formData.get("subjectLock");
+        const subjectOutfit = formData.get("subjectOutfit") as string;
+        // KeepOutfit might still be sent by cached clients or logic, good to have just in case, but we rely on subjectOutfit now.
         const keepOutfit = formData.get("keepOutfit");
+
+        const subjectLock = formData.get("subjectLock");
         const template_reference_image = formData.get("template_reference_image") as string;
 
         const headline = formData.get("headline") as string;
@@ -229,6 +240,7 @@ export async function POST(req: Request) {
 
         // Force Nano Banana Pro mapping
         const model = "fal-ai/nano-banana-pro";
+        const isNano = true;
 
         let falImageSize: any = { width: 832, height: 1216 }; // Default 9:16
         if (aspectRatio === "16:9") falImageSize = { width: 1216, height: 832 };
@@ -238,39 +250,46 @@ export async function POST(req: Request) {
 
         // Subject Lock Logic
         if (refImageUrl && subjectLock === "true") {
-            const isNano = true;
-
+            // ...
             // DETECT REMIX MODE (Template + Subject)
-            if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
+            if (template_reference_image && refImageUrl !== template_reference_image) {
                 // CLASSIC REMIX INSTRUCTION
                 subjectInstruction += " [SUBJECT REPLACEMENT MODE - STRICT LAYOUT LOCK] ";
-                subjectInstruction += " 1. TASK: Replace the person in the Base Image (Image 1) with the Subject from the Reference Image (Image 2). ";
-                subjectInstruction += " 2. SCALE LOCK: Resize the Reference Face/Body to fit the EXACT proportions of the Base Image. Do NOT zoom in. Do NOT let the subject fill the screen. ";
-                subjectInstruction += " 3. TEXT SAFETY: The Base Image contains text at the top and bottom. YOU MUST NOT COVER IT. Keep the subject's head below the top margin. ";
-                subjectInstruction += " 4. LIKENESS: The face must match the Reference Image (Image 2) exactly. Maintain the exact eye line, gaze, and facial expression. ";
-                subjectInstruction += " 5. ANATOMY: Ensure the neck transition is natural. Do not squash the head. ";
-                subjectInstruction += " 6. CAMERA: Match the lighting, depth of field, and camera angle of the Base Image. ";
+                subjectInstruction += " 1. TASK: Face Swap. Replace the face of the person in Image 1 (Template) with the face of the Subject from Image 2. ";
+                subjectInstruction += " 2. PRESERVE DETAILS: Keep Image 1's exact background, text, and PROPS. If the person in Image 1 is holding something (like a drink, phone, or object), they MUST keep holding it. ";
+                subjectInstruction += " 3. SCALE & FIT: The subject's body must be the SAME SIZE as the original person in Image 1. Match the exact head size, body proportions, and position. The subject must fit naturally within the scene—do NOT enlarge or zoom in on the subject. ";
+                subjectInstruction += " 4. LIKENESS: The face must match Image 2 exactly. IGNORE the facial features of Image 1. The face should be 100% the person from Image 2. ";
+                subjectInstruction += " 5. [FACE IDENTITY LOCK]: DO NOT blend, mix, or morph the face. COPY the face from Image 2 directly. ";
 
-                remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint";
+                remixNegativePrompt = "enlarged subject, oversized person, zoomed in, face morphing, morphed face, mixed identity, blended faces, different person, wrong person, old face, missing props, missing drink, empty hands, covering text, blocking text, text overlay, missing text, blurred text, distorted text, wrong letters, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting";
 
-                if (keepOutfit === "true") {
-                    subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
+                if (subjectOutfit && subjectOutfit.trim().length > 0) {
+                    subjectInstruction += ` OUTFIT: The subject is wearing ${subjectOutfit}. REWRITE the body to match this outfit description. `;
                 } else {
-                    subjectInstruction += " OUTFIT: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Use the clothing from the Base Image. ";
+                    // Default to keeping the same clothes - uses same pattern as typed outfit
+                    subjectInstruction += " OUTFIT: The subject is wearing the same clothes from Image 1. REWRITE the body to match the exact clothing from Image 1. ";
                 }
+                subjectInstruction += " [PROP LOCK]: IF the person in Image 1 is holding something (drink, phone, etc), the subject MUST still be holding it. Do NOT remove props from their hands. ";
 
             } else {
                 // STANDARD / GENERIC LOGIC
-                if (keepOutfit === "true") {
+                // (kept for backward compatibility or direct edit modes)
+                if (subjectOutfit && subjectOutfit.trim().length > 0) {
+                    subjectInstruction += ` OUTFIT: The subject is wearing ${subjectOutfit}. REWRITE the body. `;
+                } else if (keepOutfit === "true") {
                     subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
                 } else {
-                    subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. Do NOT use the clothing from the reference image. ";
+                    subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. ";
                 }
                 subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
             }
 
             finalPrompt = subjectInstruction + finalPrompt;
-        } else {
+
+            // Text Protection Fallback (If no replacement text provided)
+            if (!(headline || subheadline || cta || promotion || business_name)) {
+                finalPrompt += " [TEXT PRESERVATION]: Keep all existing text in the image visible and legible. Do not blur or cover the text. ";
+            }
             // Clean up prompt if no subject lock
             finalPrompt += ", shot on Canon 5D Mk IV, 85mm lens, f/1.8, sharp focus, cinematic lighting, photorealistic, hyper-realistic, 8k, master photography";
         }
@@ -290,7 +309,20 @@ export async function POST(req: Request) {
             finalPrompt += textPrompt;
         }
 
-        const imageUrl = await generateFalImage(model, finalPrompt, falImageSize, refImageUrl, template_reference_image, keepOutfit === "true", remixNegativePrompt);
+        // Determine Final Strength
+        let finalStrength = 0.75; // Default
+
+        if (isNano && template_reference_image) {
+            // Remix Mode Logic - Use same high strength for both cases
+            finalStrength = 0.85;
+
+            if (!(subjectOutfit && subjectOutfit.trim().length > 0)) {
+                // For blank outfit: Add explicit "face only" instruction
+                finalPrompt += " [FACE ONLY SWAP]: Only replace the FACE. Keep the ENTIRE body, pose, clothing, and proportions EXACTLY as they appear in Image 1. ";
+            }
+        }
+
+        const imageUrl = await generateFalImage(model, finalPrompt, falImageSize, refImageUrl, template_reference_image, finalStrength, remixNegativePrompt);
 
         // 5. Save & Deduct
         const { data: inserted } = await admin.from("prompt_generations").insert({

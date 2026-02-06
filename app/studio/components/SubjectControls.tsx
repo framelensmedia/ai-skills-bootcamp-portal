@@ -6,8 +6,8 @@ interface SubjectControlsProps {
     setSubjectMode: (mode: "human" | "non_human") => void;
     subjectLock: boolean;
     setSubjectLock: (lock: boolean) => void;
-    keepOutfit: boolean;
-    setKeepOutfit: (keep: boolean) => void;
+    subjectOutfit: string;
+    setSubjectOutfit: (outfit: string) => void;
 }
 
 export default function SubjectControls({
@@ -15,8 +15,8 @@ export default function SubjectControls({
     setSubjectMode,
     subjectLock,
     setSubjectLock,
-    keepOutfit,
-    setKeepOutfit
+    subjectOutfit,
+    setSubjectOutfit
 }: SubjectControlsProps) {
     return (
         <div className="mt-2 pt-2 border-t border-white/5 space-y-3">
@@ -54,33 +54,22 @@ export default function SubjectControls({
                     </label>
                 </div>
 
-                {/* Keep Outfit Toggle */}
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
-                    <input
-                        type="checkbox"
-                        checked={keepOutfit}
-                        onChange={(e) => setKeepOutfit(e.target.checked)}
-                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
-                        id="studio-keep-outfit-inline"
-                    />
-                    <label htmlFor="studio-keep-outfit-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
-                        <span className="font-bold">Keep Outfit</span>
-                        <span className="text-[9px] text-white/50">Preserve subject's clothing</span>
-                    </label>
-                </div>
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
-                    <input
-                        type="checkbox"
-                        checked={keepOutfit}
-                        onChange={(e) => setKeepOutfit(e.target.checked)}
-                        className="h-3 w-3 rounded border-lime-400 bg-transparent text-lime-400 focus:ring-lime-400 accent-lime-400"
-                        id="studio-keep-outfit-inline"
-                    />
-                    <label htmlFor="studio-keep-outfit-inline" className="flex-1 cursor-pointer select-none text-xs text-white flex flex-col">
-                        <span className="font-bold">Keep Outfit</span>
-                        <span className="text-[9px] text-white/50">Preserve subject's clothing</span>
-                    </label>
-                </div>
+                {/* Outfit Description (Only if Human) */}
+                {subjectMode === "human" && (
+                    <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                        <label htmlFor="studio-subject-outfit" className="text-[10px] uppercase font-bold text-white/70">
+                            What is the subject wearing?
+                        </label>
+                        <input
+                            type="text"
+                            value={subjectOutfit}
+                            onChange={(e) => setSubjectOutfit(e.target.value)}
+                            placeholder="Leave blank to keep template outfit..."
+                            className="w-full bg-transparent text-xs text-white placeholder:text-white/30 outline-none border-b border-white/10 focus:border-lime-400 py-1 transition-colors"
+                            id="studio-subject-outfit"
+                        />
+                    </div>
+                )}
 
             </div>
         </div>

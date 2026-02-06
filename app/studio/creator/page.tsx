@@ -161,7 +161,7 @@ function CreatorContent() {
     // Subject Settings
     const [subjectMode, setSubjectMode] = useState<"human" | "non_human">("human");
     const [subjectLock, setSubjectLock] = useState(true);
-    const [keepOutfit, setKeepOutfit] = useState(false); // Default unchecked
+    const [subjectOutfit, setSubjectOutfit] = useState("");
 
     // Generation state
     const [generating, setGenerating] = useState(false);
@@ -246,6 +246,15 @@ function CreatorContent() {
     const handleWizardComplete = (summary: string, ans: RemixAnswers) => {
         setManualPrompt(summary);
         setRemixAnswers(ans);
+
+        // Sync Subject Settings from Wizard
+        if (ans.subjectLock === "false") setSubjectLock(false);
+        else setSubjectLock(true);
+
+        if (ans.subjectOutfit) setSubjectOutfit(ans.subjectOutfit);
+        if (ans.subjectMode === "non_human") setSubjectMode("non_human");
+        else setSubjectMode("human");
+
         setWizardOpen(false);
         setMode("manual"); // Switch to manual to review/generate
     };
@@ -313,7 +322,7 @@ function CreatorContent() {
             formData.append("aspectRatio", aspectRatio);
             formData.append("combined_prompt_text", prompt);
             formData.append("modelId", selectedModel);
-            formData.append("keepOutfit", String(keepOutfit));
+            formData.append("subjectOutfit", subjectOutfit);
 
             // Append Images
             imageUploads.forEach((file) => {
@@ -790,8 +799,8 @@ function CreatorContent() {
                                             setSubjectMode={setSubjectMode}
                                             subjectLock={subjectLock}
                                             setSubjectLock={setSubjectLock}
-                                            keepOutfit={keepOutfit}
-                                            setKeepOutfit={setKeepOutfit}
+                                            subjectOutfit={subjectOutfit}
+                                            setSubjectOutfit={setSubjectOutfit}
                                         />
                                     )}
                                 </div>
