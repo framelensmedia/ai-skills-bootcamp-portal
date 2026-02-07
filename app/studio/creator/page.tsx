@@ -529,9 +529,37 @@ function CreatorContent() {
             }
         } catch (err: any) {
             console.error("Video Generation Error:", err);
-            setError(err.message || "Failed to animate");
-        } finally {
             setAnimating(false);
+        }
+    };
+
+    const handleShare = async (url: string) => {
+        try {
+            // 1. Fetch the image as a blob
+            const res = await fetch(url);
+            const blob = await res.blob();
+
+            // 2. Create a File object
+            const filename = `ai-creation-${Date.now()}.png`; // Simple timestamp filename
+            const file = new File([blob], filename, { type: blob.type });
+
+            // 3. Check if we can share files
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'My AI Artwork',
+                    text: 'Check out what I created with AI!'
+                });
+            } else {
+                // Fallback: Share just the URL if file sharing isn't supported
+                await navigator.share({
+                    title: 'My AI Artwork',
+                    text: 'Check out what I created with AI!',
+                    url: url
+                });
+            }
+        } catch (err) {
+            console.error("Share failed:", err);
         }
     };
 
@@ -892,8 +920,8 @@ function CreatorContent() {
 
                 {/* RIGHT COLUMN: Preview / Results */}
                 <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
-                    <div className="sticky top-8 w-full space-y-4">
-                        <div className={`relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
+                    <div className="sticky top-8 w-full flex flex-col space-y-4">
+                        <div className={`order-2 lg:order-1 relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
                             {/* Generating Overlay */}
                             {generating && (
                                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
@@ -939,9 +967,9 @@ function CreatorContent() {
                             )}
                         </div>
 
-                        {/* Placeholder Text - Below the preview */}
+                        {/* Placeholder Text - Responsive Order (Top on mobile, Bottom upon desktop) */}
                         {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
-                            <div className="w-full flex justify-center">
+                            <div className="w-full flex justify-center order-1 lg:order-2">
                                 <div className="bg-black/50 backdrop-blur-md rounded-xl p-6 w-full border border-white/5 text-center">
                                     <h3 className="text-2xl font-bold text-white mb-2">{mediaType === "video" ? "Your Video" : "Your Artwork"}</h3>
                                     <p className="text-sm text-white/50">
@@ -1000,9 +1028,10 @@ function CreatorContent() {
                     // Scroll to preview/settings
                     previewRef.current?.scrollIntoView({ behavior: 'smooth' });
                 }}
+                onShare={handleShare}
                 fullQualityUrl={resultData?.full_quality_url}
             />
-        </main >
+        </main>
     );
 }
 

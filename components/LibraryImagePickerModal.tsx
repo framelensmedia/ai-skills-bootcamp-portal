@@ -63,7 +63,7 @@ export default function LibraryImagePickerModal({ isOpen, onClose, onSelect }: P
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
             <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-[#09090b] shadow-2xl h-[80vh] flex flex-col">
                 {/* Header */}
-                <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#09090b]/95 backdrop-blur z-20">
+                <div className="p-6 border-b border-white/10 flex flex-col gap-4 items-start sm:flex-row sm:items-center sm:justify-between sticky top-0 bg-[#09090b]/95 backdrop-blur z-20">
                     <div>
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
                             <ImageIcon className="text-lime-400" size={20} />
@@ -71,20 +71,20 @@ export default function LibraryImagePickerModal({ isOpen, onClose, onSelect }: P
                         </h2>
                         <p className="text-xs text-white/40">Select an image to use as a start frame</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={14} />
                             <input
                                 type="text"
                                 placeholder="Search prompts..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="bg-white/5 border border-white/10 rounded-full py-2 pl-9 pr-4 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-lime-400/50 w-48 transition-all focus:w-64"
+                                className="bg-white/5 border border-white/10 rounded-full py-2 pl-9 pr-4 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-lime-400/50 w-full sm:w-48 transition-all focus:w-full sm:focus:w-64"
                             />
                         </div>
                         <button
                             onClick={onClose}
-                            className="h-8 w-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                            className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
                         >
                             <X size={18} />
                         </button>
