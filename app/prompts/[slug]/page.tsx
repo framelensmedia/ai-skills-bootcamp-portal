@@ -128,6 +128,7 @@ function PromptContent() {
 
   // New Wizard State
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardFlowMode, setWizardFlowMode] = useState<"full" | "short">("full");
   const [remixAnswers, setRemixAnswers] = useState<RemixAnswers | null>(null);
   const [editSummary, setEditSummary] = useState<string>("");
   const [templateConfig, setTemplateConfig] = useState<TemplateConfig | undefined>(undefined);
@@ -734,6 +735,7 @@ function PromptContent() {
   function handleRemixFocus() {
     // Trigger wizard, close lightbox
     setLightboxOpen(false);
+    setWizardFlowMode("full");
     setWizardOpen(true);
   }
 
@@ -769,6 +771,7 @@ function PromptContent() {
     // clear previous guided answers as we are starting a fresh remix on a new image
     setRemixAnswers(null);
     setEditSummary("");
+    setWizardFlowMode("short");
     setWizardOpen(true);
   }
 
@@ -1035,6 +1038,7 @@ function PromptContent() {
         businessName={businessName}
         onBusinessNameChange={setBusinessName}
         templateConfig={templateConfig}
+        flowMode={wizardFlowMode}
       />
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 text-white">
         {/* Lightbox */}

@@ -42,6 +42,7 @@ type Props = {
     templateConfig?: TemplateConfig;
     isGuest?: boolean;
     onGuestInteraction?: () => void;
+    flowMode?: "full" | "short";
 };
 
 type Message = {
@@ -88,7 +89,8 @@ export default function RemixChatWizard({
     businessName,
     onBusinessNameChange,
     isGuest,
-    onGuestInteraction
+    onGuestInteraction,
+    flowMode = "full"
 }: Props) {
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
@@ -109,25 +111,24 @@ export default function RemixChatWizard({
     const steps = useMemo(() => {
         if (!templateConfig) return [];
 
-        const list: { type: "intro" | "field" | "group" | "instructions" | "industry_intent" | "business" | "logo" | "review", data?: any }[] = [];
-        const minimal = templateConfig.force_minimal_flow;
+        // SHORT FLOW: Community Remixes (Fast & Simple)
+        if (flowMode === "short") {
+            return [
+                { type: "intro" },
+                { type: "instructions" },
+                { type: "review" }
+            ] as const;
+        }
 
-        // 1. Intro (Photo Upload) - Always show
-        list.push({ type: "intro" });
+        // FULL CONCISE FLOW: Default Templates
+        // Combines steps to reduce clicks
+        const list: { type: "intro_concise" | "intro" | "field" | "group" | "instructions" | "industry_intent" | "business_concise" | "business" | "logo" | "review", data?: any }[] = [];
 
-        // Both template and community remixes use the same full flow
-        // Users can skip to instructions if they want
+        // 1. Intro + Industry (Merged)
+        list.push({ type: "intro_concise" });
 
-
-        // FULL FLOW: Show all steps for template remixes
-        // 2. Industry Intent
-        list.push({ type: "industry_intent" });
-
-        // 3. Business Name
-        list.push({ type: "business" });
-
-        // 4. Logo
-        list.push({ type: "logo" });
+        // 2. Business + Logo (Merged)
+        list.push({ type: "business_concise" });
 
         // 5. Contact Info (Group)
         // Prioritize "contact" group if it exists
@@ -174,7 +175,7 @@ export default function RemixChatWizard({
         list.push({ type: "review" });
 
         return list;
-    }, [templateConfig]);
+    }, [templateConfig, flowMode]);
 
 
     useEffect(() => {
@@ -244,9 +245,9 @@ export default function RemixChatWizard({
             answerKey = `group_${currentStep.data.label.replace(/\s+/g, '_')}`;
         } else if (currentStep.type === "instructions") {
             answerKey = "instructions";
-        } else if (currentStep.type === "industry_intent") {
+        } else if (currentStep.type === "industry_intent" || currentStep.type === "intro_concise") {
             answerKey = "industry_intent";
-        } else if (currentStep.type === "business") {
+        } else if (currentStep.type === "business" || currentStep.type === "business_concise") {
             // Also update parent prop
             if (answerVal && !removed) onBusinessNameChange(answerVal);
             // We store it in answers too for the summary
@@ -261,8 +262,13 @@ export default function RemixChatWizard({
             setAnswers(prev => ({ ...prev, [answerKey!]: answerVal }));
         }
 
+
         // Add User Message
-        const userText = removed ? "Remove from design" : (skip ? "Skip / Keep same" : (val || "Next"));
+        const userText = removed ? "Remove from design" : (skip ? "Skip / Keep same" : (
+            (currentStep.type === "intro_concise" || currentStep.type === "intro")
+                ? (uploads.length > 0 ? `Uploaded ${uploads.length} image(s)${val ? ' + Industry: ' + val : ''}` : (val || "Skip Upload"))
+                : (val || "Next")
+        ));
         const newMsgs = [...messages, { id: `user-${Date.now()}`, role: "user" as const, text: userText }];
         setInputVal("");
 
@@ -300,11 +306,17 @@ export default function RemixChatWizard({
 
             botText = `${g.label}:\n` + lines.join("\n");
         } else if (nextStep.type === "instructions") {
-            botText = "🔥 THE SECRET SAUCE! Describe what you want to see in the image. Add your business info, text changes, vibe adjustments, or special effects.";
+            botText = "🔥 THE SECRET SAUCE!\nDescribe exactly what you want to see. Add text changes, vibe details, or specific edits.";
         } else if (nextStep.type === "industry_intent") {
             botText = "What kind of business is this for? (e.g. 'Coffee Shop', 'Tree Removal')";
         } else if (nextStep.type === "business") {
             botText = "What is your Business Name?";
+        } else if (nextStep.type === "intro_concise") {
+            // Already handled by intro step UI? No, this is for NEXT step text if we jumped TO it? 
+            // Intro is usually Step 0.
+            botText = "Let's get started. Upload your photo and tell us your industry.";
+        } else if (nextStep.type === "business_concise") {
+            botText = "What is your Business Name? (You can also upload your logo)";
         } else if (nextStep.type === "logo") {
             botText = "Upload your logo/brand mark (optional). We will remove the background automatically.";
         } else if (nextStep.type === "review") {
@@ -438,6 +450,64 @@ export default function RemixChatWizard({
                                 className="w-full rounded-xl bg-lime-400 py-4 text-sm font-bold text-black hover:bg-lime-300 md:py-3">
                                 {uploads.length > 0 ? "Use these images" : "Skip Upload"}
                             </button>
+                        ) : activeStep?.type === "intro_concise" ? (
+                            <div className="flex flex-col gap-2">
+                                {/* Industry Input + Next Button */}
+                                <div className="flex gap-2">
+                                    <input
+                                        autoFocus={!isGuest}
+                                        className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-4 text-base text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
+                                        placeholder="Industry (e.g. Coffee Shop)..."
+                                        value={inputVal}
+                                        onChange={(e) => setInputVal(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); advanceStep(); }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => advanceStep()}
+                                        className="rounded-xl bg-lime-400 px-8 py-4 text-base font-bold text-black hover:bg-lime-300 whitespace-nowrap shadow-lg shadow-lime-400/10">
+                                        Next
+                                    </button>
+                                </div>
+                                <div className="flex justify-end">
+                                    <button onClick={() => advanceStep(true)} className="px-4 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
+                                        Skip Industry
+                                    </button>
+                                </div>
+                            </div>
+                        ) : activeStep?.type === "business_concise" ? (
+                            <div className="flex flex-col gap-4">
+                                <div className="flex gap-2">
+                                    <input
+                                        autoFocus={!isGuest}
+                                        className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-4 text-base text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
+                                        placeholder="Business Name..."
+                                        value={inputVal}
+                                        onChange={(e) => setInputVal(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); advanceStep(); }
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => advanceStep()}
+                                        className="rounded-xl bg-lime-400 px-8 py-4 text-base font-bold text-black hover:bg-lime-300 whitespace-nowrap shadow-lg shadow-lime-400/10">
+                                        Next
+                                    </button>
+                                </div>
+
+                                {/* Inline Logo Uploader */}
+                                <div className="bg-white/5 p-3 rounded-xl border border-white/10">
+                                    <p className="text-xs text-white/50 mb-2 uppercase tracking-wide font-semibold">Brand Logo (Optional)</p>
+                                    <ImageUploader files={logo ? [logo] : []} onChange={(fs) => onLogoChange(fs[0] || null)} maxFiles={1} />
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button onClick={() => advanceStep(true)} className="px-4 py-2 text-xs font-semibold text-white/40 hover:text-white transition">
+                                        Skip Business Info
+                                    </button>
+                                </div>
+                            </div>
                         ) : activeStep?.type === "logo" ? (
                             <div className="flex flex-col gap-3">
                                 <ImageUploader
