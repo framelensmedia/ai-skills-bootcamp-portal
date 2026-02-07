@@ -356,8 +356,38 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         setLightboxItemId(null);
     }
 
-    function handleShare(url: string) {
-        console.log("Share clicked:", url);
+    async function handleShare(url: string) {
+        if (!url) return;
+        try {
+            // Try native share with file if possible
+            if (navigator.canShare && navigator.share) {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const filename = `generation-${Date.now()}.jpg`;
+                const file = new File([blob], filename, { type: blob.type });
+
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Check out my AI generation!',
+                    });
+                    return;
+                }
+            }
+            // Fallback to link sharing
+            await navigator.share({
+                title: 'Check out my AI generation!',
+                url: url
+            });
+        } catch (err) {
+            console.warn("Share failed, falling back to clipboard", err);
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast("Link copied to clipboard");
+            } catch (e) {
+                showToast("Failed to share");
+            }
+        }
     }
 
     async function handleCreateFolder() {
