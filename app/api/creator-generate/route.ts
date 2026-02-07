@@ -169,23 +169,92 @@ async function generateFalImage(
 
 export async function POST(req: Request) {
     try {
-        const formData = await req.formData();
+        const contentType = req.headers.get("content-type") || "";
 
-        const prompt = formData.get("prompt") as string;
-        const userId = formData.get("userId") as string;
-        const aspectRatio = formData.get("aspectRatio") as string || "9:16";
-        const subjectOutfit = formData.get("subjectOutfit") as string;
-        // KeepOutfit might still be sent by cached clients or logic, good to have just in case, but we rely on subjectOutfit now.
-        const keepOutfit = formData.get("keepOutfit");
+        let prompt = "";
+        let userId = "";
+        let aspectRatio = "9:16";
+        let subjectOutfit = "";
+        let keepOutfit = true;
+        let subjectLock = false;
+        let forceCutout = false;
+        let template_reference_image: string | null = null;
+        let subjectMode = "non_human";
+        let requestedModel: string | null = null;
 
-        const subjectLock = formData.get("subjectLock");
-        const template_reference_image = formData.get("template_reference_image") as string;
+        // Text fields
+        let headline: string | null = null;
+        let subheadline: string | null = null;
+        let cta: string | null = null;
+        let promotion: string | null = null;
+        let business_name: string | null = null;
+        let industry_intent: string | null = null;
+        let instructions: string | null = null;
 
-        const headline = formData.get("headline") as string;
-        const subheadline = formData.get("subheadline") as string;
-        const cta = formData.get("cta") as string;
-        const promotion = formData.get("promotion") as string;
-        const business_name = formData.get("business_name") as string;
+        // Images
+        let imageFiles: File[] = [];
+        let imageUrls: string[] = [];
+        let logoFile: File | null = null;
+        let logoUrl: string | null = null;
+
+        // 1. Parse Input (FormData or JSON)
+        if (contentType.includes("multipart/form-data")) {
+            const formData = await req.formData();
+
+            prompt = formData.get("prompt") as string;
+            userId = formData.get("userId") as string;
+            aspectRatio = formData.get("aspectRatio") as string || "9:16";
+            subjectOutfit = formData.get("subjectOutfit") as string;
+            keepOutfit = formData.get("keepOutfit") === "true"; // Parse string "true"
+            subjectLock = formData.get("subjectLock") === "true";
+            subjectMode = formData.get("subjectMode") as string || "non_human";
+            forceCutout = formData.get("forceCutout") === "true";
+            requestedModel = formData.get("modelId") as string;
+
+            template_reference_image = formData.get("template_reference_image") as string;
+
+            headline = formData.get("headline") as string;
+            subheadline = formData.get("subheadline") as string;
+            cta = formData.get("cta") as string;
+            promotion = formData.get("promotion") as string;
+            business_name = formData.get("business_name") as string;
+            industry_intent = formData.get("industry_intent") as string;
+            instructions = formData.get("instructions") as string;
+
+            imageFiles = formData.getAll("image") as File[];
+            logoFile = formData.get("logo_image") as File | null;
+
+        } else {
+            // JSON Handling (Fixes Payload Size Limit)
+            const body = await req.json();
+
+            prompt = body.prompt;
+            userId = body.userId;
+            aspectRatio = body.aspectRatio || "9:16";
+            subjectOutfit = body.subjectOutfit;
+            keepOutfit = body.keepOutfit === "true" || body.keepOutfit === true;
+            subjectLock = body.subjectLock === "true" || body.subjectLock === true;
+            subjectMode = body.subjectMode || "non_human";
+            forceCutout = body.forceCutout === "true" || body.forceCutout === true;
+            requestedModel = body.modelId;
+
+            template_reference_image = body.template_reference_image;
+
+            headline = body.headline;
+            subheadline = body.subheadline;
+            cta = body.cta;
+            promotion = body.promotion;
+            business_name = body.business_name;
+            industry_intent = body.industry_intent;
+            instructions = body.instructions;
+
+            // Image URLs from staged uploads
+            if (Array.isArray(body.imageUrls)) {
+                imageUrls = body.imageUrls.map(String);
+            }
+            // Logo URL
+            logoUrl = body.logo_image;
+        }
 
         if (!prompt || !userId) return NextResponse.json({ error: "Missing prompt or user" }, { status: 400 });
 
@@ -211,10 +280,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
         }
 
-        // 3. Handle Image Uploads (Server Side)
-        const imageFiles = formData.getAll("image") as File[];
-        const imageUrls: string[] = [];
-
+        // 3. Handle Image Uploads (Server Side fallback for FormData)
         if (imageFiles.length > 0) {
             const firstFile = imageFiles[0];
             const ab = await firstFile.arrayBuffer();
@@ -233,14 +299,29 @@ export async function POST(req: Request) {
             }
         }
 
+        // Handle Logo Upload (Server Side fallback)
+        if (logoFile) {
+            const ab = await logoFile.arrayBuffer();
+            const buffer = Buffer.from(ab);
+            const filePath = `fal-uploads/${userId}/logo-${Date.now()}.png`;
+            const { error: uploadErr } = await admin.storage
+                .from("generations")
+                .upload(filePath, buffer, { contentType: logoFile.type || "image/png", upsert: false });
+
+            if (!uploadErr) {
+                const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                logoUrl = pubUrl.publicUrl;
+            }
+        }
+
         // 3. Prepare Prompt Engine
         let finalPrompt = prompt;
         let subjectInstruction = "";
         let remixNegativePrompt: string | undefined;
 
         // Force Nano Banana Pro mapping
-        const model = "fal-ai/nano-banana-pro";
-        const isNano = true;
+        const model = requestedModel || "fal-ai/nano-banana-pro";
+        const isNano = true; // simplifying for creator studio
 
         let falImageSize: any = { width: 832, height: 1216 }; // Default 9:16
         if (aspectRatio === "16:9") falImageSize = { width: 1216, height: 832 };
@@ -249,8 +330,7 @@ export async function POST(req: Request) {
         const refImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
         // Subject Lock Logic
-        if (refImageUrl && subjectLock === "true") {
-            // ...
+        if (refImageUrl && subjectLock) {
             // DETECT REMIX MODE (Template + Subject)
             if (template_reference_image && refImageUrl !== template_reference_image) {
                 // CLASSIC REMIX INSTRUCTION
@@ -276,23 +356,31 @@ export async function POST(req: Request) {
                 // (kept for backward compatibility or direct edit modes)
                 if (subjectOutfit && subjectOutfit.trim().length > 0) {
                     subjectInstruction += ` OUTFIT: The subject is wearing ${subjectOutfit}. REWRITE the body. `;
-                } else if (keepOutfit === "true") {
+                } else if (keepOutfit) {
                     subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
                 } else {
                     subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. ";
                 }
                 subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
             }
-
-            finalPrompt = subjectInstruction + finalPrompt;
-
-            // Text Protection Fallback (If no replacement text provided)
-            if (!(headline || subheadline || cta || promotion || business_name)) {
-                finalPrompt += " [TEXT PRESERVATION]: Keep all existing text in the image visible and legible. Do not blur or cover the text. ";
-            }
-            // Clean up prompt if no subject lock
-            finalPrompt += ", shot on Canon 5D Mk IV, 85mm lens, f/1.8, sharp focus, cinematic lighting, photorealistic, hyper-realistic, 8k, master photography";
         }
+
+        finalPrompt = subjectInstruction + finalPrompt;
+
+        // Custom Instructions
+        if (instructions) {
+            finalPrompt += ` [USER INSTRUCTIONS]: ${instructions} `;
+        }
+        if (industry_intent) {
+            finalPrompt += ` [INDUSTRY CONTEXT]: The image must match the '${industry_intent}' industry. `;
+        }
+
+        // Text Protection Fallback (If no replacement text provided)
+        if (!(headline || subheadline || cta || promotion || business_name)) {
+            finalPrompt += " [TEXT PRESERVATION]: Keep all existing text in the image visible and legible. Do not blur or cover the text. ";
+        }
+        // Clean up prompt if no subject lock
+        finalPrompt += ", shot on Canon 5D Mk IV, 85mm lens, f/1.8, sharp focus, cinematic lighting, photorealistic, hyper-realistic, 8k, master photography";
 
         // Text Replacement Logic
         if (headline || subheadline || cta || promotion || business_name) {
@@ -304,6 +392,13 @@ export async function POST(req: Request) {
             if (cta) textPrompt += `Button/CTA: "${cta}". `;
             if (promotion) textPrompt += `Offer: "${promotion}". `;
             if (business_name) textPrompt += `Business Name: "${business_name}". `;
+
+            // LOGO INSTRUCTION (Best effort for Fal)
+            // Only generate if no specific logo was uploaded
+            if (business_name && !logoUrl) {
+                textPrompt += ` LOGO CREATION: You MUST generate a world-class, award-winning logo for the brand '${business_name}'. The logo should be a masterpiece of modern design—minimalist, iconic, and vector-style. Think Paul Rand meets Apple. Use bold geometry, negative space, and a premium color palette. It should look like a $10,000 corporate identity. Place it prominently and tastefully in the composition. `;
+            }
+
             textPrompt += "Typography must be legible, sharp, and integrated into the scene. ";
 
             finalPrompt += textPrompt;
@@ -329,7 +424,12 @@ export async function POST(req: Request) {
             user_id: userId,
             image_url: imageUrl,
             combined_prompt_text: prompt,
-            settings: { model, provider: "fal-creator-basic" }
+            settings: {
+                model,
+                provider: "fal-creator-basic",
+                logo_url: logoUrl, // Track it even if not used in generation
+                template_reference_image: template_reference_image
+            }
         }).select().single();
 
         if (!isAdmin) {
@@ -339,7 +439,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
             images: [{ url: imageUrl }],
             generationId: inserted?.id || "temp",
-            imageUrl
+            imageUrl,
+            remainingCredits: !isAdmin ? (userProfile.credits - IMAGE_COST) : userProfile.credits
         });
 
     } catch (e: any) {

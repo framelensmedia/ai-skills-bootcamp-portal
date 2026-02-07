@@ -299,6 +299,47 @@ function CreatorContent() {
         await generateImage(manualPrompt, uploads, { logoFile: logo });
     };
 
+    // Helper: Staged Upload
+    const uploadFile = async (file: File): Promise<string> => {
+        try {
+            // 1. Compress
+            let compressed = file;
+            try {
+                // Use higher resolution for creator studio source images
+                compressed = await compressImage(file, { maxWidth: 2048, quality: 0.85 });
+            } catch (e) {
+                console.warn("Compression failed, using original", e);
+            }
+
+            // 2. Get Signed URL
+            const signRes = await fetch("/api/sign-upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    filename: compressed.name,
+                    fileType: compressed.type
+                })
+            });
+
+            if (!signRes.ok) throw new Error("Failed to sign upload");
+            const { signedUrl, publicUrl } = await signRes.json();
+
+            // 3. Upload to Storage
+            const uploadRes = await fetch(signedUrl, {
+                method: "PUT",
+                body: compressed,
+                headers: { "Content-Type": compressed.type }
+            });
+
+            if (!uploadRes.ok) throw new Error("Failed to upload file to storage");
+
+            return publicUrl;
+        } catch (error) {
+            console.error("Upload helper failed:", error);
+            throw error;
+        }
+    };
+
     const generateImage = async (prompt: string, imageUploads: File[], options: { subjectLock?: boolean, logoFile?: File | null } = {}) => {
         setGenerating(true);
         setError(null);
@@ -315,54 +356,59 @@ function CreatorContent() {
                 return;
             }
 
-            // 1. Build FormData Payload
-            const formData = new FormData();
+            // 1. Upload Images Client-Side (Staging)
+            const uploadPromises = imageUploads.map(file => uploadFile(file));
+            const uploadedImageUrls = await Promise.all(uploadPromises);
 
+            // 2. Upload Logo if exists
+            let logoUrl = null;
+            if (options.logoFile) {
+                try {
+                    logoUrl = await uploadFile(options.logoFile);
+                } catch (e) {
+                    console.warn("Logo upload failed", e);
+                }
+            }
+
+            // 3. Build JSON Payload
             const stylePrompt = stylePreset ? STYLE_PRESETS.find(p => p.id === stylePreset)?.prompt : "";
             const finalPrompt = stylePrompt ? `${prompt}, ${stylePrompt}` : prompt;
 
-            formData.append("prompt", finalPrompt);
-            formData.append("userId", user.id);
-            formData.append("aspectRatio", aspectRatio);
-            formData.append("combined_prompt_text", prompt);
-            formData.append("modelId", selectedModel);
-            formData.append("subjectOutfit", subjectOutfit);
-
-            // Append Images
-            imageUploads.forEach((file) => {
-                formData.append("image", file);
-            });
-
-            if (options.logoFile) {
-                formData.append("logo_image", options.logoFile);
-            }
-
             // Subject Settings
             const effectiveSubjectLock = options.subjectLock !== undefined ? options.subjectLock : subjectLock;
-            if (effectiveSubjectLock) {
-                formData.append("subjectLock", "true");
-                if (subjectMode === "human") {
-                    formData.append("forceCutout", "true");
-                }
-            } else {
-                formData.append("subjectLock", "false");
-            }
-            formData.append("subjectMode", subjectMode === "human" ? "human" : "object");
-            formData.append("keepOutfit", keepOutfit ? "true" : "false");
 
-            // Remix Params
-            const remixImg = searchParams?.get("img");
-            if (remixImg) formData.append("template_reference_image", remixImg);
+            const payload: any = {
+                prompt: finalPrompt,
+                userId: user.id,
+                aspectRatio: aspectRatio,
+                combined_prompt_text: prompt,
+                modelId: selectedModel,
+                subjectOutfit: subjectOutfit,
 
-            // Text params (from remixAnswers if available)
+                // Passed as URLs now
+                imageUrls: uploadedImageUrls,
+                logo_image: logoUrl, // ✅ Pass Logo URL
+
+                subjectLock: effectiveSubjectLock ? "true" : "false",
+                forceCutout: (effectiveSubjectLock && subjectMode === "human") ? "true" : "false", // Only if lock is on
+                subjectMode: subjectMode === "human" ? "human" : "object",
+                keepOutfit: keepOutfit ? "true" : "false",
+
+                // Remix Params inherited
+                template_reference_image: searchParams?.get("img"),
+            };
+
+            // Mix in remix answers
             if (remixAnswers) {
-                if (remixAnswers.headline) formData.append("headline", remixAnswers.headline);
-                if (remixAnswers.subheadline) formData.append("subheadline", remixAnswers.subheadline);
-                if (remixAnswers.cta) formData.append("cta", remixAnswers.cta);
-                if (remixAnswers.promotion) formData.append("promotion", remixAnswers.promotion);
-                if (remixAnswers.business_name) formData.append("business_name", remixAnswers.business_name);
-                if (remixAnswers.industry_intent) formData.append("industry_intent", remixAnswers.industry_intent);
-                if (remixAnswers.instructions) formData.append("instructions", remixAnswers.instructions);
+                Object.assign(payload, {
+                    headline: remixAnswers.headline,
+                    subheadline: remixAnswers.subheadline,
+                    cta: remixAnswers.cta,
+                    promotion: remixAnswers.promotion,
+                    business_name: remixAnswers.business_name,
+                    industry_intent: remixAnswers.industry_intent,
+                    instructions: remixAnswers.instructions,
+                });
             }
 
             // Use AbortController with 300s timeout
@@ -371,7 +417,10 @@ function CreatorContent() {
 
             const res = await fetch("/api/creator-generate", {
                 method: "POST",
-                body: formData, // Send FormData
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload),
                 signal: controller.signal,
             });
 
