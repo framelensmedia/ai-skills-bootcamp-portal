@@ -18,7 +18,7 @@ export type TemplateConfig = {
 };
 
 export const DEFAULT_CONFIG: TemplateConfig = {
-    subject_mode: "non_human",
+    subject_mode: "human",
     editable_fields: [
         { id: "headline", label: "Headline", default: "" },
         { id: "subheadline", label: "Sub-Headline", default: "" },
@@ -180,7 +180,8 @@ export default function RemixChatWizard({
     useEffect(() => {
         if (isOpen && templateConfig) {
             setStepIndex(0);
-            const mode = templateConfig.subject_mode || "non_human";
+            // Force default to human if not explicitly set to non_human
+            const mode = templateConfig.subject_mode === "non_human" ? "non_human" : "human";
             setSubjectMode(mode);
             const isHuman = mode === "human";
             const introText = isHuman
