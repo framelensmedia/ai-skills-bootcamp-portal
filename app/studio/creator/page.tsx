@@ -174,11 +174,14 @@ function CreatorContent() {
     // Community Feed handled by StudioCommunityFeed component now
 
     const previewAspectClass = useMemo(() => {
+        // Force 1:1 if showing the placeholder orb
+        if (previewImage === "/orb-neon.gif") return "aspect-square";
+
         if (aspectRatio === "9:16") return "aspect-[9/16]";
         if (aspectRatio === "16:9") return "aspect-[16/9]";
         if (aspectRatio === "1:1") return "aspect-square";
         return "aspect-[4/5]";
-    }, [aspectRatio]);
+    }, [aspectRatio, previewImage]);
 
     // Switch Default Model when Media Type Changes
     useEffect(() => {
@@ -889,57 +892,62 @@ function CreatorContent() {
 
                 {/* RIGHT COLUMN: Preview / Results */}
                 <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
-                    <div className={`sticky top-8 w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
-                        {/* Generating Overlay */}
-                        {generating && (
-                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                                <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
-                            </div>
-                        )}
+                    <div className="sticky top-8 w-full space-y-4">
+                        <div className={`relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
+                            {/* Generating Overlay */}
+                            {generating && (
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
+                                    <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
+                                </div>
+                            )}
 
-                        {videoResult ? (
-                            <video
-                                src={videoResult}
-                                className="absolute inset-0 w-full h-full object-cover"
-                                autoPlay
-                                loop
-                                controls
-                                playsInline
-                            />
-                        ) : (
-                            <Image
-                                src={previewImage}
-                                alt="Preview"
-                                fill
-                                className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
-                                unoptimized
-                            />
-                        )}
+                            {videoResult ? (
+                                <video
+                                    src={videoResult}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    autoPlay
+                                    loop
+                                    controls
+                                    playsInline
+                                />
+                            ) : (
+                                <Image
+                                    src={previewImage}
+                                    alt="Preview"
+                                    fill
+                                    className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
+                                    unoptimized
+                                />
+                            )}
 
-                        {/* Only show overlay for actual images, not the placeholder */}
-                        {previewImage !== "/orb-neon.gif" && !videoResult && (
-                            <div className="absolute inset-0 bg-black/35 pointer-events-none" />
-                        )}
+                            {/* Only show overlay for actual images, not the placeholder */}
+                            {previewImage !== "/orb-neon.gif" && !videoResult && (
+                                <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                            )}
 
+                            {/* Download Button for Video */}
+                            {videoResult && (
+                                <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30">
+                                    <a
+                                        href={videoResult}
+                                        download="video.mp4"
+                                        className="bg-white text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-zinc-200 transition-colors"
+                                    >
+                                        <Download size={18} /> Download
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Placeholder Text - Below the preview */}
                         {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-                                <h3 className="text-2xl font-bold text-white mb-2">{mediaType === "video" ? "Your Video" : "Your Artwork"}</h3>
-                                <p className="text-sm text-white/50">
-                                    Generated {mediaType === "video" ? "videos" : "images"} will appear here. You can then edit, download, or share them.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Download Button for Video */}
-                        {videoResult && (
-                            <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30">
-                                <a
-                                    href={videoResult}
-                                    download="video.mp4"
-                                    className="bg-white text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-zinc-200 transition-colors"
-                                >
-                                    <Download size={18} /> Download
-                                </a>
+                            <div className="w-full flex justify-center">
+                                <div className="bg-black/50 backdrop-blur-md rounded-xl p-6 w-full border border-white/5 text-center">
+                                    <h3 className="text-2xl font-bold text-white mb-2">{mediaType === "video" ? "Your Video" : "Your Artwork"}</h3>
+                                    <p className="text-sm text-white/50">
+                                        Generated {mediaType === "video" ? "videos" : "images"} will appear here. You can then edit, download, or share them.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
