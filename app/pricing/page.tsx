@@ -12,8 +12,50 @@ function PricingContent() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [buyingPack, setBuyingPack] = useState<string | null>(null);
 
   const canceled = searchParams.get("canceled");
+
+  const buyCredits = async (packId: string) => {
+    setError(null);
+    setBuyingPack(packId);
+
+    try {
+      if (!userId) {
+        router.push("/login");
+        return;
+      }
+
+      const res = await fetch("/api/stripe/credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId }),
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        setError(data?.error || `Checkout error: ${res.status}`);
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setError("No checkout URL returned");
+    } catch (e: any) {
+      setError(e?.message ?? "Checkout failed");
+    } finally {
+      setBuyingPack(null);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
@@ -145,6 +187,85 @@ function PricingContent() {
             Secure checkout powered by Stripe.
           </p>
         </div>
+      </div>
+
+      {/* Credit Packs Section */}
+      <div className="mt-16">
+        <div className="flex flex-col gap-2 mb-8">
+          <h2 className="text-2xl font-semibold">Credit Packs</h2>
+          <p className="text-white/70">
+            Need more credits? Top up your account instantly with a one-time purchase.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* 50 Credits */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-4xl">⚡</div>
+              <div className="text-right">
+                <div className="text-2xl font-bold">$4.99</div>
+                <div className="text-xs text-white/50">~10¢ each</div>
+              </div>
+            </div>
+            <div className="text-xl font-semibold mb-1">50 Credits</div>
+            <p className="text-sm text-white/60 mb-6">Perfect for trying things out</p>
+            <button
+              onClick={() => buyCredits("credits_50")}
+              disabled={buyingPack !== null}
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
+            >
+              {buyingPack === "credits_50" ? "Redirecting..." : "Buy Now"}
+            </button>
+          </div>
+
+          {/* 120 Credits - Popular */}
+          <div className="rounded-2xl border-2 border-[#B7FF00]/50 bg-[#B7FF00]/5 p-6 relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#B7FF00] text-black text-xs font-bold px-3 py-1 rounded-full">
+              BEST VALUE
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-4xl">🔥</div>
+              <div className="text-right">
+                <div className="text-2xl font-bold">$9.99</div>
+                <div className="text-xs text-[#B7FF00]">~8¢ each</div>
+              </div>
+            </div>
+            <div className="text-xl font-semibold mb-1">120 Credits</div>
+            <p className="text-sm text-white/60 mb-6">Most popular choice</p>
+            <button
+              onClick={() => buyCredits("credits_120")}
+              disabled={buyingPack !== null}
+              className="w-full rounded-lg bg-[#B7FF00] px-4 py-3 text-sm font-bold text-black hover:bg-[#a8e600] disabled:opacity-60 transition-colors"
+            >
+              {buyingPack === "credits_120" ? "Redirecting..." : "Buy Now"}
+            </button>
+          </div>
+
+          {/* 300 Credits */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-4xl">💎</div>
+              <div className="text-right">
+                <div className="text-2xl font-bold">$19.99</div>
+                <div className="text-xs text-white/50">~7¢ each</div>
+              </div>
+            </div>
+            <div className="text-xl font-semibold mb-1">300 Credits</div>
+            <p className="text-sm text-white/60 mb-6">For power creators</p>
+            <button
+              onClick={() => buyCredits("credits_300")}
+              disabled={buyingPack !== null}
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
+            >
+              {buyingPack === "credits_300" ? "Redirecting..." : "Buy Now"}
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-4 text-center text-xs text-white/40">
+          Credits never expire. One-time purchase, instant delivery.
+        </p>
       </div>
     </div>
   );

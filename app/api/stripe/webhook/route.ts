@@ -121,10 +121,40 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        const customerId = session.customer as string;
 
+        // Handle ONE-TIME credit pack purchases
+        if (session.mode === "payment") {
+          const creditsAmount = session.metadata?.credits_amount;
+          if (creditsAmount) {
+            const credits = parseInt(creditsAmount, 10);
+            if (!isNaN(credits) && credits > 0) {
+              // Increment credits (not replace)
+              const { data: profile } = await supabaseAdmin
+                .from("profiles")
+                .select("credits")
+                .eq("stripe_customer_id", customerId)
+                .single();
+
+              const currentCredits = profile?.credits ?? 0;
+
+              await supabaseAdmin
+                .from("profiles")
+                .update({
+                  credits: currentCredits + credits,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("stripe_customer_id", customerId);
+
+              console.log(`💰 Credit top-up: Added ${credits} credits to customer ${customerId}`);
+            }
+          }
+          break;
+        }
+
+        // Handle SUBSCRIPTION checkouts (existing logic)
         if (session.mode !== "subscription") break;
 
-        const customerId = session.customer as string;
         const subscriptionId = session.subscription as string;
 
         // Check for Ambassador Metadata from Checkout
