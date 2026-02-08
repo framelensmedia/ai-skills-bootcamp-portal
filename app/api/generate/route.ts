@@ -557,14 +557,13 @@ export async function POST(req: Request) {
             canvasUrl: !!canvasUrl
         });
 
-        // AUTO-SWITCH REMOVED: Reverting to always use requested model
-        // AUTO-SWITCH T2I Logic: Fal Gemini (Nano Banana) often fails 404 on T2I
-        // If no input images are provided, switch to Flux Pro v1.1 Ultra for high quality T2I
-        // const hasInputImages = (imageFiles.length > 0 || imageUrls.length > 0 || template_reference_image || canvasFile || canvasUrl);
-        // if (model.includes("nano-banana") && !hasInputImages) {
-        //     console.log("Auto-switching T2I request from Nano Banana to Flux Pro");
-        //     model = "fal-ai/flux-pro/v1.1-ultra";
-        // }
+        // AUTO-SWITCH T2I Logic: Nano Banana only supports /edit endpoint (no base T2I)
+        // If no input images are provided, switch to Seedream v4.5 for high quality T2I
+        const hasInputImages = (imageFiles.length > 0 || imageUrls.length > 0 || template_reference_image || canvasFile || canvasUrl);
+        if (model.includes("nano-banana") && !hasInputImages) {
+            console.log("Auto-switching T2I request from Nano Banana to Seedream v4.5 (Nano Banana only supports /edit)");
+            model = "fal-ai/bytedance/seedream/v4.5/text-to-image";
+        }
 
         console.log(`GENERATE: final model after mapping=${model}`);
 

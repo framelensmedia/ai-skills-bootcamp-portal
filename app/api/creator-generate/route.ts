@@ -319,9 +319,10 @@ export async function POST(req: Request) {
         let subjectInstruction = "";
         let remixNegativePrompt: string | undefined;
 
-        // Force Nano Banana Pro mapping
-        const model = requestedModel || "fal-ai/nano-banana-pro";
-        const isNano = true; // simplifying for creator studio
+        // Force Nano Banana Pro mapping - ensure fal-ai/ prefix is present
+        let model = requestedModel || "fal-ai/nano-banana-pro";
+        if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
+        const isNano = model.includes("nano-banana");
 
         let falImageSize: any = { width: 832, height: 1216 }; // Default 9:16
         if (aspectRatio === "16:9") falImageSize = { width: 1216, height: 832 };
