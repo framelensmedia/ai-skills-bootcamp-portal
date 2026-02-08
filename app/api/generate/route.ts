@@ -193,122 +193,87 @@ async function generateFalImage(
 
     const endpoint = `https://queue.fal.run/${modelId}`;
 
-    // Helper: Extract simple ratio string if imageSize is an enum or object
-    // But since we control the call site, let's just assume we want to pass "16:9" if it was "landscape_16_9" or pass the enum as "image_size".
-    // Let's rely on the fact that we are passing `imageSize` which might be "landscape_16_9".
-    // BUT we also want to send "aspectRatio": "16:9" just in case.
-
-    // Handle Nano Banana Pro specifically (uses different API schema)
+    // Helper: Extract simple ratio string
     const isNanoBanana = modelId.includes("nano-banana");
 
     let payload: any;
 
     if (isNanoBanana) {
-        // Nano Banana Pro/Edit API schema:
-        // - prompt (required)
-        // - image_urls (array) - for editing
-        // - aspect_ratio (enum: auto, 9:16, 16:9, 1:1, etc.)
-        // - resolution (enum: 1K, 2K, 4K)
-        // - safety_tolerance (enum: 1-6)
-        // Does NOT support: image_size, strength, negative_prompt
+        // Nano Banana Default Payload
         payload = {
             prompt,
-            safety_tolerance: "4", // 4 is default, less strict
+            safety_tolerance: "4",
             resolution: "1K"
         };
 
-        // Set aspect_ratio based on imageSize
+        // Aspect Ratio Logic...
         if (typeof imageSize === 'string') {
             if (imageSize.includes('9_16') || imageSize.includes('portrait')) payload.aspect_ratio = "9:16";
             else if (imageSize.includes('16_9') || imageSize.includes('landscape')) payload.aspect_ratio = "16:9";
             else if (imageSize.includes('square') || imageSize.includes('1_1')) payload.aspect_ratio = "1:1";
             else if (imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
             else if (imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
-            else payload.aspect_ratio = "auto"; // Let model decide
+            else payload.aspect_ratio = "auto";
         } else {
-            payload.aspect_ratio = "9:16"; // Default to portrait
+            payload.aspect_ratio = "9:16";
         }
     } else {
-        // Other Fal models (Flux, etc.)
+        // Flux/Other Payload
         payload = {
             prompt,
             image_size: imageSize,
             safety_tolerance: "2",
             negative_prompt: negativePrompt || "cartoon, illustration, animation, face distortion, strange anatomy, disfigured, bad art, blurry, pixelated"
         };
-
-        // Add Strength for Img2Img (Remix) - only for non-nano-banana
+        // Add Strength for Img2Img
         if (mainImageUrl) {
             payload.strength = keepOutfit ? 0.85 : 0.70;
         }
 
-        // Set aspect_ratio
         if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
         if (typeof imageSize === 'string' && imageSize.includes('9_16')) payload.aspect_ratio = "9:16";
         if (typeof imageSize === 'string' && imageSize.includes('square')) payload.aspect_ratio = "1:1";
-        if (typeof imageSize === 'string' && imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
-        if (typeof imageSize === 'string' && imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
     }
+
+    // --- ENDPOINT & IMAGE HANDLING ---
+    let actualEndpoint = endpoint;
 
     if (isNanoBanana) {
-
-
-        // REMIX ARCHITECTURE:
-        // Base Canvas (image_url) = Template (Background/Scene)
-        // Reference (image_urls) = Subject (Identity/Outfit)
+        // Determine if we are Editing (Remix) or Generating (T2I)
+        let imagesToSend: string[] = [];
 
         if (template_reference_image) {
-            // CLASSIC REMIX CONFIGURATION:
-            // Base Canvas (image_url) = Template
-            // Reference Images (image_urls) = [Template, Subject]
-            // This tells the model: "Here is the scene (Image 1) and here is the Subject (Image 2). Combine them."
-            payload.image_urls = [template_reference_image];
-
+            // REMIX MODE
+            imagesToSend.push(template_reference_image);
             if (mainImageUrl && mainImageUrl !== template_reference_image) {
-                payload.image_urls.push(mainImageUrl);
+                imagesToSend.push(mainImageUrl);
             }
-
-            // NOTE: nano-banana-pro/edit does NOT support "strength" parameter
-            // Outfit/edit control is done entirely through the prompt text
-
-        } else {
-            // Case 2: Direct Edit (No Template, just the canvas image)
-            // nano-banana-pro/edit uses image_urls (array), not image_url
-            if (mainImageUrl) {
-                payload.image_urls = [mainImageUrl];
-            } else {
-                payload.image_urls = [];
-            }
-            // For direct edit, do NOT send strength - let the model handle it naturally
-            // The nano-banana-pro/edit API doesn't use strength parameter
-            if (strengthOverride) {
-                payload.strength = strengthOverride;
-            }
+        } else if (mainImageUrl) {
+            // DIRECT EDIT MODE
+            imagesToSend.push(mainImageUrl);
         }
 
-
-        // Force 9:16 for Remixes if not square
-        if (!payload.aspect_ratio) {
-            if (imageSize === "portrait_16_9") payload.aspect_ratio = "9:16";
-            else if (imageSize === "landscape_16_9") payload.aspect_ratio = "16:9";
+        // If we have images, use /edit and attach image_urls
+        if (imagesToSend.length > 0) {
+            actualEndpoint = `https://queue.fal.run/${modelId}/edit`;
+            payload.image_urls = imagesToSend;
+        } else {
+            // T2I MODE (Base Endpoint)
+            // MUST NOT send empty image_urls or image_url
+            delete payload.image_urls;
+            delete payload.image_url;
         }
     } else {
-        // Other Fal models use image_url (singular)
-        if (mainImageUrl) payload.image_url = mainImageUrl;
+        // Standard Models (Flux)
+        if (mainImageUrl) {
+            payload.image_url = mainImageUrl;
+        }
     }
-
-    // Use /edit endpoint for Nano Banana Pro if we have an image_url
-    // (Which we now always do if mainImage or Template exists)
-    const actualEndpoint = isNanoBanana && (payload.image_url || payload.image_urls?.length)
-        ? `https://queue.fal.run/${modelId}/edit`
-        : endpoint;
 
     console.log(`Fal Image Request (${modelId}):`, {
         prompt: prompt.slice(0, 50),
-        hasImage: !!mainImageUrl,
-        isNanoBanana,
         endpoint: actualEndpoint,
-        image_size: imageSize // Added for debugging
+        hasImages: !!(payload.image_url || payload.image_urls?.length)
     });
 
     // 1. Submit Request
