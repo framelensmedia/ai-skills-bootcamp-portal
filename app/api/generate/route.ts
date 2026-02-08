@@ -581,6 +581,25 @@ export async function POST(req: Request) {
         if (model === "nano-banana-pro") model = "fal-ai/nano-banana-pro";
         if (model === "seedream-4k") model = "fal-ai/flux-pro/v1.1-ultra";
 
+        // User requested to keep nano-banana-pro even for T2I
+        // Logging to debug why image might be missing
+        console.log("DEBUG: Model Resolution", {
+            model,
+            hasImageFiles: imageFiles.length,
+            hasImageUrls: imageUrls.length,
+            templateRef: template_reference_image,
+            canvasFile: !!canvasFile,
+            canvasUrl: !!canvasUrl
+        });
+
+        // AUTO-SWITCH REMOVED: Reverting to always use requested model
+        // AUTO-SWITCH T2I Logic: Fal Gemini (Nano Banana) often fails 404 on T2I
+        // If no input images are provided, switch to Flux Pro v1.1 Ultra for high quality T2I
+        // const hasInputImages = (imageFiles.length > 0 || imageUrls.length > 0 || template_reference_image || canvasFile || canvasUrl);
+        // if (model.includes("nano-banana") && !hasInputImages) {
+        //     console.log("Auto-switching T2I request from Nano Banana to Flux Pro");
+        //     model = "fal-ai/flux-pro/v1.1-ultra";
+        // }
 
         console.log(`GENERATE: final model after mapping=${model}`);
 

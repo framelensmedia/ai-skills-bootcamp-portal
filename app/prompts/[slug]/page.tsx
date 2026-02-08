@@ -924,7 +924,7 @@ function PromptContent() {
         combined_prompt_text: promptToUse,
 
         subjectMode: answersToUse?.subjectMode || templateConfig?.subject_mode || "non_human",
-        template_reference_image: imageSrc, // Used as reference for Remix
+        template_reference_image: imageSrc === fallbackOrb ? null : imageSrc, // Used as reference for Remix
 
         imageUrls, // Send URLs
         logo_image: logoUrl,
