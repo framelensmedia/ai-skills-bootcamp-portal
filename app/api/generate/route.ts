@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleAuth } from "google-auth-library"; // Restored
 import { createAspectGuide } from "./ar_guide"; // Import Helper
 import { NextRequest, NextResponse } from "next/server";
+import { triggerAutoRechargeIfNeeded } from "@/lib/autoRecharge";
 // sharp import removed (dynamic import used instead)
 
 export const runtime = "nodejs";
@@ -574,10 +575,10 @@ export async function POST(req: Request) {
 
 
 
-        // Check Credits
+        // Check Credits and Auto-Recharge settings
         const { data: userProfile, error: profileErr } = await admin
             .from("profiles")
-            .select("credits, role")
+            .select("credits, role, auto_recharge_enabled, auto_recharge_pack_id, auto_recharge_threshold")
             .eq("user_id", userId)
             .single();
 
@@ -874,11 +875,21 @@ export async function POST(req: Request) {
 
                 // DEDUCT CREDITS (Exempt Admins)
                 if (!isAdmin) {
+                    const newBalance = userCredits - IMAGE_COST;
                     const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
                     if (rpcErr) {
                         // Fallback if RPC missing
-                        await admin.from("profiles").update({ credits: userCredits - IMAGE_COST }).eq("user_id", userId);
+                        await admin.from("profiles").update({ credits: newBalance }).eq("user_id", userId);
                     }
+
+                    // Trigger auto-recharge if enabled and below threshold
+                    triggerAutoRechargeIfNeeded({
+                        userId,
+                        newBalance,
+                        autoRechargeEnabled: userProfile.auto_recharge_enabled ?? false,
+                        autoRechargePackId: userProfile.auto_recharge_pack_id ?? null,
+                        autoRechargeThreshold: userProfile.auto_recharge_threshold ?? 10,
+                    }).catch(err => console.error("[Auto-Recharge] Error:", err));
                 }
 
                 console.log("Fal Image Saved to DB:", inserted?.id);

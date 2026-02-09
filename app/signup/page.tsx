@@ -38,7 +38,7 @@ export default function SignupPage() {
     // Attempt tracking referral
     await fetch("/api/ambassador/track-referral", { method: "POST" });
 
-    router.push("/feed");
+    router.push("/welcome");
   };
 
   const handleGoogleLogin = async () => {

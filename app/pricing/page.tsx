@@ -63,6 +63,68 @@ function PricingContent() {
     });
   }, [supabase]);
 
+  // Auto-recharge state
+  const [autoRechargeEnabled, setAutoRechargeEnabled] = useState(false);
+  const [autoRechargePackId, setAutoRechargePackId] = useState<string | null>(null);
+  const [autoRechargeLoading, setAutoRechargeLoading] = useState(false);
+  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
+
+  // Fetch auto-recharge settings when user is loaded
+  useEffect(() => {
+    if (!userId) return;
+
+    fetch("/api/account/auto-recharge")
+      .then(res => res.json())
+      .then(data => {
+        setAutoRechargeEnabled(data.enabled ?? false);
+        setAutoRechargePackId(data.packId ?? null);
+        setHasPaymentMethod(data.hasPaymentMethod ?? false);
+      })
+      .catch(() => { });
+  }, [userId]);
+
+  const toggleAutoRecharge = async (enabled: boolean) => {
+    setAutoRechargeLoading(true);
+    try {
+      const res = await fetch("/api/account/auto-recharge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled,
+          packId: autoRechargePackId || "credits_120"
+        }),
+      });
+      if (res.ok) {
+        setAutoRechargeEnabled(enabled);
+        if (enabled && !autoRechargePackId) {
+          setAutoRechargePackId("credits_120");
+        }
+      }
+    } catch (e) {
+      console.error("Failed to update auto-recharge:", e);
+    } finally {
+      setAutoRechargeLoading(false);
+    }
+  };
+
+  const updateAutoRechargePack = async (packId: string) => {
+    setAutoRechargeLoading(true);
+    try {
+      const res = await fetch("/api/account/auto-recharge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId }),
+      });
+      if (res.ok) {
+        setAutoRechargePackId(packId);
+      }
+    } catch (e) {
+      console.error("Failed to update pack:", e);
+    } finally {
+      setAutoRechargeLoading(false);
+    }
+  };
+
   const startCheckout = async () => {
     setError(null);
     setLoading(true);
@@ -266,6 +328,55 @@ function PricingContent() {
         <p className="mt-4 text-center text-xs text-white/40">
           Credits never expire. One-time purchase, instant delivery.
         </p>
+
+        {/* Auto-Recharge Toggle */}
+        {userId && (
+          <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔄</span>
+                  <h3 className="font-semibold text-white">Auto-Recharge</h3>
+                </div>
+                <p className="text-sm text-white/60 mt-1">
+                  Automatically top up when credits drop below 10
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoRechargeEnabled}
+                  onChange={(e) => toggleAutoRecharge(e.target.checked)}
+                  disabled={autoRechargeLoading || !hasPaymentMethod}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#B7FF00] disabled:opacity-50"></div>
+              </label>
+            </div>
+
+            {autoRechargeEnabled && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <label className="text-sm text-white/70 block mb-2">Recharge pack:</label>
+                <select
+                  value={autoRechargePackId || "credits_120"}
+                  onChange={(e) => updateAutoRechargePack(e.target.value)}
+                  disabled={autoRechargeLoading}
+                  className="w-full rounded-lg border border-white/20 bg-black/50 px-4 py-2 text-sm text-white focus:border-[#B7FF00] outline-none"
+                >
+                  <option value="credits_50">50 Credits - $4.99</option>
+                  <option value="credits_120">120 Credits - $9.99</option>
+                  <option value="credits_300">300 Credits - $19.99</option>
+                </select>
+              </div>
+            )}
+
+            {!hasPaymentMethod && (
+              <p className="mt-3 text-xs text-amber-400/80">
+                ⚠️ Make a credit purchase first to enable auto-recharge
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
