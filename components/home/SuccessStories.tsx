@@ -31,32 +31,32 @@ export default function SuccessStories() {
                 <h2 className="mt-2 text-3xl font-bold md:text-4xl text-white">
                     Success Stories
                 </h2>
-                <p className="mt-3 text-white/60 max-w-2xl mx-auto">
+                <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
                     See how our members are launching and growing their businesses with AI Skills Studio.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {reviews.map((review, i) => (
-                    <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-6 md:p-8 hover:border-[#B7FF00]/30 transition-colors">
+                    <div key={i} className="rounded-2xl border border-border bg-card p-6 md:p-8 hover:border-[#B7FF00]/30 transition-colors">
                         <div className="flex gap-1 mb-4 text-[#B7FF00]">
                             {[...Array(5)].map((_, i) => (
                                 <Star key={i} size={16} fill="currentColor" />
                             ))}
                         </div>
 
-                        <p className="text-lg text-white/90 leading-relaxed mb-6">
+                        <p className="text-lg text-foreground/90 leading-relaxed mb-6">
                             "{review.content}"
                         </p>
 
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-white/10 overflow-hidden relative">
+                            <div className="h-10 w-10 rounded-full bg-muted overflow-hidden relative">
                                 {/* Using standard img tag for simplicity in static component, or could use Next Image if needed but external domains need config */}
                                 <img src={review.image} alt={review.name} className="h-full w-full object-cover" />
                             </div>
                             <div>
-                                <div className="font-semibold text-white text-sm">{review.name}</div>
-                                <div className="text-xs text-white/50">{review.role}</div>
+                                <div className="font-semibold text-foreground text-sm">{review.name}</div>
+                                <div className="text-xs text-muted-foreground">{review.role}</div>
                             </div>
                         </div>
                     </div>

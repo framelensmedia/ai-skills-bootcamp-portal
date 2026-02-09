@@ -33,11 +33,11 @@ export default function FeaturedPromptSlider({
 
   if (!safeItems.length) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-white/10 to-black/50" />
-        <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-          <p className="text-xs text-white/60">Featured prompts</p>
-          <p className="mt-1 text-sm font-semibold text-white">Coming soon</p>
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-muted to-black/50" />
+        <div className="mt-4 rounded-xl border border-border bg-popover p-3">
+          <p className="text-xs text-muted-foreground">Featured prompts</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">Coming soon</p>
         </div>
       </div>
     );
@@ -46,9 +46,9 @@ export default function FeaturedPromptSlider({
   const item = safeItems[idx];
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-2xl border border-border bg-card p-4">
       {/* Top “image” area */}
-      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-gradient-to-br from-white/10 to-black/50">
+      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-gradient-to-br from-muted to-black/50">
         {/* subtle overlay label */}
         <div className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[11px] font-semibold text-white/80">
           Featured Prompt
@@ -64,8 +64,8 @@ export default function FeaturedPromptSlider({
                 onClick={() => setIdx(i)}
                 aria-label={`Go to featured prompt ${i + 1}`}
                 className={[
-                  "h-1.5 w-6 rounded-full border border-white/10 transition",
-                  i === idx ? "bg-[#B7FF00]/70" : "bg-white/10 hover:bg-white/15",
+                  "h-1.5 w-6 rounded-full border border-border transition",
+                  i === idx ? "bg-primary/70" : "bg-muted-foreground/30 hover:bg-muted-foreground/50",
                 ].join(" ")}
               />
             ))}
@@ -74,34 +74,34 @@ export default function FeaturedPromptSlider({
       </div>
 
       {/* Content */}
-      <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
+      <div className="mt-4 rounded-xl border border-border bg-popover p-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-semibold text-[#B7FF00]">{item.category}</p>
+          <p className="text-xs font-semibold text-primary">{item.category}</p>
 
           <span
             className={[
               "rounded-full border px-2 py-1 text-[10px] font-semibold tracking-wide",
               item.access === "PRO"
-                ? "border-[#B7FF00]/30 bg-[#B7FF00]/10 text-[#B7FF00]"
-                : "border-white/10 bg-black/30 text-white/70",
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border bg-secondary text-muted-foreground",
             ].join(" ")}
           >
             {item.access}
           </span>
         </div>
 
-        <p className="mt-2 text-sm font-semibold text-white">{item.title}</p>
+        <p className="mt-2 text-sm font-semibold text-foreground">{item.title}</p>
 
         {item.summary ? (
-          <p className="mt-2 text-xs text-white/60">{item.summary}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{item.summary}</p>
         ) : null}
 
         <div className="mt-3 flex items-center justify-between">
-          <span className="text-xs text-white/60">Rotate: Auto</span>
+          <span className="text-xs text-muted-foreground">Rotate: Auto</span>
 
           <Link
             href={item.href}
-            className="text-xs font-semibold text-white/80 hover:text-white"
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             Open →
           </Link>
@@ -113,7 +113,7 @@ export default function FeaturedPromptSlider({
             <button
               type="button"
               onClick={() => setIdx((v) => (v - 1 + safeItems.length) % safeItems.length)}
-              className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/75 hover:bg-black/40 hover:text-white"
+              className="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               Prev
             </button>
@@ -121,7 +121,7 @@ export default function FeaturedPromptSlider({
             <button
               type="button"
               onClick={() => setIdx((v) => (v + 1) % safeItems.length)}
-              className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/75 hover:bg-black/40 hover:text-white"
+              className="rounded-md border border-border bg-secondary px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               Next
             </button>

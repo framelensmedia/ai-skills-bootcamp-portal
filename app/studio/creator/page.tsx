@@ -44,7 +44,7 @@ function TypeWriter({ text }: { text: string }) {
     }, []);
 
     return (
-        <div ref={ref} className="text-xl font-bold text-white tracking-tight mb-4 min-h-[28px]">
+        <div ref={ref} className="text-xl font-bold text-foreground tracking-tight mb-4 min-h-[28px]">
             {text.split("").map((char, i) => (
                 <span
                     key={i}
@@ -54,7 +54,7 @@ function TypeWriter({ text }: { text: string }) {
                     {char === " " ? "\u00A0" : char}
                 </span>
             ))}
-            <span className={`inline-block ml-0.5 animate-pulse text-lime-400 ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
+            <span className={`inline-block ml-0.5 animate-pulse text-primary ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
         </div>
     );
 }
@@ -616,11 +616,11 @@ function CreatorContent() {
         <main className="mx-auto w-full max-w-7xl px-4 py-8">
             {/* Page Header */}
             <div className="mb-8">
-                <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-                    <Clapperboard className="w-8 h-8 md:w-10 md:h-10 text-lime-400" />
+                <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
+                    <Clapperboard className="w-8 h-8 md:w-10 md:h-10 text-primary" />
                     Creator Studio
                 </h1>
-                <p className="mt-2 text-white/60">Generate stunning visuals in minutes</p>
+                <p className="mt-2 text-muted-foreground">Generate stunning visuals in minutes</p>
             </div>
 
             {/* GLOBAL PAUSE BANNER */}
@@ -647,21 +647,21 @@ function CreatorContent() {
                 {/* LEFT COLUMN: Controls */}
                 <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-white">Prompt Tool</h2>
-                        <div className="text-xs font-bold text-[#B7FF00] uppercase tracking-wider">AI Studio</div>
+                        <h2 className="text-lg font-bold text-foreground">Prompt Tool</h2>
+                        <div className="text-xs font-bold text-primary uppercase tracking-wider">AI Studio</div>
                     </div>
 
-                    <p className="text-xs text-white/40 text-center italic">
+                    <p className="text-xs text-muted-foreground/60 text-center italic">
                         AI is not perfect; it can make mistakes.
                     </p>
 
                     {/* Settings Card */}
-                    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5">
+                    <div className="rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2">
-                                <div className="text-sm font-bold text-white/90">Settings</div>
+                                <div className="text-sm font-bold text-foreground">Settings</div>
                             </div>
-                            <div className="text-xs font-mono text-lime-400/80">
+                            <div className="text-xs font-mono text-primary">
                                 {mediaType.toUpperCase()} / {aspectRatio}
                             </div>
                         </div>
@@ -700,7 +700,7 @@ function CreatorContent() {
                             </div>
                         )}
 
-                        <div className="mt-4 pt-4 border-t border-white/5">
+                        <div className="mt-4 pt-4 border-t border-border">
                             <div className="grid grid-cols-4 gap-2">
                                 <SelectPill
                                     label="9:16"
@@ -739,8 +739,8 @@ function CreatorContent() {
 
                         {/* Model Selector */}
                         {mediaType === "image" && GENERATION_MODELS.length > 1 && (
-                            <div className="mt-4 pt-4 border-t border-white/5">
-                                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Model</div>
+                            <div className="mt-4 pt-4 border-t border-border">
+                                <div className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Model</div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                     {GENERATION_MODELS.map((model) => (
                                         <SelectPill
@@ -778,9 +778,9 @@ function CreatorContent() {
 
 
                     {/* Style Presets */}
-                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-                        <label className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
-                            Style Preset <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/60">Optional</span>
+                    <div className="mt-4 pt-4 border-t border-border space-y-3">
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                            Style Preset <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Optional</span>
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                             {STYLE_PRESETS.map((preset) => (
@@ -790,8 +790,8 @@ function CreatorContent() {
                                     className={`
                                             relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all group overflow-hidden
                                             ${stylePreset === preset.id
-                                            ? "bg-lime-400 border-lime-400 text-black shadow-[0_0_20px_-5px_rgba(183,255,0,0.4)]"
-                                            : "bg-white/5 border-white/5 text-white/60 hover:bg-white/10 hover:text-white hover:border-white/10"
+                                            ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                                            : "bg-secondary border-border text-muted-foreground hover:bg-accent hover:text-foreground hover:border-border"
                                         }
                                         `}
                                 >

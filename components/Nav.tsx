@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
 import { Menu, Coins } from "lucide-react";
 
+
 export default function Nav() {
   const router = useRouter();
   const pathname = usePathname();
@@ -81,7 +82,7 @@ export default function Nav() {
     const active = pathname === href;
     return [
       "text-sm font-medium transition-colors whitespace-nowrap",
-      active ? "text-white" : "text-white/80 hover:text-white",
+      active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
     ].join(" ");
   };
 
@@ -101,7 +102,7 @@ export default function Nav() {
 
   // Visual component for the avatar circle (no longer a link itself)
   const UserAvatar = () => (
-    <div className="relative h-8 w-8 rounded-full bg-zinc-800 overflow-hidden border border-white/20 hover:border-[#B7FF00] transition cursor-pointer">
+    <div className="relative h-8 w-8 rounded-full bg-muted overflow-hidden border border-border hover:border-[#B7FF00] transition cursor-pointer">
       {avatarUrl ? (
         <img src={avatarUrl} alt="User" className="h-full w-full object-cover" />
       ) : (
@@ -115,6 +116,7 @@ export default function Nav() {
       <nav className="flex items-center justify-end gap-3">
         {/* Desktop links */}
         <div className="hidden items-center gap-5 sm:flex">
+
           {links.map((l) => (
             <Link key={l.href} href={l.href} className={linkClass(l.href)}>
               {l.label}
@@ -133,7 +135,7 @@ export default function Nav() {
                 className="flex items-center gap-3 outline-none focus:ring-2 focus:ring-[#B7FF00]/50 rounded-full pr-1"
               >
                 {credits !== null && (
-                  <div className="hidden md:flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1 text-xs font-semibold text-[#B7FF00]">
+                  <div className="hidden md:flex items-center gap-1.5 bg-secondary border border-border rounded-full px-3 py-1 text-xs font-semibold text-primary">
                     <Coins size={12} />
                     <span>{isAdmin ? "∞" : credits}</span>
                   </div>
@@ -144,17 +146,17 @@ export default function Nav() {
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-zinc-900 shadow-xl z-50 overflow-hidden">
+                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-popover shadow-xl z-50 overflow-hidden">
                     <Link
                       href="/settings"
-                      className="block px-4 py-3 text-sm text-white/80 hover:bg-white/5 hover:text-white transition border-b border-white/5"
+                      className="block px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition border-b border-border"
                       onClick={() => setDropdownOpen(false)}
                     >
                       Edit Profile
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full text-left px-4 py-3 text-sm text-white/60 hover:bg-white/5 hover:text-white transition"
+                      className="w-full text-left px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition"
                     >
                       Log Out
                     </button>
@@ -167,7 +169,7 @@ export default function Nav() {
           <div className="hidden sm:flex items-center gap-3">
             <Link
               href="/login"
-              className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+              className="rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent"
             >
               Log in
             </Link>
@@ -183,7 +185,7 @@ export default function Nav() {
         {/* Mobile toggle */}
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 h-9 w-9 text-white hover:bg-white/10 sm:hidden"
+          className="inline-flex items-center justify-center rounded-lg border border-border bg-secondary h-9 w-9 text-foreground hover:bg-accent sm:hidden"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
           aria-expanded={mobileOpen ? "true" : "false"}
@@ -207,19 +209,23 @@ export default function Nav() {
           {/* Dropdown panel */}
           <div className="fixed inset-x-0 top-[73px] z-[70] sm:hidden">
             <div className="mx-auto w-full max-w-6xl px-4">
-              <div className="relative rounded-2xl border border-white/10 bg-black p-4 shadow-2xl backdrop-blur-sm">
+              <div className="relative rounded-2xl border border-border bg-popover p-4 shadow-2xl backdrop-blur-sm">
                 {/* X Close */}
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
-                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/10"
+                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-secondary text-foreground hover:bg-accent"
                   aria-label="Close menu"
                 >
                   ✕
                 </button>
 
+                <div className="absolute left-4 top-4">
+
+                </div>
+
                 <div className="pt-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Menu
                   </div>
                 </div>
@@ -233,8 +239,8 @@ export default function Nav() {
                       className={[
                         "rounded-xl border px-4 py-3 text-sm font-medium transition",
                         pathname === l.href
-                          ? "border-lime-400/30 bg-lime-400/10 text-white"
-                          : "border-white/10 bg-black/40 text-white/85 hover:bg-black/60 hover:text-white",
+                          ? "border-primary/30 bg-primary/10 text-primary-foreground"
+                          : "border-border bg-secondary/40 text-muted-foreground hover:bg-secondary/80 hover:text-foreground",
                       ].join(" ")}
                     >
                       {l.label}
@@ -243,23 +249,23 @@ export default function Nav() {
                 </div>
 
                 {/* Auth (mobile) */}
-                <div className="mt-4 border-t border-white/10 pt-4">
+                <div className="mt-4 border-t border-border pt-4">
                   {loading ? (
-                    <div className="h-10 w-full animate-pulse rounded-xl border border-white/15 bg-white/5" />
+                    <div className="h-10 w-full animate-pulse rounded-xl border border-border bg-secondary" />
                   ) : loggedIn ? (
                     <div className="flex items-center gap-4">
-                      <Link href="/settings" className="flex items-center gap-3 flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-3 hover:bg-white/10">
-                        <div className="h-8 w-8 rounded-full bg-zinc-800 overflow-hidden border border-white/10">
+                      <Link href="/settings" className="flex items-center gap-3 flex-1 rounded-xl border border-border bg-secondary px-4 py-3 hover:bg-accent">
+                        <div className="h-8 w-8 rounded-full bg-muted overflow-hidden border border-border">
                           {avatarUrl ? <img src={avatarUrl} className="h-full w-full object-cover" /> : null}
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-white">Edit Profile</span>
-                          {credits !== null && <span className="text-xs text-[#B7FF00] font-mono">{isAdmin ? "∞" : credits} Credits</span>}
+                          <span className="text-sm font-semibold text-foreground">Edit Profile</span>
+                          {credits !== null && <span className="text-xs text-primary font-mono">{isAdmin ? "∞" : credits} Credits</span>}
                         </div>
                       </Link>
                       <button
                         onClick={handleLogout}
-                        className="rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                        className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground hover:bg-accent"
                       >
                         Logout
                       </button>
@@ -268,7 +274,7 @@ export default function Nav() {
                     <div className="grid grid-cols-2 gap-3">
                       <Link
                         href="/login"
-                        className="inline-flex w-full items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                        className="inline-flex w-full items-center justify-center rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-semibold text-foreground hover:bg-accent"
                       >
                         Log in
                       </Link>
@@ -285,7 +291,8 @@ export default function Nav() {
             </div>
           </div>
         </>
-      ) : null}
-    </div>
+      ) : null
+      }
+    </div >
   );
 }

@@ -32,20 +32,20 @@ function MiniCard({
     comingSoon?: boolean;
 }) {
     return (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 hover:border-white/20">
-            <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-white/10 to-black/40" />
+        <div className="rounded-2xl border border-border bg-card p-4 hover:border-border/80">
+            <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-muted to-background/40" />
             <p className="mt-4 text-xs font-semibold text-[#B7FF00]">
                 {tag}{" "}
                 {comingSoon ? (
-                    <span className="ml-2 rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] font-semibold text-white/60">
+                    <span className="ml-2 rounded-full border border-border bg-black/30 px-2 py-1 text-[10px] font-semibold text-white/60">
                         COMING SOON
                     </span>
                 ) : null}
             </p>
-            <h3 className="mt-2 text-base font-semibold text-white">{title}</h3>
-            <p className="mt-2 text-sm text-white/60">{desc}</p>
+            <h3 className="mt-2 text-base font-semibold text-foreground">{title}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
             <div className="mt-4">
-                <span className="text-xs text-white/60 hover:text-white">
+                <span className="text-xs text-muted-foreground hover:text-foreground">
                     {comingSoon ? "Preview →" : "Read now →"}
                 </span>
             </div>
@@ -107,11 +107,11 @@ function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
 
     if (!active) {
         return (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-white/10 to-black/50" />
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-3">
-                    <p className="text-xs text-white/60">Featured content</p>
-                    <p className="mt-1 text-sm font-semibold text-white">Loading…</p>
+            <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="aspect-[16/10] rounded-xl bg-gradient-to-br from-muted to-black/50" />
+                <div className="mt-4 rounded-xl border border-border bg-popover p-3">
+                    <p className="text-xs text-muted-foreground">Featured content</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Loading…</p>
                 </div>
             </div>
         );
@@ -137,13 +137,13 @@ function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
     const categoryLabel = isBootcamp ? "Instructor Led Bootcamp" : (active as PublicPrompt).category ?? "general";
     const bottomLabel = isBootcamp ? "Instructor Led Bootcamp" : "Featured prompt";
     const actionText = isBootcamp ? "Coming Soon" : "Open →";
-    const actionColor = isBootcamp ? "text-white/40" : "text-[#B7FF00]";
+    const actionColor = isBootcamp ? "text-muted-foreground/40" : "text-[#B7FF00]";
     const actionCursor = isBootcamp ? "cursor-default" : "cursor-pointer"; // But user said "remain clickable", so keep pointer? "appear disabled but remain clickable" -> styles disabled but link works.
 
     return (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
             <Link href={href} className={`block ${isBootcamp ? "cursor-pointer" : ""}`}>
-                <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border bg-black/40">
                     {hasImage ? (
                         <Image
                             src={bestImage}
@@ -173,11 +173,11 @@ function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
                     {/* Bootcamp Enticing Summary Overlay - REMOVED */}
                 </div>
 
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/40 p-4">
+                <div className="mt-4 rounded-xl border border-border bg-popover p-4">
                     <div className="flex items-start justify-between mb-2">
                         <div className="min-w-0 pr-4">
-                            <p className="text-xs text-white/60 mb-1">{bottomLabel}</p>
-                            <p className="truncate text-base font-bold text-white">{active.title}</p>
+                            <p className="text-xs text-muted-foreground mb-1">{bottomLabel}</p>
+                            <p className="truncate text-base font-bold text-foreground">{active.title}</p>
                         </div>
                         <div className="text-right shrink-0">
                             <p className={`text-sm font-semibold ${actionColor}`}>{actionText}</p>
@@ -186,7 +186,7 @@ function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
 
                     {/* Tagline for Bootcamps */}
                     {isBootcamp && (
-                        <p className="text-sm text-white/70 line-clamp-2 leading-relaxed">
+                        <p className="text-sm text-muted-foreground/70 line-clamp-2 leading-relaxed">
                             {getBootcampTagline(active.slug)}
                         </p>
                     )}
@@ -198,8 +198,8 @@ function FeaturedPromptSlider({ items }: { items: SliderItem[] }) {
                     <span
                         key={i}
                         className={[
-                            "h-1.5 w-1.5 rounded-full border border-white/10",
-                            i === idx ? "bg-[#B7FF00]" : "bg-white/20",
+                            "h-1.5 w-1.5 rounded-full border border-border",
+                            i === idx ? "bg-[#B7FF00]" : "bg-muted-foreground/30",
                         ].join(" ")}
                     />
                 ))}
@@ -247,7 +247,7 @@ function Typewriter({ text, className = "", gradientWords = [] }: { text: string
                         {word.split("").map((char, charIndex) => (
                             <span
                                 key={charIndex}
-                                className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'} ${isGradient ? "text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400" : "text-white"}`}
+                                className={`inline-block transition-opacity duration-100 ${visible ? 'opacity-100' : 'opacity-0'} ${isGradient ? "text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400" : "text-foreground"}`}
                                 style={{ transitionDelay: `${(previousChars + charIndex) * 100}ms` }}
                             >
                                 {char}
@@ -319,7 +319,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
     // BUT we render client side so hydration happens.
 
     const themePrimary = "bg-[#B7FF00] text-black hover:opacity-90";
-    const themeSecondary = "border border-white/15 bg-white/5 text-white hover:bg-white/10";
+    const themeSecondary = "border border-border bg-secondary text-foreground hover:bg-accent";
 
     // Default (Loading or Pro): Browse is Primary
     let browseStyle = themePrimary;
@@ -343,11 +343,11 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B7FF00]">No technical skills required</span>
                         </div>
 
-                        <h1 className="mt-6 text-5xl font-bold tracking-tight text-white md:text-7xl">
+                        <h1 className="mt-6 text-5xl font-bold tracking-tight text-foreground md:text-7xl">
                             <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
                         </h1>
 
-                        <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-white/60 md:text-xl">
+                        <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-muted-foreground md:text-xl">
                             The all-in-one platform to launch your business with AI, and master the skills.
                         </p>
 
@@ -356,17 +356,17 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             {sliderPrompts.length > 0 ? (
                                 <FeaturedPromptSlider items={sliderPrompts} />
                             ) : (
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white/50 text-xs">No featured prompts.</div>
+                                <div className="rounded-2xl border border-border bg-card p-4 text-muted-foreground text-xs">No featured prompts.</div>
                             )}
                         </div>
 
                         {/* CONTROLS */}
                         <div className="mt-6 max-w-xl">
                             {/* Search (full width) */}
-                            <div className="mb-4 flex w-full items-center gap-2 rounded-md border border-white/15 bg-white/5 px-4 py-3">
-                                <span className="text-xs text-white/60">🔎</span>
+                            <div className="mb-4 flex w-full items-center gap-2 rounded-md border border-input bg-background/50 px-4 py-3 shadow-sm">
+                                <span className="text-xs text-muted-foreground">🔎</span>
                                 <input
-                                    className="w-full bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
+                                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
                                     placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") {
@@ -387,7 +387,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
                                 <Link
                                     href="/studio/creator"
-                                    className="inline-flex w-full items-center justify-center rounded-md border border-white/15 bg-white/5 px-6 py-4 text-sm font-semibold text-white hover:bg-white/10"
+                                    className="inline-flex w-full items-center justify-center rounded-md border border-border bg-card px-6 py-4 text-sm font-semibold text-foreground hover:bg-accent"
                                 >
                                     Open Creator Studio →
                                 </Link>
@@ -395,8 +395,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </div>
 
 
-                        <div className="mt-5 flex items-center gap-3 text-xs text-white/60">
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/10">
+                        <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted">
                                 ★
                             </span>
                             Built for entrepreneurs and creators
@@ -408,7 +408,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         {sliderPrompts.length > 0 ? (
                             <FeaturedPromptSlider items={sliderPrompts} />
                         ) : (
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white/50 text-xs">No featured prompts.</div>
+                            <div className="rounded-2xl border border-border bg-card p-4 text-muted-foreground text-xs">No featured prompts.</div>
                         )}
                     </div>
                 </div>
@@ -420,7 +420,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
             {/* TRENDING PROMPTS */}
             <section className="mx-auto max-w-6xl px-4 py-8">
                 {/* ... existing trending prompt header ... */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-white/10 pb-8">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-border pb-8">
                     <div>
                         <div className="flex items-center gap-2 mb-3">
                             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
@@ -430,17 +430,17 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 Prompt Templates
                             </span>
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-3">
+                        <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight mb-3">
                             Remix & Create
                         </h2>
-                        <p className="text-lg text-white/60 max-w-2xl">
+                        <p className="text-lg text-muted-foreground max-w-2xl">
                             Pick a professional template or find inspiration from the community to remix.
                         </p>
                     </div>
 
-                    <Link href="/prompts" className="group flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0">
+                    <Link href="/prompts" className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0">
                         <span>View All Prompts</span>
-                        <ArrowRight size={16} className="text-white/50 transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
+                        <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
                     </Link>
                 </div>
 
@@ -450,8 +450,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         <Flame size={24} />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-white mb-1">Trending Prompts</h3>
-                        <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+                        <h3 className="text-xl font-bold text-foreground mb-1">Trending Prompts</h3>
+                        <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-border bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
                             <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
                             <span>Create pro level content in just a few clicks</span>
                         </div>
@@ -474,12 +474,12 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             />
                         ))
                     ) : (
-                        <div className="text-sm text-white/60 col-span-4 py-8 text-center">No prompts found.</div>
+                        <div className="text-sm text-muted-foreground col-span-4 py-8 text-center">No prompts found.</div>
                     )}
                 </div>
 
                 <div className="mt-6 flex justify-center md:hidden">
-                    <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+                    <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80">
                         <span>View More Prompts</span>
                     </Link>
                 </div>
@@ -493,8 +493,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 <RefreshCw size={24} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-white mb-1">Community Remixes</h3>
-                                <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+                                <h3 className="text-xl font-bold text-foreground mb-1">Community Remixes</h3>
+                                <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-border bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
                                     <span className="text-blue-400">●</span>
                                     <span>Fresh inspiration made by creators like you</span>
                                 </div>
@@ -508,7 +508,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </div>
 
                         <div className="mt-6 flex justify-center">
-                            <Link href="/feed" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-white/10 hover:border-white/20">
+                            <Link href="/feed" className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80">
                                 <span>View Community Feed</span>
                                 <ArrowRight size={14} className="opacity-50 group-hover:translate-x-0.5 transition-transform" />
                             </Link>
@@ -524,11 +524,11 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             {/* TESTIMONIAL STRIP */}
             <section className="mx-auto max-w-6xl px-4 pb-10 md:pb-14">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center md:p-10">
-                    <p className="text-sm text-white/70">
+                <div className="rounded-2xl border border-border bg-card p-6 text-center md:p-10">
+                    <p className="text-sm text-foreground/70">
                         “I stopped guessing and started executing. The prompts and remix tool paid for themselves fast.”
                     </p>
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-white/50">
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                         Member, AI Skills Studio
                     </p>
                 </div>
@@ -536,11 +536,11 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             {/* FINAL CTA */}
             < section className="mx-auto max-w-6xl px-4 pb-14" >
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-black p-6 text-center md:p-10">
-                    <h2 className="text-2xl font-black md:text-4xl">
+                <div className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-6 text-center md:p-10">
+                    <h2 className="text-2xl font-black md:text-4xl text-foreground">
                         READY TO <span className="text-[#B7FF00]">CREATE?</span>
                     </h2>
-                    <p className="mx-auto mt-3 max-w-2xl text-sm text-white/70 md:text-base">
+                    <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
                         Start with free prompts. Upgrade for Pro prompts and the fastest workflow for content production.
                     </p>
 
@@ -553,7 +553,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </Link>
                         <Link
                             href="/studio/creator"
-                            className="inline-flex w-full justify-center rounded-md border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 sm:w-auto"
+                            className="inline-flex w-full justify-center rounded-md border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground hover:bg-accent sm:w-auto"
                         >
                             Open Creator Studio
                         </Link>
@@ -574,7 +574,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             </Link>
                         ) : null}
                     </div>
-                    <p className="mt-4 text-xs text-white/50">Free tier available. Upgrade anytime.</p>
+                    <p className="mt-4 text-xs text-muted-foreground/60">Free tier available. Upgrade anytime.</p>
                 </div>
             </section >
         </>

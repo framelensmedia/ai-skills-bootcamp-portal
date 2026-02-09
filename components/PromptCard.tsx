@@ -149,7 +149,7 @@ export default function PromptCard({
       <button
         type="button"
         onClick={handleClick}
-        className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left transition hover:border-white/20 hover:bg-white/10"
+        className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition hover:border-border/80 hover:bg-accent"
       >
         <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-black/40">
           {resolvedImageUrl && resolvedImageUrl.length > 5 ? (
@@ -206,15 +206,15 @@ export default function PromptCard({
         <div className="flex flex-1 flex-col p-4 sm:p-5">
           <div className="text-lg font-semibold leading-tight pr-6">{title}</div>
 
-          <div className="mt-2 line-clamp-2 text-sm text-white/70">
+          <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">
             {summary && summary.trim().length > 0 ? summary : "Open to view and use this prompt."}
           </div>
 
           <div className="mt-auto pt-4 flex items-center justify-between">
-            <div className="text-xs text-white/50">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>
+            <div className="text-xs text-muted-foreground/70">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>
 
             {/* Icon-only Remix Button (Subtle) */}
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${isAuthed ? "border-[#B7FF00]/30 text-[#B7FF00] bg-[#B7FF00]/5" : "border-white/10 text-white/50 bg-white/5"} transition group-hover:bg-[#B7FF00] group-hover:text-black group-hover:border-[#B7FF00] group-hover:scale-110 shadow-sm`}>
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${isAuthed ? "border-primary/30 text-primary bg-primary/5" : "border-border text-muted-foreground bg-secondary"} transition group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:scale-110 shadow-sm`}>
               <RefreshCw size={14} />
             </div>
           </div>

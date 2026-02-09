@@ -1,86 +1,50 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import Link from "next/link";
+import { Users, MessageSquare, Award } from "lucide-react";
 
 export default function CommunityPage() {
-  const supabase = createSupabaseBrowserClient();
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState<string>("");
-
-  useEffect(() => {
-    const run = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      setEmail(user.email ?? "");
-      setLoading(false);
-    };
-
-    run();
-  }, [router, supabase]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-white">
-        Loading community…
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:py-10">
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-6 md:p-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-white">Community</h1>
-        <p className="mt-2 text-sm md:text-base text-white/70">
-          Placeholder page. This will be the paid community hub.
+    <div className="mx-auto max-w-4xl px-4 py-16 text-white/80">
+      <Link href="/" className="text-sm text-[#B7FF00] hover:underline mb-8 block">← Back to Home</Link>
+
+      <div className="text-center mb-16">
+        <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">Join the Community</h1>
+        <p className="text-xl text-white/60 max-w-2xl mx-auto">
+          Connect with thousands of creators, share your work, and get feedback on your AI projects.
         </p>
+      </div>
 
-        <div className="mt-5 rounded-xl border border-white/10 bg-black/30 p-5">
-          <p className="text-sm text-white/70">
-            Logged in as <span className="font-medium text-white">{email}</span>
-          </p>
+      <div className="grid gap-8 md:grid-cols-3">
+        <div className="text-center p-6 rounded-2xl border border-white/10 bg-white/5">
+          <div className="mx-auto bg-[#B7FF00]/10 h-16 w-16 rounded-full flex items-center justify-center text-[#B7FF00] mb-6">
+            <Users size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Discord Server</h3>
+          <p className="text-sm opacity-70 mb-6">Real-time chat, live events, and instant feedback.</p>
+          <button className="w-full py-2 rounded-lg bg-[#5865F2] text-white font-semibold hover:opacity-90 transition-opacity">
+            Join Discord
+          </button>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-black/30 p-5">
-            <h2 className="text-lg font-semibold text-white">Announcements</h2>
-            <p className="mt-1 text-sm text-white/70">
-              Updates, drops, and weekly challenges.
-            </p>
+        <div className="text-center p-6 rounded-2xl border border-white/10 bg-white/5">
+          <div className="mx-auto bg-pink-500/10 h-16 w-16 rounded-full flex items-center justify-center text-pink-500 mb-6">
+            <MessageSquare size={32} />
           </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/30 p-5">
-            <h2 className="text-lg font-semibold text-white">Discussions</h2>
-            <p className="mt-1 text-sm text-white/70">
-              Threads, Q&A, wins, and help.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-black/30 p-5">
-            <h2 className="text-lg font-semibold text-white">Office Hours</h2>
-            <p className="mt-1 text-sm text-white/70">
-              Live calls, replays, and hot seats.
-            </p>
-          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Forum</h3>
+          <p className="text-sm opacity-70 mb-6">Deep dive discussions, tutorials, and show-and-tell.</p>
+          <button className="w-full py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-white font-semibold">
+            Visit Forum
+          </button>
         </div>
 
-        <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-5">
-          <h3 className="text-base font-semibold text-white">Coming next</h3>
-          <ul className="mt-2 space-y-2 text-sm text-white/70">
-            <li>• Post composer</li>
-            <li>• Threads and replies</li>
-            <li>• Premium-only access rules</li>
-            <li>• Notifications</li>
-          </ul>
+        <div className="text-center p-6 rounded-2xl border border-white/10 bg-white/5">
+          <div className="mx-auto bg-purple-500/10 h-16 w-16 rounded-full flex items-center justify-center text-purple-500 mb-6">
+            <Award size={32} />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Weekly Challenges</h3>
+          <p className="text-sm opacity-70 mb-6">Compete for prizes and recognition in our weekly prompts.</p>
+          <button className="w-full py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-white font-semibold">
+            View Challenges
+          </button>
         </div>
       </div>
     </div>

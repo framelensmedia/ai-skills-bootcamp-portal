@@ -16,9 +16,17 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms and Conditions to sign up.");
+      return;
+    }
+
     setLoading(true);
 
     const { error: signUpError } = await supabase.auth.signUp({
@@ -42,6 +50,10 @@ export default function SignupPage() {
   };
 
   const handleGoogleLogin = async () => {
+    // Google login implies agreement, or we could force a check differently. 
+    // Usually for OAuth, the terms are linked in the "Continue with" text or implied.
+    // For now, let's keep it simple.
+
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
@@ -65,7 +77,7 @@ export default function SignupPage() {
           Start free. Upgrade anytime.
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4 shadow-lg">
           <div className="space-y-2">
             <label className="text-sm text-white/80">Email</label>
             <input
@@ -97,6 +109,21 @@ export default function SignupPage() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+
+          <div className="flex items-start gap-3 py-2">
+            <div className="relative flex items-center h-5">
+              <input
+                id="terms"
+                type="checkbox"
+                className="h-4 w-4 rounded border-white/10 bg-black/30 text-lime-400 focus:ring-lime-400 focus:ring-offset-black"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+              />
+            </div>
+            <label htmlFor="terms" className="text-xs text-white/60 leading-relaxed">
+              I agree to the <Link href="/terms" className="text-white hover:text-lime-400 underline decoration-white/30 hover:decoration-lime-400" target="_blank">Terms of Service</Link> and <Link href="/privacy" className="text-white hover:text-lime-400 underline decoration-white/30 hover:decoration-lime-400" target="_blank">Privacy Policy</Link>.
+            </label>
           </div>
 
           {error ? (

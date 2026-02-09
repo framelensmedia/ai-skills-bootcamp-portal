@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aiskills.studio"),
@@ -54,18 +55,20 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-[100dvh] bg-black text-white overflow-x-hidden" suppressHydrationWarning={true}>
         <AuthProvider>
-          <ToastContextProvider>
-            {/* Header */}
-            <Header />
+          <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
+            <ToastContextProvider>
+              {/* Header */}
+              <Header />
 
-            {/* Main Content */}
-            <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-24">{children}</main>
+              {/* Main Content */}
+              <main className="mx-auto w-full max-w-6xl px-4 pb-8 pt-24">{children}</main>
 
-            {/* AI Assistant Chat Bubble */}
-            <AIAssistant />
-            <BackToTop />
-            <Footer />
-          </ToastContextProvider>
+              {/* AI Assistant Chat Bubble */}
+              <AIAssistant />
+              <BackToTop />
+              <Footer />
+            </ToastContextProvider>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>
