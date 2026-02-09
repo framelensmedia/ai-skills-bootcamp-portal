@@ -48,7 +48,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to get Vertex access token" }, { status: 401 });
         }
 
-        const model = "gemini-3-pro-preview";
+        const model = "gemini-1.5-flash";
         const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
         // Build system context
