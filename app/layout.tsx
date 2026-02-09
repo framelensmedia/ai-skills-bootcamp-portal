@@ -5,6 +5,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import Header from "@/components/Header";
 import AIAssistant from "@/components/AIAssistant";
+import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
@@ -63,6 +64,7 @@ export default function RootLayout({
             {/* AI Assistant Chat Bubble */}
             <AIAssistant />
             <BackToTop />
+            <Footer />
           </ToastContextProvider>
         </AuthProvider>
       </body>

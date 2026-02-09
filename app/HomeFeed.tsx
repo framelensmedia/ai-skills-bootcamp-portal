@@ -7,8 +7,8 @@ import PromptCard from "@/components/PromptCard";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
 import { Wand2, ArrowRight, Flame, RefreshCw } from "lucide-react";
 import Image from "next/image";
+import SuccessStories from "@/components/home/SuccessStories";
 import BasicTrainingSection from "@/components/home/BasicTrainingSection";
-import BasicTrainingCards from "@/components/home/BasicTrainingCards";
 
 // --- Subcomponents ---
 
@@ -519,18 +519,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             </section>
 
-            {/* BASIC TRAINING MODULES - Repurposed Tutorials section */}
-            <section className="mx-auto max-w-6xl px-4 pt-20 pb-10 md:pt-32 md:pb-14">
-                <div className="text-center">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#B7FF00]">Learn the system</p>
-                    <h2 className="mt-2 text-2xl font-bold md:text-3xl">Basic Training Modules</h2>
-                    <p className="mt-2 text-sm text-white/60">Master AI creation with these free guided missions.</p>
-                </div>
-
-                <div className="mt-6">
-                    <BasicTrainingCards />
-                </div>
-            </section>
+            {/* SUCCESS STORIES - Replaces Basic Training */}
+            <SuccessStories />
 
             {/* TESTIMONIAL STRIP */}
             <section className="mx-auto max-w-6xl px-4 pb-10 md:pb-14">

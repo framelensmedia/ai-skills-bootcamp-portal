@@ -188,19 +188,19 @@ function PricingContent() {
 
       <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Free</h2>
-              <p className="mt-1 text-white/70">Get started with the basics.</p>
-            </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-4xl">🌱</div>
             <div className="text-right">
               <div className="text-3xl font-semibold">$0</div>
               <div className="text-sm text-white/60">forever</div>
             </div>
           </div>
 
-          <ul className="mt-6 space-y-3 text-sm text-white/80">
+          <div className="text-xl font-semibold mb-1">Free</div>
+          <p className="text-sm text-white/60 mb-6">Get started with the basics.</p>
+
+          <ul className="space-y-3 text-sm text-white/80 mb-8">
             <li>Free prompt drops (green prompts)</li>
             <li>Quick tips and mini tutorials</li>
             <li>Basic resources</li>
@@ -208,29 +208,33 @@ function PricingContent() {
 
           <button
             onClick={() => router.push(userId ? "/dashboard" : "/login")}
-            className="mt-8 w-full rounded-lg border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold hover:bg-black/60"
+            className="w-full rounded-lg border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold hover:bg-black/60 transition-colors"
           >
             {userId ? "Go to Dashboard" : "Log in to Start"}
           </button>
         </div>
 
         {/* Premium */}
-        <div className="rounded-2xl border border-white/15 bg-white/8 p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Premium</h2>
-              <p className="mt-1 text-white/70">
-                Full access to the vault, tools, and member perks.
-              </p>
-            </div>
+        <div className="rounded-2xl border-2 border-[#B7FF00]/30 bg-[#B7FF00]/5 p-6 relative hover:border-[#B7FF00]/50 transition-colors">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#B7FF00] text-black text-xs font-bold px-3 py-1 rounded-full">
+            MOST POPULAR
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-4xl">👑</div>
             <div className="text-right shrink-0">
               <div className="text-3xl font-semibold">$39.99</div>
               <div className="text-sm text-white/60">per month</div>
-              <div className="text-xs text-[#B7FF00] mt-1 font-medium">7-day trial for $1</div>
             </div>
           </div>
 
-          <ul className="mt-6 space-y-3 text-sm text-white/80">
+          <div className="text-xl font-semibold mb-1">Premium</div>
+          <p className="text-sm text-white/60 mb-2">
+            Full access to the vault, tools, and member perks.
+          </p>
+          <div className="text-xs text-[#B7FF00] font-bold mb-6">7-day trial for $1</div>
+
+          <ul className="space-y-3 text-sm text-white/80 mb-8">
             <li>Premium prompts and templates</li>
             <li>Members-only vault pages</li>
             <li>Self-paced course access</li>
@@ -240,12 +244,12 @@ function PricingContent() {
           <button
             onClick={startCheckout}
             disabled={loading}
-            className="mt-8 w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60"
+            className="w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 transition-colors"
           >
             {loading ? "Redirecting..." : "Start Trial for $1"}
           </button>
 
-          <p className="mt-3 text-xs text-white/60">
+          <p className="mt-3 text-center text-xs text-white/40">
             Secure checkout powered by Stripe.
           </p>
         </div>
@@ -267,7 +271,6 @@ function PricingContent() {
               <div className="text-4xl">⚡</div>
               <div className="text-right">
                 <div className="text-2xl font-bold">$4.99</div>
-                <div className="text-xs text-white/50">~10¢ each</div>
               </div>
             </div>
             <div className="text-xl font-semibold mb-1">50 Credits</div>
@@ -290,7 +293,6 @@ function PricingContent() {
               <div className="text-4xl">🔥</div>
               <div className="text-right">
                 <div className="text-2xl font-bold">$9.99</div>
-                <div className="text-xs text-[#B7FF00]">~8¢ each</div>
               </div>
             </div>
             <div className="text-xl font-semibold mb-1">120 Credits</div>
@@ -310,7 +312,6 @@ function PricingContent() {
               <div className="text-4xl">💎</div>
               <div className="text-right">
                 <div className="text-2xl font-bold">$19.99</div>
-                <div className="text-xs text-white/50">~7¢ each</div>
               </div>
             </div>
             <div className="text-xl font-semibold mb-1">300 Credits</div>
