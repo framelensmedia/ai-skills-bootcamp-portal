@@ -12,13 +12,13 @@ export default function SiteHeader() {
         <Link
           href="/"
           className="flex min-w-0 items-center gap-3"
-          aria-label="AI Skills Bootcamp Home"
+          aria-label="AI Skills Studio Home"
         >
           {/* Icon / mark */}
           <div className="relative h-10 w-10 shrink-0">
             <Image
               src="/logo.png"
-              alt="AI Skills Bootcamp"
+              alt="AI Skills Studio"
               fill
               className="object-contain"
               priority
@@ -32,7 +32,7 @@ export default function SiteHeader() {
                 AI Skills
               </span>
               <span className="text-lg font-extrabold tracking-tight text-white">
-                Bootcamp
+                Studio
               </span>
             </div>
 

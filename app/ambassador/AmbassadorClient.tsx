@@ -335,7 +335,7 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                     <div className="space-y-8 text-gray-300">
                         <section>
                             <h3 className="text-xl font-bold text-white mb-2">How it works</h3>
-                            <p>You earn recurring commissions by referring new Pro members to AI Skills Bootcamp. As an Ambassador, you are a partner in our mission to teach AI literacy.</p>
+                            <p>You earn recurring commissions by referring new Pro members to AI Skills Studio. As an Ambassador, you are a partner in our mission to teach AI literacy.</p>
                         </section>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
@@ -689,7 +689,7 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                     <div className="space-y-12 text-gray-300">
                         <section>
                             <h3 className="text-xl font-bold text-white mb-4">How it works</h3>
-                            <p className="leading-relaxed text-gray-400">You earn recurring commissions by referring new Pro members to AI Skills Bootcamp. As an Ambassador, you are a partner in our mission to teach AI literacy.</p>
+                            <p className="leading-relaxed text-gray-400">You earn recurring commissions by referring new Pro members to AI Skills Studio. As an Ambassador, you are a partner in our mission to teach AI literacy.</p>
                         </section>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
