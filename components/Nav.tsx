@@ -210,7 +210,7 @@ export default function Nav() {
           {/* Dropdown panel */}
           <div className="fixed inset-x-0 top-[73px] z-[70] sm:hidden">
             <div className="mx-auto w-full max-w-6xl px-4">
-              <div className="relative rounded-2xl border border-border bg-popover p-4 shadow-2xl backdrop-blur-sm">
+              <div className="relative rounded-2xl border border-border bg-popover p-4 shadow-2xl backdrop-blur-sm max-h-[80vh] overflow-y-auto">
                 {/* X Close */}
                 <button
                   type="button"
