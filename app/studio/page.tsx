@@ -427,6 +427,12 @@ function StudioContent() {
         if (answersToUse.industry_intent) payload.industry_intent = answersToUse.industry_intent;
         if (answersToUse.business_name) payload.business_name = answersToUse.business_name;
         if (answersToUse.subject_mode) payload.subjectMode = answersToUse.subject_mode;
+
+        // CRITICAL: Pass outfit fields so the API can change the outfit
+        if (answersToUse.subjectOutfit) {
+          payload.subjectOutfit = answersToUse.subjectOutfit;
+          payload.keepOutfit = "false"; // If user specified an outfit, don't keep the original
+        }
       }
 
       // Handle Logo Separately (Also Stage?)

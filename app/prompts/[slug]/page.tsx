@@ -6,7 +6,7 @@ import Loading from "@/components/Loading";
 import { useEffect, useMemo, useState, useRef, Suspense, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
+import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 import { RefineChat } from "@/components/RefineChat";
@@ -440,8 +440,9 @@ function PromptContent() {
       }
 
       const config = (meta as any).template_config_json || {};
+      // Fallback to DEFAULT_CONFIG if no fields are defined in DB, ensuring Headline/Sub/CTA always appear
       setTemplateConfig({
-        editable_fields: config.editable_fields || [],
+        editable_fields: (config.editable_fields && config.editable_fields.length > 0) ? config.editable_fields : DEFAULT_CONFIG.editable_fields,
         editable_groups: config.editable_groups || [],
         subject_mode: (meta as any).subject_mode || config.subject_mode || "non_human"
       });
@@ -943,6 +944,12 @@ function PromptContent() {
         // Pass Selected Model
         modelId: selectedModel
       };
+
+      console.log("DEBUG handleGenerate Payload:", {
+        subjectOutfit: payload.subjectOutfit,
+        headline: payload.headline,
+        answers: answersToUse
+      });
 
       const res = await fetch("/api/generate", {
         method: "POST",

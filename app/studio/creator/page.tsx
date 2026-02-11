@@ -255,7 +255,10 @@ function CreatorContent() {
         if (ans.subjectLock === "false") setSubjectLock(false);
         else setSubjectLock(true);
 
-        if (ans.subjectOutfit) setSubjectOutfit(ans.subjectOutfit);
+        if (ans.subjectOutfit) {
+            setSubjectOutfit(ans.subjectOutfit);
+            setKeepOutfit(false); // CRITICAL: If user specified a new outfit, disable keepOutfit so the outfit change logic fires
+        }
         if (ans.subjectMode === "non_human") setSubjectMode("non_human");
         else setSubjectMode("human");
 

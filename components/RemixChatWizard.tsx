@@ -54,14 +54,18 @@ type Message = {
 };
 
 export function generateEditSummary(answers: RemixAnswers, hasUploads: boolean): string {
-    const parts = ["Edit the template image."];
+    const parts: string[] = [];
     // This is a rough client-side summary. Real prompt assembly happens server-side.
-    if (hasUploads) {
-        parts.push("Use uploaded image as reference.");
-    }
+    // INTERNAL SETTINGS: These are handled separately by the API via dedicated fields.
+    // They must NOT be included in the prompt text or they confuse the model.
+    const internalKeys = new Set([
+        "instructions", "subjectLock", "subjectOutfit", "subjectMode",
+        "modelId", "keepOutfit", "forceCutout", "industry_intent", "business_name",
+        "subject_mode"
+    ]);
 
     Object.entries(answers).forEach(([k, v]) => {
-        if (k === "instructions") return;
+        if (internalKeys.has(k)) return;
         if (v === "__REMOVED__") {
             parts.push(`Remove ${k} element.`);
         } else if (v) {
@@ -69,10 +73,11 @@ export function generateEditSummary(answers: RemixAnswers, hasUploads: boolean):
         }
     });
 
+    // Instructions (Secret Sauce) go at the END for emphasis
     if (answers.instructions) {
-        parts.push(`Instructions: ${answers.instructions}`);
+        parts.push(answers.instructions);
     }
-    return parts.join(" ");
+    return parts.join(" ") || "Edit the template image.";
 }
 
 export default function RemixChatWizard({
@@ -112,7 +117,8 @@ export default function RemixChatWizard({
         if (!templateConfig) return [];
 
         // SHORT FLOW: Community Remixes (Fast & Simple)
-        if (flowMode === "short") {
+        // Respect force_minimal_flow from config OR explicit flowMode prop
+        if (flowMode === "short" || templateConfig.force_minimal_flow) {
             return [
                 { type: "intro" },
                 { type: "instructions" },
@@ -227,8 +233,13 @@ export default function RemixChatWizard({
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    const navigatingRef = useRef(false);
+
     function advanceStep(skip = false, removed = false) {
-        if (!templateConfig) return;
+        if (!templateConfig || navigatingRef.current) return;
+        navigatingRef.current = true;
+        // Release lock after short delay to allow state update to complete
+        setTimeout(() => { navigatingRef.current = false; }, 500);
 
         const currentStep = steps[stepIndex];
         const val = inputVal.trim();
@@ -286,13 +297,30 @@ export default function RemixChatWizard({
 
         if (nextStep.type === "field") {
             const f = nextStep.data;
-            // 1) Logic: User Answer -> Default -> Fallback
+            const fid = f.id.toLowerCase();
             const currentVal = answers[f.id] || f.default;
+            const hasCurrent = currentVal && currentVal !== "(set in template)";
 
-            if (!currentVal || currentVal === "(set in template)") {
-                botText = `What would you like the ${f.label} to be?`;
+            // 6th Grade Reading Level / Marketing Education
+            if (fid === "headline") {
+                botText = hasCurrent
+                    ? `The current Headline is '${currentVal}'. Convert this to your new title? (This is the big text that grabs attention)`
+                    : "What is the Main Title (Headline)? This is the big text people see first.";
+            } else if (fid === "subheadline") {
+                botText = hasCurrent
+                    ? `The current Sub-Headline is '${currentVal}'. What should it say now? (This is the smaller text with details)`
+                    : "What is the Sub-Headline? This is the smaller text that explains your title.";
+            } else if (fid === "cta" || fid === "call_to_action") {
+                botText = hasCurrent
+                    ? `The current Button says '${currentVal}'. Change it to?`
+                    : "What should the Button say (CTA)? This tells people what to do next, like 'Shop Now' or 'Learn More'.";
             } else {
-                botText = `The current ${f.label} is '${currentVal}'. What would you like to change it to?`;
+                // Default fallback
+                if (!hasCurrent) {
+                    botText = `What would you like the ${f.label} to be?`;
+                } else {
+                    botText = `The current ${f.label} is '${currentVal}'. What would you like to change it to?`;
+                }
             }
         } else if (nextStep.type === "group") {
             const g = nextStep.data as { label: string, fields: string[] };
@@ -316,9 +344,9 @@ export default function RemixChatWizard({
             // Intro is usually Step 0.
             botText = "Let's get started. Upload your photo and tell us your industry.";
         } else if (nextStep.type === "business_concise") {
-            botText = "What is your Business Name? (You can also upload your logo)";
+            botText = "What is your Business Name? (You can upload your logo, or skip for a FREE AI design!)";
         } else if (nextStep.type === "logo") {
-            botText = "Upload your logo/brand mark (optional). We will remove the background automatically.";
+            botText = "Upload your logo (optional). If you don't have one, just skip — I'll design a premium new logo for you automatically!";
         } else if (nextStep.type === "review") {
             botText = "Everything looks good! Ready to generate your artwork?";
         }
@@ -498,7 +526,7 @@ export default function RemixChatWizard({
 
                                 {/* Inline Logo Uploader */}
                                 <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-                                    <p className="text-xs text-white/50 mb-2 uppercase tracking-wide font-semibold">Brand Logo (Optional)</p>
+                                    <p className="text-xs text-white/50 mb-2 uppercase tracking-wide font-semibold">Brand Logo (Skip = Auto-Generate)</p>
                                     <ImageUploader files={logo ? [logo] : []} onChange={(fs) => onLogoChange(fs[0] || null)} maxFiles={1} />
                                 </div>
 

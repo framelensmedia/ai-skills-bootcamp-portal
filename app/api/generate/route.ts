@@ -187,7 +187,8 @@ async function generateFalImage(
     template_reference_image?: string | null,
     keepOutfit: boolean = true,
     negativePrompt?: string,
-    strengthOverride?: number
+    strengthOverride?: number,
+    subjectFirst: boolean = false // When true, subject is Image 1 (preserved) and template is Image 2 (reference)
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -204,8 +205,14 @@ async function generateFalImage(
         payload = {
             prompt,
             safety_tolerance: "4",
-            resolution: "1K"
+            resolution: "1K",
+            negative_prompt: negativePrompt // Pass negative prompt
         };
+
+        // Apply Strength for Edit Mode (Nano supports it)
+        if (strengthOverride) {
+            payload.strength = strengthOverride;
+        }
 
         // Aspect Ratio Logic...
         if (typeof imageSize === 'string') {
@@ -228,7 +235,7 @@ async function generateFalImage(
         };
         // Add Strength for Img2Img
         if (mainImageUrl) {
-            payload.strength = keepOutfit ? 0.85 : 0.70;
+            payload.strength = strengthOverride || (keepOutfit ? 0.85 : 0.70);
         }
 
         if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
@@ -245,9 +252,16 @@ async function generateFalImage(
 
         if (template_reference_image) {
             // REMIX MODE
-            imagesToSend.push(template_reference_image);
-            if (mainImageUrl && mainImageUrl !== template_reference_image) {
+            if (subjectFirst && mainImageUrl && mainImageUrl !== template_reference_image) {
+                // SUBJECT-FIRST: Subject is Image 1 (face preserved), Template is Image 2 (scene reference)
                 imagesToSend.push(mainImageUrl);
+                imagesToSend.push(template_reference_image);
+            } else {
+                // DEFAULT: Template is Image 1, Subject is Image 2
+                imagesToSend.push(template_reference_image);
+                if (mainImageUrl && mainImageUrl !== template_reference_image) {
+                    imagesToSend.push(mainImageUrl);
+                }
             }
         } else if (mainImageUrl) {
             // DIRECT EDIT MODE
@@ -258,6 +272,7 @@ async function generateFalImage(
         if (imagesToSend.length > 0) {
             actualEndpoint = `https://queue.fal.run/${modelId}/edit`;
             payload.image_urls = imagesToSend;
+            console.log(`NANO BANANA EDIT: Sending ${imagesToSend.length} images. subjectFirst=${subjectFirst}. Image 1: ${imagesToSend[0]?.slice(0, 60)}, Image 2: ${imagesToSend[1]?.slice(0, 60) || 'NONE'}`);
         } else {
             // T2I MODE (Base Endpoint)
             // MUST NOT send empty image_urls or image_url
@@ -566,6 +581,13 @@ export async function POST(req: Request) {
             model = "fal-ai/bytedance/seedream/v4.5/text-to-image";
         }
 
+        // AUTO-SWITCH REMIX Logic: Flux does not support multi-image subject replacement easily.
+        // If we have both a Template AND a Subject, we MUST use Nano Banana (Gemini) which supports this via /edit.
+        if (!model.includes("nano-banana") && template_reference_image && (imageFiles.length > 0 || imageUrls.length > 0)) {
+            console.log("Auto-switching Remix request to Nano Banana (Flux lacks multi-image support)");
+            model = "fal-ai/nano-banana-pro";
+        }
+
         console.log(`GENERATE: final model after mapping=${model}`);
 
         // Setup Supabase Admin (needed for both branches)
@@ -673,6 +695,18 @@ export async function POST(req: Request) {
                 refImageUrl = template_reference_image;
             }
 
+            // 🔍 IMAGE ROUTING DEBUG
+            console.log("=== IMAGE ROUTING DEBUG ===");
+            console.log("imageFiles.length:", imageFiles.length);
+            console.log("imageUrls.length:", imageUrls.length);
+            console.log("imageUrls:", imageUrls);
+            console.log("canvasUrl:", canvasUrl?.slice(0, 60));
+            console.log("canvasFile:", !!canvasFile);
+            console.log("refImageUrl:", refImageUrl?.slice(0, 60));
+            console.log("template_reference_image:", template_reference_image?.slice(0, 60));
+            console.log("refImageUrl === template_reference_image:", refImageUrl === template_reference_image);
+            console.log("=== END IMAGE ROUTING DEBUG ===");
+
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
             // Flux models (Pro) require explicit dimensions to guarantee ratio in remix mode
@@ -724,6 +758,9 @@ export async function POST(req: Request) {
                 }
             }
 
+            let falStrength: number | undefined;
+            let useSubjectFirst = false; // When true, subject is Image 1 (face preserved), template is Image 2
+
             // 2. Subject Lock Instructions (Eye Line / Angle)
             // FIRST: Check for SIMPLIFIED EDIT MODE (Library/Studio Edit)
             // If canvas_image is provided with no template, this is a simple edit - skip all complex logic
@@ -740,29 +777,70 @@ export async function POST(req: Request) {
                 // DETECT REMIX MODE (Template + Subject)
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
 
-                    // CLASSIC REMIX INSTRUCTION
-                    subjectInstruction += " [SUBJECT REPLACEMENT MODE - STRICT LAYOUT LOCK] ";
-                    subjectInstruction += " 1. TASK: Replace the person in the Base Image (Image 1) with the Subject from the Reference Image (Image 2). ";
-                    subjectInstruction += " 2. SCALE LOCK: Resize the Reference Face/Body to fit the EXACT proportions of the Base Image. Do NOT zoom in. Do NOT let the subject fill the screen. ";
-                    subjectInstruction += " 3. TEXT SAFETY: The Base Image contains text at the top and bottom. YOU MUST NOT COVER IT. Keep the subject's head below the top margin. ";
-                    subjectInstruction += " 4. LIKENESS: The face must match the Reference Image (Image 2) exactly. Maintain the exact eye line, gaze, and facial expression. ";
-                    subjectInstruction += " 5. ANATOMY: Ensure the neck transition is natural. Do not squash the head. ";
-                    subjectInstruction += " 6. CAMERA: Match the lighting, depth of field, and camera angle of the Base Image. ";
+                    // 🔍 DIAGNOSTIC LOGGING - REMOVE AFTER DEBUGGING
+                    console.log("=== REMIX DEBUG ===");
+                    console.log("rawPrompt:", rawPrompt);
+                    console.log("keepOutfit:", keepOutfit);
+                    console.log("subjectOutfit:", subjectOutfit);
+                    console.log("refImageUrl:", refImageUrl?.slice(0, 50));
+                    console.log("template_reference_image:", template_reference_image?.slice(0, 50));
+                    console.log("=== END REMIX DEBUG ===");
 
-                    remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint";
+                    // CHANGED: Re-enabled STRICT IDENTITY LOCK to ensure face swap happens, with explicit background replacement
+                    // CHANGED: Reverted to POSE LOCK (less rigid than STRICT IDENTITY) to fix uncanny/plastic faces
+                    subjectInstruction += " [SUBJECT REPLACEMENT MODE - POSE LOCK] ";
+
+                    // INJECT USER SCENE CONTEXT (Secret Sauce) EARLY
+                    if (rawPrompt) {
+                        subjectInstruction += ` SCENE CONTEXT: ${rawPrompt}. `;
+                    }
+
+                    subjectInstruction += " 1. TASK: Replace the person in the Base Image (Image 1) with the Subject from the Reference Image (Image 2). ";
+                    subjectInstruction += " 2. IDENTITY LOCK: The person in the final image MUST be the person from Image 2. Do not use the person from Image 1. ";
+                    subjectInstruction += " 3. POSE LOCK: Match the pose and framing of Image 1, but REPLACE the background entirely. ";
+                    subjectInstruction += " 4. LIKENESS: The face must match the Reference Image (Image 2) exactly. Maintain the exact eye line, gaze, and facial expression. Preserve natural skin texture, pores, and imperfections — do NOT smooth or airbrush the skin. ";
+                    subjectInstruction += " 5. BODY CONSISTENCY: The skin tone of the NECK, HANDS, and ARMS must MATCH the face of the Subject from Image 2. Do NOT use the skin tone from the Base Image (Image 1). ";
+                    subjectInstruction += " 6. BACKGROUND: The environment must match the SCENE CONTEXT. Discard the original background from Image 1. ";
+                    subjectInstruction += " 6. COMPOSITION: Keep the subject's head below the top margin for text safety. ";
+
+                    remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint, wax figure, mannequin, uncanny valley, smooth skin, airbrushed, overprocessed, doll-like, synthetic skin, dead eyes, deformed hands, extra fingers, missing fingers, mismatched skin tone, mask effect, head on wrong body, different skin color hands neck";
 
                     // REMIX SPECIFIC OUTFIT LOGIC
                     if (keepOutfit) {
+                        console.log("REMIX BRANCH: keepOutfit=true → Keeping original outfit");
                         subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
                     } else if (subjectOutfit) {
-                        // When changing outfit, REINFORCE face lock to prevent drift
-                        subjectInstruction += ` [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify, age, or stylize the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally, and hands should interact with any props in the scene. Match the CAMERA SETTINGS of Image 1: lighting, depth of field, and camera angle. `;
-                        subjectInstruction += ` OUTFIT CHANGE: The Subject MUST be wearing: "${subjectOutfit}". Replace the clothing while keeping the face and expression identical to Image 2. `;
+                        console.log("REMIX BRANCH: subjectOutfit → Changing outfit to:", subjectOutfit);
+                        // Tell the model to DISCARD Image 2's clothes (without specifying what to wear — that's in finalFalPrompt)
+                        subjectInstruction += " OUTFIT: DO NOT use the clothing from Image 2. The subject's outfit is described in the prompt below. ";
+
+                        // Inject outfit into the MAIN PROMPT
+                        // Fix grammar: avoid "The person is wearing he is wearing..."
+                        const outfitLower = subjectOutfit.toLowerCase().trim();
+                        const outfitPrefix = (outfitLower.startsWith("he is") || outfitLower.startsWith("she is") || outfitLower.startsWith("they are") || outfitLower.startsWith("wearing"))
+                            ? subjectOutfit
+                            : `The person is wearing ${subjectOutfit}`;
+                        finalFalPrompt = `${outfitPrefix}. ` + finalFalPrompt;
+
+                        remixNegativePrompt += ", original clothes, wearing previous outfit, mismatched clothing";
+
+                        // FORCE HIGH STRENGTH (but not too high) on outfit changes to regenerate pixels and kill the bleed without being plastic
+                        falStrength = 0.92;
                     } else {
+                        console.log("REMIX BRANCH: else → Matching template outfit");
                         // Matching template outfit - reinforce face lock
-                        subjectInstruction += " [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally, and hands should interact with any props in the scene. Match the CAMERA SETTINGS of Image 1: lighting, depth of field, and camera angle. ";
-                        subjectInstruction += " OUTFIT MATCH: The Subject is wearing the EXACT outfit shown in the Base Image (Image 1). Match the clothing while keeping the face and expression identical to Image 2. ";
+                        subjectInstruction += " [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally. ";
+                        subjectInstruction += " OUTFIT MATCH: The NEW SUBJECT (from Image 2) should be wearing the EXACT outfit shown in the Base Image (Image 1). Match the clothing style/color while keeping the face and expression identical to Image 2. ";
+
+                        // Fix Blank Outfit: Explicitly tell the model to wear Image 1's outfit in the main prompt
+                        finalFalPrompt = "The person is wearing the same outfit as the person in Image 1. " + finalFalPrompt;
+
+                        // FORCE VERY HIGH STRENGTH for template match because we are rewriting the subject's body/clothes entirely
+                        falStrength = 0.95;
                     }
+
+                    console.log("FINAL subjectInstruction:", subjectInstruction.slice(0, 200));
+                    console.log("FINAL falStrength:", falStrength);
 
 
 
@@ -803,21 +881,17 @@ export async function POST(req: Request) {
                 if (promotion) textPrompt += `Offer: "${promotion}". `;
                 if (businessName) textPrompt += `Business Name: "${businessName}". `;
 
-                // LOGO LOGIC FOR FAL
-                if (logoFile || logoUrl) {
-                    // If we had a way to pass logo as 3rd image to Fal, we would. 
-                    // For now, Flux is good at hallucinating a "Logo for X". 
-                    // If we have a file, we might have mapped it to 'logoInstruction' for Vertex, but Fal handles prompts.
-                    // IMPORTANT: If we strictly want the uploaded logo, we need to composite it. 
-                    // Fal's "Subject Reference" is usually for the Person. 
-                    // We will trust the model to "Generate a logo" if no file, or "Insert Logo" if described.
-                } else if (businessName) {
-                    textPrompt += ` LOGO GENERATION: Generate a modern, professional logo icon for '${businessName}' and place it in the designated logo area (usually top or corner). `;
-                }
-
                 textPrompt += "Typography must be legible, sharp, and integrated into the scene. ";
 
+                // Append general text instructions
                 finalFalPrompt += textPrompt;
+
+                // LOGO LOGIC (Moved to START of Prompt for Visibility)
+                if (!logoFile && !logoUrl && businessName) {
+                    // FIRE LOGO PROMPT - Prepend to ensure model prioritizes the overlay
+                    const logoPrompt = ` COMPOSITION PRIORITY: Start by placing a clean, vector-style logo for '${businessName}' in the top-right corner. It must be a distinct, white or black graphic overlay. `;
+                    finalFalPrompt = logoPrompt + finalFalPrompt;
+                }
             } else if (industryIntent) {
                 // User changed industry but didn't provide new text - auto-update text to match
                 let autoTextPrompt = ` [AUTO-TEXT FOR INDUSTRY CHANGE]: The business type has changed to '${industryIntent}'. `;
@@ -831,7 +905,7 @@ export async function POST(req: Request) {
 
             try {
                 // Strength Logic: If Industry Intent (Background Change) is active, lower strength to allow Hallucination
-                let falStrength = undefined;
+                // falStrength already declared above
                 let finalKeepOutfit = keepOutfit;
 
                 if (industryIntent) {
@@ -851,7 +925,7 @@ export async function POST(req: Request) {
                 const falMainImage = canvasUrl || refImageUrl;
                 console.log("FAL GENERATION INPUTS:", { model, falMainImage, template_reference_image, falStrength, finalKeepOutfit });
 
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, falMainImage, template_reference_image, finalKeepOutfit, remixNegativePrompt, falStrength);
+                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, falMainImage, template_reference_image, finalKeepOutfit, remixNegativePrompt, falStrength, useSubjectFirst);
                 console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
