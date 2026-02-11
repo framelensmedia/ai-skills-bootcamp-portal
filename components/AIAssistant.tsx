@@ -1,15 +1,14 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Minimize2, Sparkles, Menu, X, ArrowLeft } from "lucide-react";
 import StudioSidebar from "@/components/studio/StudioSidebar";
 import StudioChatInterface from "@/components/studio/StudioChatInterface";
 
-export default function AIAssistant() {
+function AIAssistantContent() {
     const supabase = createSupabaseBrowserClient();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -154,5 +153,13 @@ export default function AIAssistant() {
                 </button>
             </div>
         </>
+    );
+}
+
+export default function AIAssistant() {
+    return (
+        <Suspense fallback={null}>
+            <AIAssistantContent />
+        </Suspense>
     );
 }

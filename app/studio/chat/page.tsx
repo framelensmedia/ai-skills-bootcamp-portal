@@ -9,7 +9,9 @@ import NotebookDrawer from "@/components/NotebookDrawer";
 import StudioSidebar from "@/components/studio/StudioSidebar";
 import StudioChatInterface from "@/components/studio/StudioChatInterface";
 
-export default function StudioChatPage() {
+import { Suspense } from "react";
+
+function StudioChatContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const chatId = searchParams.get("id");
@@ -89,5 +91,13 @@ export default function StudioChatPage() {
             />
 
         </div>
+    );
+}
+
+export default function StudioChatPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center bg-black text-white">Loading Chat...</div>}>
+            <StudioChatContent />
+        </Suspense>
     );
 }

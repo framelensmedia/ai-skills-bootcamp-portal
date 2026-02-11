@@ -8,7 +8,9 @@ import { NotebookEditor } from "@/components/notebook/NotebookEditor";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { toast } from "sonner";
 
-export default function NotebookPage() {
+import { Suspense } from "react";
+
+function NotebookContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const folderIdParam = searchParams.get("folderId");
@@ -126,5 +128,13 @@ export default function NotebookPage() {
                 />
             </main>
         </div>
+    );
+}
+
+export default function NotebookPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading Notebook...</div>}>
+            <NotebookContent />
+        </Suspense>
     );
 }

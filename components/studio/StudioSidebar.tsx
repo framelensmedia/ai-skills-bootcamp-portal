@@ -140,7 +140,7 @@ export default function StudioSidebar({ activeChatId, onChatSelect, onNewChat, c
                                                 isActive={activeChatId === chat.id}
                                                 onSelect={() => onChatSelect(chat.id)}
                                                 onDelete={() => deleteChat(chat.id)}
-                                                onMove={(fid) => moveChatToFolder(chat.id, fid)}
+                                                onMove={(fid: string | null) => moveChatToFolder(chat.id, fid)}
                                                 folders={folders}
                                             />
                                         ))}
@@ -166,7 +166,7 @@ export default function StudioSidebar({ activeChatId, onChatSelect, onNewChat, c
                             isActive={activeChatId === chat.id}
                             onSelect={() => onChatSelect(chat.id)}
                             onDelete={() => deleteChat(chat.id)}
-                            onMove={(fid) => moveChatToFolder(chat.id, fid)}
+                            onMove={(fid: string | null) => moveChatToFolder(chat.id, fid)}
                             folders={folders}
                         />
                     ))}
