@@ -101,7 +101,9 @@ export async function PUT(
         if (body.description !== undefined) updateData.description = body.description?.trim() || null;
         if (body.thumbnail_url !== undefined) updateData.thumbnail_url = body.thumbnail_url || null;
         if (body.access_level !== undefined) updateData.access_level = body.access_level;
+        if (body.access_level !== undefined) updateData.access_level = body.access_level;
         if (body.is_published !== undefined) updateData.is_published = body.is_published;
+        if (body.is_featured !== undefined) updateData.is_featured = body.is_featured;
 
         const { data: bootcamp, error } = await supabase
             .from("bootcamps")

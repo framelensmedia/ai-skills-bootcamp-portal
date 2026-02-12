@@ -19,6 +19,7 @@ export default function NewBootcampPage() {
         thumbnail_url: "",
         access_level: "free",
         is_published: false,
+        is_featured: false,
     });
 
     const handleChange = (field: string, value: any) => {
@@ -173,21 +174,33 @@ export default function NewBootcampPage() {
                     </div>
                 </div>
 
-                {/* Publish Status */}
-                <div className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-zinc-900/50">
-                    <input
-                        type="checkbox"
-                        id="is_published"
-                        checked={form.is_published}
-                        onChange={(e) => handleChange("is_published", e.target.checked)}
-                        className="w-5 h-5 rounded border-white/20 bg-zinc-800 text-[#B7FF00] focus:ring-[#B7FF00] focus:ring-offset-0"
-                    />
-                    <label htmlFor="is_published" className="flex-1">
-                        <div className="font-medium">Publish immediately</div>
-                        <div className="text-sm text-white/50">
-                            If unchecked, bootcamp will be saved as draft
-                        </div>
-                    </label>
+                {/* Publish & Featured Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-zinc-900/50">
+                        <input
+                            type="checkbox"
+                            id="is_published"
+                            checked={form.is_published}
+                            onChange={(e) => handleChange("is_published", e.target.checked)}
+                            className="w-5 h-5 rounded border-white/20 bg-zinc-800 text-[#B7FF00] focus:ring-[#B7FF00] focus:ring-offset-0"
+                        />
+                        <label htmlFor="is_published" className="flex-1 cursor-pointer">
+                            <div className="font-medium">Publish immediately</div>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-zinc-900/50">
+                        <input
+                            type="checkbox"
+                            id="is_featured"
+                            checked={(form as any).is_featured}
+                            onChange={(e) => handleChange("is_featured", e.target.checked)}
+                            className="w-5 h-5 rounded border-white/20 bg-zinc-800 text-[#B7FF00] focus:ring-[#B7FF00] focus:ring-offset-0"
+                        />
+                        <label htmlFor="is_featured" className="flex-1 cursor-pointer">
+                            <div className="font-medium">Featured (Home Page)</div>
+                        </label>
+                    </div>
                 </div>
 
                 {/* Actions */}

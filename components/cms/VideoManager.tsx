@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2, GripVertical, Play, Clock, X, ChevronUp, ChevronDown } from "lucide-react";
+import VideoUploader from "./VideoUploader";
 
 type Video = {
     id?: string;
@@ -104,8 +105,8 @@ export default function VideoManager({
                     <div
                         key={index}
                         className={`rounded-xl border bg-zinc-900/50 overflow-hidden transition ${expandedIndex === index
-                                ? "border-[#B7FF00]/30"
-                                : "border-white/10"
+                            ? "border-[#B7FF00]/30"
+                            : "border-white/10"
                             }`}
                     >
                         {/* Video Header Row */}
@@ -164,67 +165,98 @@ export default function VideoManager({
                         {/* Expanded Editor */}
                         {expandedIndex === index && (
                             <div className="border-t border-white/10 p-4 space-y-4 bg-black/20">
-                                {/* Title */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/60 mb-1">
-                                        Title
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={video.title}
-                                        onChange={(e) => updateVideo(index, "title", e.target.value)}
-                                        placeholder="e.g., Introduction to AI Prompting"
-                                        className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none"
-                                    />
-                                </div>
+                                <div className="space-y-4">
+                                    {/* Title */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-white/60 mb-1">
+                                            Title
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={video.title}
+                                            onChange={(e) => updateVideo(index, "title", e.target.value)}
+                                            placeholder="e.g., Introduction to AI Prompting"
+                                            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none"
+                                        />
+                                    </div>
 
-                                {/* Video URL */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/60 mb-1">
-                                        Video URL
-                                    </label>
-                                    <input
-                                        type="url"
-                                        value={video.video_url}
-                                        onChange={(e) => updateVideo(index, "video_url", e.target.value)}
-                                        placeholder="https://youtube.com/watch?v=... or HeyGen URL"
-                                        className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none"
-                                    />
-                                    <p className="mt-1 text-[10px] text-white/40">
-                                        Supports YouTube, Vimeo, HeyGen, or direct video URLs
-                                    </p>
-                                </div>
+                                    {/* Video Source Selection */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-white/60 mb-2">
+                                            Video Source
+                                        </label>
 
-                                {/* Duration */}
-                                <div className="w-32">
-                                    <label className="block text-xs font-medium text-white/60 mb-1">
-                                        Duration (seconds)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={30}
-                                        max={90}
-                                        value={video.duration_seconds}
-                                        onChange={(e) => updateVideo(index, "duration_seconds", parseInt(e.target.value) || 60)}
-                                        className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-[#B7FF00] focus:outline-none"
-                                    />
-                                    <p className="mt-1 text-[10px] text-white/40">
-                                        Target: 45–75 seconds
-                                    </p>
-                                </div>
+                                        <div className="space-y-3">
+                                            {/* Upload Option */}
+                                            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                                                <div className="mb-2 text-xs font-medium text-white/80">Upload File</div>
+                                                <VideoUploader
+                                                    currentUrl={video.video_url && !video.video_url.includes("youtube") && !video.video_url.includes("vimeo") ? video.video_url : undefined}
+                                                    onUpload={(url, duration) => {
+                                                        const updated = videos.map((v, i) =>
+                                                            i === index
+                                                                ? { ...v, video_url: url, duration_seconds: duration || v.duration_seconds }
+                                                                : v
+                                                        );
+                                                        onChange(updated);
+                                                    }}
+                                                />
+                                            </div>
 
-                                {/* Description */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/60 mb-1">
-                                        Description (optional)
-                                    </label>
-                                    <textarea
-                                        value={video.description || ""}
-                                        onChange={(e) => updateVideo(index, "description", e.target.value)}
-                                        placeholder="Brief description of what this video covers..."
-                                        rows={2}
-                                        className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none resize-none"
-                                    />
+                                            <div className="relative flex items-center py-2">
+                                                <div className="grow border-t border-white/10"></div>
+                                                <span className="shrink-0 px-3 text-xs text-white/40">OR USE URL</span>
+                                                <div className="grow border-t border-white/10"></div>
+                                            </div>
+
+                                            {/* URL Input */}
+                                            <div>
+                                                <input
+                                                    type="url"
+                                                    value={video.video_url}
+                                                    onChange={(e) => updateVideo(index, "video_url", e.target.value)}
+                                                    placeholder="https://youtube.com/watch?v=..."
+                                                    className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none"
+                                                />
+                                                <p className="mt-1 text-[10px] text-white/40">
+                                                    YouTube, Vimeo, or direct links
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+                                    {/* Duration */}
+                                    <div className="w-32">
+                                        <label className="block text-xs font-medium text-white/60 mb-1">
+                                            Duration (seconds)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={30}
+                                            max={90}
+                                            value={video.duration_seconds}
+                                            onChange={(e) => updateVideo(index, "duration_seconds", parseInt(e.target.value) || 60)}
+                                            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white focus:border-[#B7FF00] focus:outline-none"
+                                        />
+                                        <p className="mt-1 text-[10px] text-white/40">
+                                            Target: 45–75 seconds
+                                        </p>
+                                    </div>
+
+                                    {/* Description */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-white/60 mb-1">
+                                            Description (optional)
+                                        </label>
+                                        <textarea
+                                            value={video.description || ""}
+                                            onChange={(e) => updateVideo(index, "description", e.target.value)}
+                                            placeholder="Brief description of what this video covers..."
+                                            rows={2}
+                                            className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none resize-none"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -233,23 +265,27 @@ export default function VideoManager({
             </div>
 
             {/* Add Button */}
-            {videos.length < maxVideos && (
-                <button
-                    onClick={addVideo}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 py-3 text-sm text-white/60 hover:border-[#B7FF00]/50 hover:text-[#B7FF00] transition"
-                >
-                    <Plus size={16} />
-                    Add Micro-Video
-                    <span className="text-white/30">({videos.length}/{maxVideos})</span>
-                </button>
-            )}
+            {
+                videos.length < maxVideos && (
+                    <button
+                        onClick={addVideo}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 py-3 text-sm text-white/60 hover:border-[#B7FF00]/50 hover:text-[#B7FF00] transition"
+                    >
+                        <Plus size={16} />
+                        Add Micro-Video
+                        <span className="text-white/30">({videos.length}/{maxVideos})</span>
+                    </button>
+                )
+            }
 
             {/* Warning if below minimum */}
-            {videos.length < minVideos && (
-                <p className="text-xs text-amber-400 flex items-center gap-1">
-                    ⚠️ Add at least {minVideos} videos for a complete Learning Flow
-                </p>
-            )}
+            {
+                videos.length < minVideos && (
+                    <p className="text-xs text-amber-400 flex items-center gap-1">
+                        ⚠️ Add at least {minVideos} videos for a complete Learning Flow
+                    </p>
+                )
+            }
         </div>
     );
 }

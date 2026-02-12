@@ -5,11 +5,13 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Search, Check, Plus, X, Sparkles, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 
-type Template = {
+export type Template = {
     id: string;
     title: string;
     slug: string;
     image_url: string | null;
+    featured_image_url: string | null;
+    media_url: string | null;
     visibility: string;
     access_level: string;
     category: string | null;
@@ -54,7 +56,7 @@ export default function TemplateSelector({
             // Query prompts table for templates
             const { data, error } = await supabase
                 .from("prompts")
-                .select("id, title, slug, image_url, visibility, access_level, category")
+                .select("id, title, slug, image_url, featured_image_url, media_url, visibility, access_level, category")
                 .in("visibility", visibilityFilter)
                 .eq("status", "published")
                 .order("title", { ascending: true })
@@ -73,7 +75,7 @@ export default function TemplateSelector({
         try {
             const { data } = await supabase
                 .from("prompts")
-                .select("id, title, slug, image_url, visibility, access_level, category")
+                .select("id, title, slug, image_url, featured_image_url, media_url, visibility, access_level, category")
                 .eq("id", id)
                 .single();
 
@@ -106,15 +108,18 @@ export default function TemplateSelector({
         onSelect(null);
     }
 
+    // Helper to get best image
+    const getTemplateImage = (t: Template) => t.featured_image_url || t.image_url || t.media_url;
+
     return (
         <div className="relative">
             {/* Selected Template Display */}
             {selectedTemplate ? (
                 <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-zinc-900 p-3">
-                    {selectedTemplate.image_url ? (
+                    {getTemplateImage(selectedTemplate) ? (
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
                             <Image
-                                src={selectedTemplate.image_url}
+                                src={getTemplateImage(selectedTemplate)!}
                                 alt=""
                                 fill
                                 className="object-cover"
@@ -131,8 +136,8 @@ export default function TemplateSelector({
                         <div className="font-medium text-sm truncate">{selectedTemplate.title}</div>
                         <div className="text-xs text-white/40 flex items-center gap-2">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${selectedTemplate.visibility === "learning_only"
-                                    ? "bg-blue-500/20 text-blue-400"
-                                    : "bg-green-500/20 text-green-400"
+                                ? "bg-blue-500/20 text-blue-400"
+                                : "bg-green-500/20 text-green-400"
                                 }`}>
                                 {selectedTemplate.visibility === "learning_only" ? "Learning Only" : "Public"}
                             </span>
@@ -209,46 +214,49 @@ export default function TemplateSelector({
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    {filteredTemplates.map(template => (
-                                        <button
-                                            key={template.id}
-                                            onClick={() => handleSelect(template)}
-                                            className={`group relative rounded-xl border p-2 text-left transition ${selectedTemplateId === template.id
+                                    {filteredTemplates.map(template => {
+                                        const imageUrl = getTemplateImage(template);
+                                        return (
+                                            <button
+                                                key={template.id}
+                                                onClick={() => handleSelect(template)}
+                                                className={`group relative rounded-xl border p-2 text-left transition ${selectedTemplateId === template.id
                                                     ? "border-[#B7FF00] bg-[#B7FF00]/10"
                                                     : "border-white/10 hover:border-white/20 bg-zinc-800/50"
-                                                }`}
-                                        >
-                                            {/* Check mark */}
-                                            {selectedTemplateId === template.id && (
-                                                <div className="absolute top-2 right-2 z-10 w-5 h-5 rounded-full bg-[#B7FF00] flex items-center justify-center">
-                                                    <Check size={12} className="text-black" />
-                                                </div>
-                                            )}
-
-                                            {/* Image */}
-                                            <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-zinc-800 mb-2">
-                                                {template.image_url ? (
-                                                    <Image
-                                                        src={template.image_url}
-                                                        alt=""
-                                                        fill
-                                                        className="object-cover"
-                                                        unoptimized
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        <Sparkles size={24} className="text-white/20" />
+                                                    }`}
+                                            >
+                                                {/* Check mark */}
+                                                {selectedTemplateId === template.id && (
+                                                    <div className="absolute top-2 right-2 z-10 w-5 h-5 rounded-full bg-[#B7FF00] flex items-center justify-center">
+                                                        <Check size={12} className="text-black" />
                                                     </div>
                                                 )}
-                                            </div>
 
-                                            {/* Info */}
-                                            <div className="text-xs font-medium truncate">{template.title}</div>
-                                            <div className="text-[10px] text-white/40 truncate">
-                                                {template.visibility === "learning_only" ? "Learning Only" : "Public"}
-                                            </div>
-                                        </button>
-                                    ))}
+                                                {/* Image */}
+                                                <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-zinc-800 mb-2">
+                                                    {imageUrl ? (
+                                                        <Image
+                                                            src={imageUrl}
+                                                            alt=""
+                                                            fill
+                                                            className="object-cover"
+                                                            unoptimized
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <Sparkles size={24} className="text-white/20" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="text-xs font-medium truncate">{template.title}</div>
+                                                <div className="text-[10px] text-white/40 truncate">
+                                                    {template.visibility === "learning_only" ? "Learning Only" : "Public"}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

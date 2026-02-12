@@ -45,14 +45,14 @@ export default function BasicTrainingSection({ className = "" }: Props) {
 
     async function loadBasicTraining() {
         try {
-            // Fetch basic training bootcamps
+            // Fetch featured bootcamps (Basic Training)
             const { data: bootcampData } = await supabase
                 .from("bootcamps")
                 .select(`
           id, title, slug, description, thumbnail_url,
           lessons:lessons(count)
         `)
-                .eq("bootcamp_type", "basic_training")
+                .eq("is_featured", true)
                 .eq("is_published", true)
                 .order("created_at", { ascending: true });
 
@@ -61,6 +61,7 @@ export default function BasicTrainingSection({ className = "" }: Props) {
                     ...b,
                     lesson_count: b.lessons?.[0]?.count || 0,
                 }));
+                // If no featured found, we might want to fallback or just empty
                 setBootcamps(mapped);
             }
 
@@ -195,13 +196,13 @@ export default function BasicTrainingSection({ className = "" }: Props) {
                             <Rocket size={12} />
                         </span>
                         <span className="text-xs font-bold uppercase tracking-wider text-[#B7FF00]">
-                            Basic Training Flight
+                            Featured Mission
                         </span>
                     </div>
 
                     {/* Headline */}
                     <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight tracking-tight">
-                        Free AI Training
+                        {activeBootcamp.title}
                     </h2>
 
                     {/* Description */}
@@ -221,7 +222,7 @@ export default function BasicTrainingSection({ className = "" }: Props) {
                             }}
                             className="inline-flex items-center gap-3 bg-[#B7FF00] text-black px-8 py-4 rounded-xl font-bold text-lg hover:bg-[#a3e600] active:scale-95 transition-all shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)] hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.5)]"
                         >
-                            {isComplete ? "Review Mission" : isStarted ? "Resume Mission" : "Start Basic Training"}
+                            {isComplete ? "Review Mission" : isStarted ? "Resume Mission" : "Start Mission"}
                             <ArrowRight size={20} />
                         </Link>
 

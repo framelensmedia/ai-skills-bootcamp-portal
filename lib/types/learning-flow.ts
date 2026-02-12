@@ -10,6 +10,7 @@ export type Bootcamp = {
     lesson_count: number;
     total_duration_minutes: number;
     is_published: boolean;
+    is_featured?: boolean;
     created_at: string;
     updated_at: string;
 };

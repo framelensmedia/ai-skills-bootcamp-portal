@@ -38,8 +38,7 @@ export default function CreateNowAction({
                     <Sparkles size={20} />
                 </div>
                 <div>
-                    <h3 className="font-bold text-white">Time to Create</h3>
-                    <p className="text-sm text-white/60">Put what you learned into action</p>
+                    <h3 className="font-bold text-white">Your Mission</h3>
                 </div>
             </div>
 

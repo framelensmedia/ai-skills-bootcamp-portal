@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
 import { Menu, Coins } from "lucide-react";
+import GamificationStatus from "./GamificationStatus";
 
 
 export default function Nav() {
@@ -135,6 +136,9 @@ export default function Nav() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-3 outline-none focus:ring-2 focus:ring-[#B7FF00]/50 rounded-full pr-1"
               >
+                <div className="hidden md:block">
+                  <GamificationStatus />
+                </div>
                 {credits !== null && (
                   <div className="hidden md:flex items-center gap-1.5 bg-secondary border border-border rounded-full px-3 py-1 text-xs font-semibold text-primary">
                     <Coins size={12} />

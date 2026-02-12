@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
                 thumbnail_url: body.thumbnail_url || null,
                 access_level: body.access_level || "free",
                 is_published: body.is_published ?? false,
+                is_featured: body.is_featured ?? false,
             })
             .select()
             .single();

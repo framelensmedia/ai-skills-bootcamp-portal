@@ -35,6 +35,7 @@ export default function EditBootcampPage({ params }: Props) {
         thumbnail_url: "",
         access_level: "free",
         is_published: false,
+        is_featured: false,
     });
 
     useEffect(() => {
@@ -62,6 +63,7 @@ export default function EditBootcampPage({ params }: Props) {
                 thumbnail_url: data.bootcamp.thumbnail_url || "",
                 access_level: data.bootcamp.access_level || "free",
                 is_published: data.bootcamp.is_published || false,
+                is_featured: data.bootcamp.is_featured || false,
             });
         } catch (e: any) {
             setError(e.message);
@@ -272,7 +274,7 @@ export default function EditBootcampPage({ params }: Props) {
                             </div>
                         </div>
 
-                        <div className="flex items-end">
+                        <div className="flex items-end gap-6">
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -281,6 +283,16 @@ export default function EditBootcampPage({ params }: Props) {
                                     className="w-5 h-5 rounded border-white/20 bg-zinc-800 text-[#B7FF00]"
                                 />
                                 <span className="text-sm">Published</span>
+                            </label>
+
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.is_featured}
+                                    onChange={(e) => handleChange("is_featured", e.target.checked)}
+                                    className="w-5 h-5 rounded border-white/20 bg-zinc-800 text-[#B7FF00]"
+                                />
+                                <span className="text-sm">Featured</span>
                             </label>
                         </div>
                     </div>

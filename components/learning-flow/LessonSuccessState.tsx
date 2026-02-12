@@ -83,6 +83,12 @@ export default function LessonSuccessState({
                     </>
                 ) : (
                     <>
+                        <div className="flex justify-center mb-4">
+                            <div className="flex items-center gap-2 bg-[#B7FF00]/10 border border-[#B7FF00]/20 rounded-full px-4 py-2 text-[#B7FF00]">
+                                <span className="font-bold">+10 XP</span>
+                                <span className="text-xs opacity-70">Lesson Complete</span>
+                            </div>
+                        </div>
                         <h2 className="text-3xl font-bold text-white mb-2">Mission Complete!</h2>
                         <p className="text-white/60 mb-6">
                             You created something real. It's saved to your library.

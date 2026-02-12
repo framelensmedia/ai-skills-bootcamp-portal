@@ -20,7 +20,8 @@ type Props = {
 };
 
 export default function LessonPage({ params }: Props) {
-    const { bootcamp: bootcampSlug, lesson: lessonSlug } = use(params);
+    const { bootcamp: bootcampSlug, lesson: lessonSlugEncoded } = use(params);
+    const lessonSlug = decodeURIComponent(lessonSlugEncoded);
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, initialized } = useAuth();
@@ -37,6 +38,19 @@ export default function LessonPage({ params }: Props) {
         nextLesson: Lesson | null;
         generationId?: string;
     }>({ completed: false, nextLesson: null });
+
+    // Track if content (video/text) is finished, separate from "lesson completed" API status
+    // Initialize based on existing progress
+    const [contentFinished, setContentFinished] = useState(
+        lesson?.progress?.status === "completed"
+    );
+
+    // Update contentFinished when lesson loads or changes
+    useEffect(() => {
+        if (lesson?.progress?.status === "completed") {
+            setContentFinished(true);
+        }
+    }, [lesson]);
 
     // Check if returning from studio with completion
     const fromStudio = searchParams?.get("completed") === "true";
@@ -59,6 +73,11 @@ export default function LessonPage({ params }: Props) {
                     throw new Error("Lesson not found");
                 }
                 setLesson(currentLesson);
+
+                // Initialize content finished state
+                if (currentLesson.progress?.status === "completed") {
+                    setContentFinished(true);
+                }
 
                 // If returning from studio, mark as complete
                 if (fromStudio && currentLesson) {
@@ -90,6 +109,7 @@ export default function LessonPage({ params }: Props) {
                     nextLesson: data.next_lesson,
                     generationId: genId,
                 });
+                setContentFinished(true);
             }
         } catch (e) {
             console.error("Failed to mark lesson complete:", e);
@@ -230,24 +250,19 @@ export default function LessonPage({ params }: Props) {
 
                         {/* Lesson Content (Video/Text) */}
                         <div className="mb-10">
-                            <LessonContent lesson={lesson} />
-                        </div>
-
-                        {/* Divider */}
-                        <div className="relative my-10">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-white/10" />
-                            </div>
-                            <div className="relative flex justify-center">
-                                <span className="bg-black px-4 text-sm text-white/40">Time to create</span>
-                            </div>
+                            <LessonContent
+                                lesson={lesson}
+                                bootcampSlug={bootcampSlug}
+                                nextLessonSlug={nextLesson?.slug}
+                                onVideoComplete={() => setContentFinished(true)}
+                            />
                         </div>
 
                         {/* Create Now Action */}
-                        <div className="mb-10">
+                        <div className="mb-10 border-t border-white/10 pt-10">
                             <CreateNowAction
                                 lesson={lesson}
-                                disabled={isAlreadyCompleted}
+                                disabled={!contentFinished}
                             />
                         </div>
 
