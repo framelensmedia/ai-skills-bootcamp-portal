@@ -44,6 +44,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     // If we have initial items, we are not loading initially.
     const [loading, setLoading] = useState(initialItems.length === 0);
     const [sort, setSort] = useState<"newest" | "trending">("newest");
+    const [timeFilter, setTimeFilter] = useState<"today" | "week" | "all">("all");
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true); // Assume more unless initial fetch was empty? 
     // Actually if initialItems < 8, we know there's no more.
@@ -111,14 +112,32 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             // Don't force redirect here on client fetch, maybe user is exploring? 
             // Although page requires auth generally.
 
-            let qImages = supabase
-                .from("prompt_generations")
-                .select(`
-                id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, is_public,
-                user_id, prompt_id
-            `)
-                .eq("is_public", true)
-                .range(page * 12, (page + 1) * 12 - 1); // Increased fetch size
+            let qImages;
+
+            if (sort === "trending") {
+                // Use trending views based on time filter
+                let viewName = "trending_generations";
+                if (timeFilter === "today") viewName = "trending_today";
+                else if (timeFilter === "week") viewName = "trending_week";
+
+                qImages = supabase
+                    .from(viewName)
+                    .select(`
+                        id, image_url, created_at, upvotes_count, user_id, prompt_id
+                    `)
+                    .range(page * 12, (page + 1) * 12 - 1)
+                    .order("trending_score", { ascending: false });
+            } else {
+                qImages = supabase
+                    .from("prompt_generations")
+                    .select(`
+                        id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text, is_public,
+                        user_id, prompt_id
+                    `)
+                    .eq("is_public", true)
+                    .range(page * 12, (page + 1) * 12 - 1)
+                    .order("created_at", { ascending: false });
+            }
 
             let qVideos = supabase
                 .from("video_generations")
@@ -128,10 +147,8 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 .range(page * 12, (page + 1) * 12 - 1);
 
             if (sort === "newest") {
-                qImages = qImages.order("created_at", { ascending: false });
                 qVideos = qVideos.order("created_at", { ascending: false });
             } else {
-                qImages = qImages.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
                 qVideos = qVideos.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
             }
 
@@ -293,13 +310,22 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
         // But if isReset, we might want to show loading skeleton?
 
         fetchFeed(isReset);
-
-    }, [page, sort]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, sort, timeFilter]);
 
     // Handle Sort Click
     const handleSort = (s: "newest" | "trending") => {
         if (s === sort) return;
         setSort(s);
+        setPage(0);
+        setHasMore(true);
+        setItems([]);
+    };
+
+    // Handle Time Filter Click
+    const handleTimeFilter = (t: "today" | "week" | "all") => {
+        if (t === timeFilter) return;
+        setTimeFilter(t);
         setPage(0);
         setHasMore(true);
         setItems([]);
@@ -441,19 +467,46 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                         <span>Discover what others are creating</span>
                     </div>
                 </div>
-                <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
-                    <button
-                        onClick={() => handleSort("newest")}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase rounded flex items-center gap-2 ${sort === "newest" ? "bg-[#B7FF00] text-black" : "text-white/50 hover:text-white"}`}
-                    >
-                        <Clock size={12} /> Newest
-                    </button>
-                    <button
-                        onClick={() => handleSort("trending")}
-                        className={`px-4 py-1.5 text-xs font-bold uppercase rounded flex items-center gap-2 ${sort === "trending" ? "bg-[#B7FF00] text-black" : "text-white/50 hover:text-white"}`}
-                    >
-                        <TrendingUp size={12} /> Trending
-                    </button>
+                <div className="flex flex-col gap-2">
+                    {/* Main Sort Tabs */}
+                    <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+                        <button
+                            onClick={() => handleSort("newest")}
+                            className={`px-4 py-1.5 text-xs font-bold uppercase rounded flex items-center gap-2 ${sort === "newest" ? "bg-[#B7FF00] text-black" : "text-white/50 hover:text-white"}`}
+                        >
+                            <Clock size={12} /> Newest
+                        </button>
+                        <button
+                            onClick={() => handleSort("trending")}
+                            className={`px-4 py-1.5 text-xs font-bold uppercase rounded flex items-center gap-2 ${sort === "trending" ? "bg-[#B7FF00] text-black" : "text-white/50 hover:text-white"}`}
+                        >
+                            <TrendingUp size={12} /> Trending
+                        </button>
+                    </div>
+
+                    {/* Time Filter Tabs - Only show when Trending is active */}
+                    {sort === "trending" && (
+                        <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+                            <button
+                                onClick={() => handleTimeFilter("today")}
+                                className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${timeFilter === "today" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"}`}
+                            >
+                                Today
+                            </button>
+                            <button
+                                onClick={() => handleTimeFilter("week")}
+                                className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${timeFilter === "week" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"}`}
+                            >
+                                This Week
+                            </button>
+                            <button
+                                onClick={() => handleTimeFilter("all")}
+                                className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${timeFilter === "all" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"}`}
+                            >
+                                All Time
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
