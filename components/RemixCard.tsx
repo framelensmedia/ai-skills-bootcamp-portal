@@ -11,12 +11,14 @@ import AutoplayVideo from "./AutoplayVideo";
 export type RemixItem = {
     id: string;
     imageUrl: string;
-    videoUrl?: string; // Added videoUrl
-    mediaType?: "image" | "video"; // Added mediaType
+    videoUrl?: string;
+    mediaType?: "image" | "video";
     title: string;
     username: string;
     userAvatar: string | null;
     upvotesCount: number;
+    favoritesCount?: number;
+    remixCount?: number;
     originalPromptText?: string;
     remixPromptText?: string;
     combinedPromptText?: string;
@@ -32,6 +34,38 @@ type RemixCardProps = {
 export default function RemixCard({ item, onRemix }: RemixCardProps) {
     const router = useRouter();
     const [imgFailed, setImgFailed] = useState(false);
+    const [isFavorited, setIsFavorited] = useState(false);
+    const [localFavCount, setLocalFavCount] = useState(item.favoritesCount || 0);
+    const [favLoading, setFavLoading] = useState(false);
+
+    const handleFavorite = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (favLoading) return;
+        setFavLoading(true);
+
+        // Optimistic UI
+        setIsFavorited(!isFavorited);
+        setLocalFavCount(prev => isFavorited ? prev - 1 : prev + 1);
+
+        try {
+            const res = await fetch("/api/engagement", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ generationId: item.id, type: "favorite" }),
+            });
+            if (!res.ok) {
+                // Revert on failure
+                setIsFavorited(isFavorited);
+                setLocalFavCount(item.favoritesCount || 0);
+            }
+        } catch {
+            setIsFavorited(isFavorited);
+            setLocalFavCount(item.favoritesCount || 0);
+        } finally {
+            setFavLoading(false);
+        }
+    };
 
     const handleRemixClick = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -119,10 +153,22 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
                         {item.title || "Untitled Remix"}
                     </h3>
 
-                    {/* Upvote Count (Visual Only or functional if we implement) */}
-                    <div className="flex items-center gap-1 text-xs text-white/50">
-                        <ArrowBigUp size={14} />
-                        <span>{item.upvotesCount}</span>
+                    <div className="flex items-center gap-2">
+                        {/* Favorite Button */}
+                        <button
+                            onClick={handleFavorite}
+                            className={`flex items-center gap-0.5 text-xs transition-colors ${isFavorited ? 'text-pink-400' : 'text-white/40 hover:text-pink-400'}`}
+                            title={isFavorited ? 'Unfavorite' : 'Favorite'}
+                        >
+                            <Heart size={13} fill={isFavorited ? 'currentColor' : 'none'} />
+                            {localFavCount > 0 && <span>{localFavCount}</span>}
+                        </button>
+
+                        {/* Upvote Count */}
+                        <div className="flex items-center gap-0.5 text-xs text-white/40">
+                            <ArrowBigUp size={14} />
+                            <span>{item.upvotesCount}</span>
+                        </div>
                     </div>
                 </div>
 

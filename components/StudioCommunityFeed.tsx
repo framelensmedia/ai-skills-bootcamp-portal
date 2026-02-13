@@ -67,24 +67,26 @@ export default function StudioCommunityFeed() {
             const to = from + LIMIT - 1;
 
             try {
-                // Build query based on tab
+                // For "trending" tab, use the trending_generations view with time-decay algorithm
+                // For "latest" tab, use standard prompt_generations table
+                const tableName = fetchingTab === "trending" ? "trending_generations" : "prompt_generations";
+
                 let query = supabase
-                    .from("prompt_generations")
+                    .from(tableName)
                     .select(`
                          id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
-                         user_id, prompt_id
+                         user_id, prompt_id, remix_count, favorites_count
                       `)
-                    .eq("is_public", true)
                     .not("image_url", "is", null); // Only show items with images
 
-                // Apply ordering BEFORE range for consistent results
                 if (fetchingTab === "trending") {
-                    query = query
-                        .order("upvotes_count", { ascending: false })
-                        .order("created_at", { ascending: false });
+                    // trending_generations view is already filtered by is_public
+                    // and ordered by trending_score DESC
+                    query = query.order("trending_score", { ascending: false });
                 } else {
-                    // Latest: newest first
-                    query = query.order("created_at", { ascending: false });
+                    query = query
+                        .eq("is_public", true)
+                        .order("created_at", { ascending: false });
                 }
 
                 // Apply range after ordering
@@ -128,6 +130,8 @@ export default function StudioCommunityFeed() {
                             username: profile.full_name || "Anonymous Creator",
                             userAvatar: profile.profile_image || null,
                             upvotesCount: r.upvotes_count || 0,
+                            favoritesCount: r.favorites_count || 0,
+                            remixCount: r.remix_count || 0,
                             originalPromptText: r.original_prompt_text,
                             remixPromptText: r.remix_prompt_text,
                             combinedPromptText: r.combined_prompt_text,
