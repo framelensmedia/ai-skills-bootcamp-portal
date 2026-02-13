@@ -55,40 +55,40 @@ export default function LessonPage({ params }: Props) {
     const fromStudio = searchParams?.get("completed") === "true";
     const generationId = searchParams?.get("generationId") || undefined;
 
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const res = await fetch(`/api/bootcamps/${bootcampSlug}`);
-                if (!res.ok) {
-                    if (res.status === 404) throw new Error("Bootcamp not found");
-                    throw new Error("Failed to load bootcamp");
-                }
-                const data: BootcampWithLessons = await res.json();
-                setBootcamp(data);
-
-                // Find current lesson
-                const currentLesson = data.lessons.find((l) => l.slug === lessonSlug);
-                if (!currentLesson) {
-                    throw new Error("Lesson not found");
-                }
-                setLesson(currentLesson);
-
-                // Initialize content finished state
-                if (currentLesson.progress?.status === "completed") {
-                    setContentFinished(true);
-                }
-
-                // If returning from studio, mark as complete
-                if (fromStudio && currentLesson) {
-                    await handleComplete(currentLesson.id, generationId);
-                }
-            } catch (e: any) {
-                setError(e.message);
-            } finally {
-                setLoading(false);
+    const fetchData = async () => {
+        try {
+            const res = await fetch(`/api/bootcamps/${bootcampSlug}`);
+            if (!res.ok) {
+                if (res.status === 404) throw new Error("Bootcamp not found");
+                throw new Error("Failed to load bootcamp");
             }
-        }
+            const data: BootcampWithLessons = await res.json();
+            setBootcamp(data);
 
+            // Find current lesson
+            const currentLesson = data.lessons.find((l) => l.slug === lessonSlug);
+            if (!currentLesson) {
+                throw new Error("Lesson not found");
+            }
+            setLesson(currentLesson);
+
+            // Initialize content finished state
+            if (currentLesson.progress?.status === "completed") {
+                setContentFinished(true);
+            }
+
+            // If returning from studio, mark as complete
+            if (fromStudio && currentLesson && !currentLesson.progress?.status) {
+                await handleComplete(currentLesson.id, generationId);
+            }
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         if (initialized) {
             fetchData();
         }
@@ -109,6 +109,8 @@ export default function LessonPage({ params }: Props) {
                     generationId: genId,
                 });
                 setContentFinished(true);
+                // Refresh data to update progress bars
+                await fetchData();
             }
         } catch (e) {
             console.error("Failed to mark lesson complete:", e);
