@@ -70,8 +70,10 @@ export async function POST(
             .single();
 
         if (progressError) {
+            console.error("DEBUG: Lesson progress upsert failed:", progressError);
             return NextResponse.json({ error: progressError.message }, { status: 500 });
         }
+        console.log("DEBUG: Lesson progress upsert success:", lessonProgress);
 
         // Count completed lessons for this bootcamp
         const { count: completedCount } = await supabase

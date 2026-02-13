@@ -8,9 +8,9 @@ export default function Footer() {
 
     return (
         <footer className="border-t border-border bg-background py-12 text-sm text-muted-foreground">
-            <div className="mx-auto max-w-6xl px-4 grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            <div className="mx-auto max-w-6xl px-4 grid grid-cols-3 md:grid-cols-4 gap-8 mb-12">
                 {/* Brand */}
-                <div className="col-span-2 md:col-span-1">
+                <div className="col-span-3 md:col-span-1 flex flex-col items-center md:items-start text-center md:text-left">
                     <Link href="/" className="flex items-center gap-2 mb-4">
                         <Image
                             src="/logo-symbol.png"
@@ -21,10 +21,10 @@ export default function Footer() {
                         />
                         <span className="font-bold text-foreground text-lg">Skills Studio</span>
                     </Link>
-                    <p className="mb-6">
+                    <p className="mb-6 max-w-xs md:max-w-none mx-auto md:mx-0">
                         Empowering the next generation of creators and entrepreneurs with AI.
                     </p>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 justify-center md:justify-start">
                         <Link href="#" className="hover:text-foreground transition-colors"><Twitter size={20} /></Link>
                         <Link href="#" className="hover:text-foreground transition-colors"><Instagram size={20} /></Link>
                         <Link href="#" className="hover:text-foreground transition-colors"><Linkedin size={20} /></Link>
@@ -64,7 +64,7 @@ export default function Footer() {
                 </div>
             </div>
 
-            <div className="mx-auto max-w-6xl px-4 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="mx-auto max-w-6xl px-4 pt-8 border-t border-border flex flex-col items-center gap-4 text-center">
                 <div>
                     &copy; {currentYear} AI Skills Studio. All rights reserved.
                 </div>

@@ -1649,7 +1649,7 @@ function PromptContent() {
             </div>
 
             {/* Community Feed */}
-            <div className="mt-8 border-t border-white/10 pt-8">
+            <div className="mt-8 pt-8">
               <StudioCommunityFeed />
             </div>
 

@@ -88,13 +88,11 @@ export default function Nav() {
   };
 
   const links = [
-    { href: "/", label: "Home" },
     { href: "/learn", label: "Learn" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/prompts", label: "Prompts" },
-    { href: "/studio/chat", label: "AI Chat" },
     { href: "/studio/creator", label: "Studio" },
+    { href: "/prompts", label: "Prompts" },
     { href: "/library", label: "My Library" },
+    { href: "/pricing", label: "Pricing" },
   ];
 
   if (loggedIn) {
