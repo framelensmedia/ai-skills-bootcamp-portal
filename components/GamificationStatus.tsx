@@ -41,7 +41,7 @@ export default function GamificationStatus() {
                     table: 'profiles',
                     filter: `id=eq.${user.id}`
                 },
-                (payload) => {
+                (payload: any) => {
                     setStats({
                         xp: payload.new.xp || 0,
                         streak: payload.new.streak_days || 0
