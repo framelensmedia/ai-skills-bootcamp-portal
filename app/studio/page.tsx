@@ -86,33 +86,49 @@ function StudioContent() {
   // Fetch Template Config if promptId is present
   useEffect(() => {
     if (prePromptId) {
-      supabase.from("prompts")
-        .select("template_config_json, subject_mode, featured_image_url, aspect_ratios")
-        .eq("id", prePromptId)
-        .maybeSingle()
-        .then(({ data }: { data: any }) => {
-          if (data) {
-            if (data.featured_image_url && !preImg) setPreviewImageUrl(data.featured_image_url);
+      async function fetchTemplate() {
+        // Try private prompts first
+        let { data } = await supabase.from("prompts")
+          .select("template_config_json, subject_mode, featured_image_url, aspect_ratios")
+          .eq("id", prePromptId)
+          .maybeSingle();
 
-            // Set Aspect Ratio from template if available
-            if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
-              const validRatios = ["9:16", "16:9", "1:1", "4:5"];
-              if (validRatios.includes(data.aspect_ratios[0])) {
-                setAspectRatio(data.aspect_ratios[0]);
-              }
-            }
-
-            const config = data.template_config_json || {};
-            setTemplateConfig({
-              editable_fields: config.editable_fields || [],
-              editable_groups: config.editable_groups || [],
-              subject_mode: data.subject_mode || config.subject_mode || "non_human"
-            });
-          } else {
-            console.warn("Template not found or access denied:", prePromptId);
-            setTemplateConfig({ editable_fields: [], subject_mode: "non_human" });
+        // Fallback to public prompts
+        if (!data) {
+          const res = await supabase.from("prompts_public")
+            .select("template_config_json, subject_mode, featured_image_url, aspect_ratios, image_url")
+            .eq("id", prePromptId)
+            .maybeSingle();
+          data = res.data;
+          // prompts_public uses image_url instead of featured_image_url
+          if (data && !data.featured_image_url && data.image_url) {
+            data.featured_image_url = data.image_url;
           }
-        });
+        }
+
+        if (data) {
+          if (data.featured_image_url && !preImg) setPreviewImageUrl(data.featured_image_url);
+
+          // Set Aspect Ratio from template if available
+          if (data.aspect_ratios && Array.isArray(data.aspect_ratios) && data.aspect_ratios.length > 0) {
+            const validRatios = ["9:16", "16:9", "1:1", "4:5"];
+            if (validRatios.includes(data.aspect_ratios[0])) {
+              setAspectRatio(data.aspect_ratios[0]);
+            }
+          }
+
+          const config = data.template_config_json || {};
+          setTemplateConfig({
+            editable_fields: config.editable_fields || [],
+            editable_groups: config.editable_groups || [],
+            subject_mode: data.subject_mode || config.subject_mode || "non_human"
+          });
+        } else {
+          console.warn("Template not found in any table:", prePromptId);
+          setTemplateConfig({ editable_fields: [], subject_mode: "non_human" });
+        }
+      }
+      fetchTemplate();
     } else {
       // Community Remix / Scratch mode - Use minimal flow (skip industry/business steps)
       // This creates a simpler wizard for remixing community images
@@ -235,9 +251,8 @@ function StudioContent() {
       setPreviewImageUrl(preImg);
     }
 
-    // If we have a remix param or img param, we assume the user wants to start the Remix Wizard
-    // The feed passes 'remix' param with the prompt text usually.
-    if (preImg || sp?.get("remix")) {
+    // If we have a remix param, img param, OR promptId, we assume the user wants to start the Remix Wizard
+    if (preImg || sp?.get("remix") || prePromptId) {
       setWizardOpen(true);
 
       // ✅ Ported Logic: If preImg exists, Wizard shows it via templatePreviewUrl

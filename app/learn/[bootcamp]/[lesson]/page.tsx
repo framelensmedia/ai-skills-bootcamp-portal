@@ -258,13 +258,7 @@ export default function LessonPage({ params }: Props) {
                             />
                         </div>
 
-                        {/* Create Now Action */}
-                        <div className="mb-10 border-t border-white/10 pt-10">
-                            <CreateNowAction
-                                lesson={lesson}
-                                disabled={!contentFinished}
-                            />
-                        </div>
+
 
                         {/* Already completed message */}
                         {isAlreadyCompleted && (

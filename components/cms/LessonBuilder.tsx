@@ -279,7 +279,7 @@ function SortableCanvasItem({ id, item, index, totalItems, onDelete, onUpdate }:
                                 <div>
                                     <label className="text-xs font-medium text-white/60 mb-2 block">Select Template</label>
                                     <TemplateSelector
-                                        selectedTemplateId={item.content.correct_answer_index?.toString() || null} // Hacking this field to store ID
+                                        selectedTemplateId={item.content.explanation || null}
                                         onSelect={(id, template) => {
                                             // Storing as int if possible, or we need to change type?
                                             // Wait, IDs are UUIDs. I cannot store UUID in correct_answer_index (number).
@@ -287,11 +287,21 @@ function SortableCanvasItem({ id, item, index, totalItems, onDelete, onUpdate }:
                                             // 'options[0]' can be Template Name.
                                             if (id && template) {
                                                 const imageUrl = template.featured_image_url || template.image_url || template.media_url || "";
-                                                updateContent("explanation", id);
-                                                updateContent("options", [template.title, imageUrl]);
+                                                onUpdate({
+                                                    content: {
+                                                        ...item.content,
+                                                        explanation: id,
+                                                        options: [template.title, imageUrl]
+                                                    }
+                                                });
                                             } else {
-                                                updateContent("explanation", "");
-                                                updateContent("options", []);
+                                                onUpdate({
+                                                    content: {
+                                                        ...item.content,
+                                                        explanation: "",
+                                                        options: []
+                                                    }
+                                                });
                                             }
                                         }}
                                         visibilityFilter={["public", "learning_only"]}

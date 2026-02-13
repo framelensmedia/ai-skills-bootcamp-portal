@@ -1,6 +1,6 @@
 "use client";
 
-import { Lesson } from "@/lib/types/learning-flow";
+import { Lesson, LessonWithProgress } from "@/lib/types/learning-flow";
 import { Play, FileText, Clock, Loader2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
@@ -21,7 +21,7 @@ type Video = {
 };
 
 type LessonContentProps = {
-    lesson: Lesson & { videos?: Video[] };
+    lesson: LessonWithProgress & { videos?: Video[] };
     bootcampSlug: string;
     nextLessonSlug?: string;
     onVideoComplete?: () => void;
@@ -88,6 +88,17 @@ export default function LessonContent({ lesson, bootcampSlug, nextLessonSlug, on
         setShowCompleteModal(true);
     }
 
+    // Prepare progress set
+    const completedIds = useMemo(() => {
+        const ids = new Set<string>();
+        if (lesson.content_progress) {
+            lesson.content_progress.forEach(cp => {
+                if (cp.is_completed) ids.add(cp.content_id);
+            });
+        }
+        return ids;
+    }, [lesson.content_progress]);
+
     // RENDER: Loading
     if (loading) {
         return (
@@ -107,6 +118,7 @@ export default function LessonContent({ lesson, bootcampSlug, nextLessonSlug, on
                         items={contentItems}
                         lessonId={lesson.id}
                         onAllCompleted={handleCompletion}
+                        initialCompletedIds={completedIds}
                     />
 
 

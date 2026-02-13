@@ -1,7 +1,6 @@
 // Export all Learning Flow components
 export { default as LessonList } from "./LessonList";
 export { default as ProgressBar } from "./ProgressBar";
-export { default as CreateNowAction } from "./CreateNowAction";
 export { default as LessonContent } from "./LessonContent";
 export { default as LessonSuccessState } from "./LessonSuccessState";
 export { default as VideoStepper } from "./VideoStepper";

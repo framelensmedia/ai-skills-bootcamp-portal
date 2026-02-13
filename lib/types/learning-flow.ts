@@ -74,6 +74,7 @@ export type BootcampProgress = {
 // Extended types for UI
 export type LessonWithProgress = Lesson & {
     progress?: LessonProgress;
+    content_progress?: { content_id: string; is_completed: boolean }[];
 };
 
 export type BootcampWithLessons = Bootcamp & {

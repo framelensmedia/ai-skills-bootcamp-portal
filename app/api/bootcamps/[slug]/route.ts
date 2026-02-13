@@ -60,6 +60,7 @@ export async function GET(
 
         // If user is logged in, fetch their progress
         let lessonProgressMap: Record<string, LessonProgress> = {};
+        let contentProgressMap: Record<string, { content_id: string; is_completed: boolean }[]> = {};
         let userBootcampProgress: BootcampProgress | undefined;
 
         if (user) {
@@ -73,6 +74,25 @@ export async function GET(
             if (lessonProgress) {
                 lessonProgress.forEach((lp: LessonProgress) => {
                     lessonProgressMap[lp.lesson_id] = lp;
+                });
+            }
+
+            // Content progress (granular)
+            const { data: contentProgress } = await supabase
+                .from("lesson_content_progress")
+                .select("lesson_id, content_id, is_completed")
+                .eq("user_id", user.id)
+                .in("lesson_id", lessons?.map(l => l.id) || []);
+
+            if (contentProgress) {
+                contentProgress.forEach((cp: any) => {
+                    if (!contentProgressMap[cp.lesson_id]) {
+                        contentProgressMap[cp.lesson_id] = [];
+                    }
+                    contentProgressMap[cp.lesson_id].push({
+                        content_id: cp.content_id,
+                        is_completed: cp.is_completed
+                    });
                 });
             }
 
@@ -91,6 +111,7 @@ export async function GET(
         const lessonsWithProgress = (lessons || []).map((lesson: Lesson) => ({
             ...lesson,
             progress: lessonProgressMap[lesson.id] || undefined,
+            content_progress: contentProgressMap[lesson.id] || [],
         }));
 
         const response: BootcampWithLessons = {

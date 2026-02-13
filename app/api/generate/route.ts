@@ -493,6 +493,7 @@ export async function POST(req: Request) {
             subheadline = body.subheadline ? String(body.subheadline).trim() : null;
             cta = body.cta ? String(body.cta).trim() : null;
             promotion = body.promotion ? String(body.promotion).trim() : null;
+            businessName = body.business_name ? String(body.business_name).trim() : null;
 
             intentQueue = body.intent_queue || [];
             if (Array.isArray(body.imageUrls)) {
@@ -777,74 +778,64 @@ export async function POST(req: Request) {
                 // DETECT REMIX MODE (Template + Subject)
                 if (isNano && template_reference_image && refImageUrl !== template_reference_image) {
 
-                    // 🔍 DIAGNOSTIC LOGGING - REMOVE AFTER DEBUGGING
-                    console.log("=== REMIX DEBUG ===");
-                    console.log("rawPrompt:", rawPrompt);
-                    console.log("keepOutfit:", keepOutfit);
-                    console.log("subjectOutfit:", subjectOutfit);
-                    console.log("refImageUrl:", refImageUrl?.slice(0, 50));
-                    console.log("template_reference_image:", template_reference_image?.slice(0, 50));
-                    console.log("=== END REMIX DEBUG ===");
+                    // 🚨 GLOBAL CHANGE: "PHOTOSHOP CUTOUT" MODE
+                    // We now force the SUBJECT (refImageUrl) to be IMAGE 1 (The Base/Primary)
+                    // and the TEMPLATE (template_reference_image) to be IMAGE 2 (The Style/Composition Ref).
+                    // This tells the model: "Take Image 1 (Subject) and style it like Image 2 (Template)"
+                    // which preserves the subject's identity MUCH better than the reverse.
+                    useSubjectFirst = true;
 
-                    // CHANGED: Re-enabled STRICT IDENTITY LOCK to ensure face swap happens, with explicit background replacement
-                    // CHANGED: Reverted to POSE LOCK (less rigid than STRICT IDENTITY) to fix uncanny/plastic faces
-                    subjectInstruction += " [SUBJECT REPLACEMENT MODE - POSE LOCK] ";
+                    /* 
+                       STRATEGY: 
+                       1. Subject is BASE (Image 1). 
+                       2. Template is REFERENCE (Image 2).
+                       3. We instruct the model to "Keep the subject from Image 1, but replace the background/outfit to match Image 2".
+                    */
 
-                    // INJECT USER SCENE CONTEXT (Secret Sauce) EARLY
-                    if (rawPrompt) {
-                        subjectInstruction += ` SCENE CONTEXT: ${rawPrompt}. `;
-                    }
+                    console.log("=== HIGH-FIDELITY CUTOUT MODE ===");
+                    console.log("Subject (Image 1):", refImageUrl?.slice(0, 50));
+                    console.log("Template (Image 2):", template_reference_image?.slice(0, 50));
 
-                    subjectInstruction += " 1. TASK: Replace the person in the Base Image (Image 1) with the Subject from the Reference Image (Image 2). ";
-                    subjectInstruction += " 2. IDENTITY LOCK: The person in the final image MUST be the person from Image 2. Do not use the person from Image 1. ";
-                    subjectInstruction += " 3. POSE LOCK: Match the pose and framing of Image 1, but REPLACE the background entirely. ";
-                    subjectInstruction += " 4. LIKENESS: The face must match the Reference Image (Image 2) exactly. Maintain the exact eye line, gaze, and facial expression. Preserve natural skin texture, pores, and imperfections — do NOT smooth or airbrush the skin. ";
-                    subjectInstruction += " 5. BODY CONSISTENCY: The skin tone of the NECK, HANDS, and ARMS must MATCH the face of the Subject from Image 2. Do NOT use the skin tone from the Base Image (Image 1). ";
-                    subjectInstruction += " 6. BACKGROUND: The environment must match the SCENE CONTEXT. Discard the original background from Image 1. ";
-                    subjectInstruction += " 6. COMPOSITION: Keep the subject's head below the top margin for text safety. ";
+                    subjectInstruction = " [STRICT IDENTITY LOCK - PHOTOSHOP CUTOUT MODE] ";
+                    subjectInstruction += " 1. CRITICAL TASK: You are a professional retoucher. You must CUT OUT the person from Image 1 (The Subject) and composite them into the scene defined by Image 2 (The Template). ";
+                    subjectInstruction += " 2. FACE LOCK: The face in the final image MUST BE AN EXACT PIXEL-PERFECT MATCH to the person in Image 1. DO NOT GENERATE A NEW FACE. DO NOT MORPH THE FACE. ";
+                    subjectInstruction += " 3. NO BEAUTIFICATION: Do not smooth the skin, change features, or apply 'AI filters'. Keep the original skin texture, moles, and imperfections from Image 1. ";
+                    subjectInstruction += " 4. POSE & PROP MATCH: The subject must mimic the EXACT POSE and ACTION of the reference person in Image 2 (The Template). If Image 2 shows the person holding an object (e.g. phone, cup, tool), the NEW subject MUST hold that same object in the same way. ";
+                    subjectInstruction += " 5. EXPRESSION LOCK: You MUST preserve the EXACT facial expression, mouth shape, and emotion from Image 1. Do NOT force a smile. Do NOT change the mood. ";
+                    subjectInstruction += " 6. COMPOSITION: Use the background, lighting, and composition of Image 2. Discard the background from Image 1 completely. ";
+                    subjectInstruction += " 7. BLENDING: The subject should look like they are standing in the scene of Image 2. Match the lighting direction and color tone of Image 2 on the subject's body, but KEEP THE FACE IDENTICAL to Image 1. ";
 
-                    remixNegativePrompt = "close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint, wax figure, mannequin, uncanny valley, smooth skin, airbrushed, overprocessed, doll-like, synthetic skin, dead eyes, deformed hands, extra fingers, missing fingers, mismatched skin tone, mask effect, head on wrong body, different skin color hands neck";
+                    remixNegativePrompt = "smiling, forced smile, open mouth, happy, changing expression, changing mood, different emotion, bad hands, fused fingers, too many fingers, mutation, mutated hands, claw, malformed hands, missing limb, floating limbs, disconnected limbs, close up, extreme close up, zooming in, face filling screen, covering text, blocking text, text overlay, cartoon, illustration, 3d render, plastic, fake, distorted face, bad anatomy, ghosting, double exposure, blurry, pixelated, low resolution, bad lighting, makeup, face paint, wax figure, mannequin, doll-like, synthetic skin, dead eyes, deformed hands, extra fingers, missing fingers, mismatched skin tone, mask effect, head on wrong body, different skin color hands neck";
 
-                    // REMIX SPECIFIC OUTFIT LOGIC
+                    // Outfit Logic with Subject-First Strategy
                     if (keepOutfit) {
-                        console.log("REMIX BRANCH: keepOutfit=true → Keeping original outfit");
-                        subjectInstruction += " OUTFIT: Keep the Subject's original outfit (from Image 2). ";
+                        // Keep Outfit -> Lower strength allows the original pixels (Image 1) to shine through
+                        console.log("CUTOUT BRANCH: keepOutfit=true → Preserving Image 1 pixels");
+                        subjectInstruction += " 6. OUTFIT: Keep the Subject's EXACT outfit from Image 1. Do not change their clothing. ";
+                        falStrength = 0.85; // Lower strength = More original image
                     } else if (subjectOutfit) {
-                        console.log("REMIX BRANCH: subjectOutfit → Changing outfit to:", subjectOutfit);
-                        // Tell the model to DISCARD Image 2's clothes (without specifying what to wear — that's in finalFalPrompt)
-                        subjectInstruction += " OUTFIT: DO NOT use the clothing from Image 2. The subject's outfit is described in the prompt below. ";
+                        // Change Outfit -> Needs high strength to overwrite Image 1's clothes
+                        console.log("CUTOUT BRANCH: subjectOutfit → Overwriting Image 1 clothes");
+                        subjectInstruction += " 6. OUTFIT: REPLACEMENT REQUIRED. Ignore the clothing in Image 1. Generate the outfit described in the prompt. ";
 
-                        // Inject outfit into the MAIN PROMPT
-                        // Fix grammar: avoid "The person is wearing he is wearing..."
                         const outfitLower = subjectOutfit.toLowerCase().trim();
                         const outfitPrefix = (outfitLower.startsWith("he is") || outfitLower.startsWith("she is") || outfitLower.startsWith("they are") || outfitLower.startsWith("wearing"))
                             ? subjectOutfit
                             : `The person is wearing ${subjectOutfit}`;
                         finalFalPrompt = `${outfitPrefix}. ` + finalFalPrompt;
 
-                        remixNegativePrompt += ", original clothes, wearing previous outfit, mismatched clothing";
-
-                        // FORCE HIGH STRENGTH (but not too high) on outfit changes to regenerate pixels and kill the bleed without being plastic
-                        falStrength = 0.92;
+                        falStrength = 0.95; // High strength to force change
                     } else {
-                        console.log("REMIX BRANCH: else → Matching template outfit");
-                        // Matching template outfit - reinforce face lock
-                        subjectInstruction += " [PHOTOSHOP CUTOUT MODE]: The FACE from Image 2 must be preserved EXACTLY - same eyes, nose, mouth, skin texture, and EXPRESSION. Do not modify the face. The facial expression must remain identical even when the body pose adapts. However, the BODY POSE may adapt to fit the scene naturally. ";
-                        subjectInstruction += " OUTFIT MATCH: The NEW SUBJECT (from Image 2) should be wearing the EXACT outfit shown in the Base Image (Image 1). Match the clothing style/color while keeping the face and expression identical to Image 2. ";
+                        // Match Template -> Needs VERY high strength to overwrite Image 1's clothes with Image 2's style
+                        console.log("CUTOUT BRANCH: Match Template → Overwriting Image 1 clothes");
+                        subjectInstruction += " 6. OUTFIT: REPLACEMENT REQUIRED. The subject must wear the outfit shown in the 'Template Reference' (Image 2). Match the clothing style and color of Image 2. ";
+                        subjectInstruction += " 7. IGNORE TEMPLATE FACE: Do NOT copy the face, expression, or age of the person in Image 2. The face must remain the person from Image 1. ";
 
-                        // Fix Blank Outfit: Explicitly tell the model to wear Image 1's outfit in the main prompt
-                        finalFalPrompt = "The person is wearing the same outfit as the person in Image 1. " + finalFalPrompt;
+                        // Explicitly describe the template outfit in the main prompt to help the model
+                        finalFalPrompt = "The person is wearing the same outfit as the character in the Template Reference (Image 2). " + finalFalPrompt;
 
-                        // FORCE VERY HIGH STRENGTH for template match because we are rewriting the subject's body/clothes entirely
-                        falStrength = 0.95;
+                        falStrength = 0.93; // Reduced from 1.0 to allow some image structure retention and better face lock
                     }
-
-                    console.log("FINAL subjectInstruction:", subjectInstruction.slice(0, 200));
-                    console.log("FINAL falStrength:", falStrength);
-
-
-
-
 
                 } else {
                     // STANDARD / GENERIC LOGIC

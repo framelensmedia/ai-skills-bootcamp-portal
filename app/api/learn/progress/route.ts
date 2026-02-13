@@ -4,9 +4,9 @@ import { cookies } from "next/headers";
 
 export async function POST(request: NextRequest) {
     try {
-        const { lesson_id, video_index, is_completed } = await request.json();
+        const { lesson_id, content_id, is_completed, video_index } = await request.json();
 
-        if (!lesson_id || video_index === undefined) {
+        if (!lesson_id || (!content_id && video_index === undefined)) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
@@ -31,21 +31,40 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // 1. Save video progress
-        const { error: progressError } = await supabase
-            .from("lesson_video_progress")
-            .upsert(
-                {
-                    user_id: user.id,
-                    lesson_id,
-                    video_index,
-                    is_completed: is_completed || true,
-                    updated_at: new Date().toISOString()
-                },
-                { onConflict: 'user_id, lesson_id, video_index' }
-            );
+        // 1. Save progress
+        // Support new content_id based tracking
+        if (content_id) {
+            const { error: progressError } = await supabase
+                .from("lesson_content_progress")
+                .upsert(
+                    {
+                        user_id: user.id,
+                        lesson_id,
+                        content_id,
+                        is_completed: is_completed || true,
+                        updated_at: new Date().toISOString()
+                    },
+                    { onConflict: 'user_id, content_id' }
+                );
 
-        if (progressError) throw progressError;
+            if (progressError) throw progressError;
+        }
+        // Fallback for legacy video_index (if still used)
+        else if (video_index !== undefined) {
+            const { error: progressError } = await supabase
+                .from("lesson_video_progress")
+                .upsert(
+                    {
+                        user_id: user.id,
+                        lesson_id,
+                        video_index,
+                        is_completed: is_completed || true,
+                        updated_at: new Date().toISOString()
+                    },
+                    { onConflict: 'user_id, lesson_id, video_index' }
+                );
+            if (progressError) throw progressError;
+        }
 
         // 2. Award XP/Streak (Gamification logic)
         // Simplistic logic: Award 10 XP per video completed
