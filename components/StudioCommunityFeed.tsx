@@ -15,21 +15,24 @@ export default function StudioCommunityFeed() {
     const [communityPrompts, setCommunityPrompts] = useState<any[]>([]);
     const [communityRemixes, setCommunityRemixes] = useState<any[]>([]);
     const [feedTab, setFeedTab] = useState<"latest" | "trending">("latest");
+    const [timeFilter, setTimeFilter] = useState<"today" | "week" | "all">("all");
     // We reset page/data when tab changes, so keep track of current tab for fetch consistency
     const [fetchingTab, setFetchingTab] = useState<"latest" | "trending">("latest");
+    const [fetchingTimeFilter, setFetchingTimeFilter] = useState<"today" | "week" | "all">("all");
 
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [loadingRemixes, setLoadingRemixes] = useState(false);
     const observer = useRef<IntersectionObserver | null>(null);
 
-    // Reset feed when tab switches
+    // Reset feed when tab or time filter switches
     useEffect(() => {
         setCommunityRemixes([]);
         setPage(0);
         setHasMore(true);
         setFetchingTab(feedTab);
-    }, [feedTab]);
+        setFetchingTimeFilter(timeFilter);
+    }, [feedTab, timeFilter]);
 
     const lastRemixRef = useCallback((node: HTMLDivElement | null) => {
         if (loadingRemixes) return;
@@ -67,9 +70,19 @@ export default function StudioCommunityFeed() {
             const to = from + LIMIT - 1;
 
             try {
-                // For "trending" tab, use the trending_generations view with time-decay algorithm
-                // For "latest" tab, use standard prompt_generations table
-                const tableName = fetchingTab === "trending" ? "trending_generations" : "prompt_generations";
+                // Determine table/view based on tab and time filter
+                let tableName = "prompt_generations";
+
+                if (fetchingTab === "trending") {
+                    // Use time-filtered trending views
+                    if (fetchingTimeFilter === "today") {
+                        tableName = "trending_today";
+                    } else if (fetchingTimeFilter === "week") {
+                        tableName = "trending_week";
+                    } else {
+                        tableName = "trending_generations"; // all time
+                    }
+                }
 
                 let query = supabase
                     .from(tableName)
@@ -80,8 +93,7 @@ export default function StudioCommunityFeed() {
                     .not("image_url", "is", null); // Only show items with images
 
                 if (fetchingTab === "trending") {
-                    // trending_generations view is already filtered by is_public
-                    // and ordered by trending_score DESC
+                    // trending views are already filtered by is_public and ordered by trending_score DESC
                     query = query.order("trending_score", { ascending: false });
                 } else {
                     query = query
@@ -158,7 +170,7 @@ export default function StudioCommunityFeed() {
         };
 
         fetchRemixes();
-    }, [page, fetchingTab, supabase, hasMore]);
+    }, [page, fetchingTab, fetchingTimeFilter, supabase, hasMore]);
 
     return (
         <div className="space-y-8">
@@ -196,23 +208,53 @@ export default function StudioCommunityFeed() {
             {/* Community Remixes */}
             {communityRemixes.length > 0 && (
                 <div className="pt-6 border-t border-white/10">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col gap-3 items-start sm:flex-row sm:items-center sm:justify-between mb-4">
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider opacity-60">Community Remixes</h3>
-                        <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                            <button
-                                onClick={() => setFeedTab("latest")}
-                                className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "latest" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
-                                    }`}
-                            >
-                                Latest
-                            </button>
-                            <button
-                                onClick={() => setFeedTab("trending")}
-                                className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "trending" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
-                                    }`}
-                            >
-                                Trending
-                            </button>
+                        <div className="flex flex-col gap-2 w-full sm:w-auto">
+                            {/* Main Tabs: Latest / Trending */}
+                            <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                                <button
+                                    onClick={() => setFeedTab("latest")}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "latest" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
+                                        }`}
+                                >
+                                    Latest
+                                </button>
+                                <button
+                                    onClick={() => setFeedTab("trending")}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${feedTab === "trending" ? "bg-lime-400 text-black shadow-sm" : "text-white/40 hover:text-white"
+                                        }`}
+                                >
+                                    Trending
+                                </button>
+                            </div>
+
+                            {/* Time Filter Tabs: Only show when Trending is active */}
+                            {feedTab === "trending" && (
+                                <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                                    <button
+                                        onClick={() => setTimeFilter("today")}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${timeFilter === "today" ? "bg-white/20 text-white shadow-sm" : "text-white/40 hover:text-white"
+                                            }`}
+                                    >
+                                        Today
+                                    </button>
+                                    <button
+                                        onClick={() => setTimeFilter("week")}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${timeFilter === "week" ? "bg-white/20 text-white shadow-sm" : "text-white/40 hover:text-white"
+                                            }`}
+                                    >
+                                        This Week
+                                    </button>
+                                    <button
+                                        onClick={() => setTimeFilter("all")}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${timeFilter === "all" ? "bg-white/20 text-white shadow-sm" : "text-white/40 hover:text-white"
+                                            }`}
+                                    >
+                                        All Time
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
