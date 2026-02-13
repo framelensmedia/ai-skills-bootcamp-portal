@@ -17,7 +17,7 @@ export default function GamificationStatus() {
             const { data } = await supabase
                 .from("profiles")
                 .select("xp, streak_days")
-                .eq("id", user.id)
+                .eq("id", user?.id)
                 .single();
 
             if (data) {
