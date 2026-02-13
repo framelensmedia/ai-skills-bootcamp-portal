@@ -10,7 +10,6 @@ import {
     LessonList,
     ProgressBar,
     LessonContent,
-    CreateNowAction,
     LessonSuccessState,
 } from "@/components/learning-flow";
 import { ArrowLeft, ArrowRight, SkipForward, Menu, X, ChevronLeft, ChevronRight } from "lucide-react";
