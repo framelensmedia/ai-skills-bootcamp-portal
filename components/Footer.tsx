@@ -1,18 +1,24 @@
 import Link from "next/link";
 import { Twitter, Instagram, Linkedin, Github } from "lucide-react";
 
+import Image from "next/image";
+
 export default function Footer() {
     const currentYear = new Date().getFullYear();
 
     return (
         <footer className="border-t border-border bg-background py-12 text-sm text-muted-foreground">
-            <div className="mx-auto max-w-6xl px-4 grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+            <div className="mx-auto max-w-6xl px-4 grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
                 {/* Brand */}
-                <div className="col-span-1 md:col-span-1">
+                <div className="col-span-2 md:col-span-1">
                     <Link href="/" className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 rounded-lg bg-[#B7FF00]/10 border border-[#B7FF00]/20 flex items-center justify-center text-[#B7FF00] font-bold">
-                            AI
-                        </div>
+                        <Image
+                            src="/logo-symbol.png"
+                            alt="AI Skills Studio"
+                            width={32}
+                            height={32}
+                            className="h-8 w-8"
+                        />
                         <span className="font-bold text-foreground text-lg">Skills Studio</span>
                     </Link>
                     <p className="mb-6">
