@@ -253,7 +253,7 @@ export default function LessonPage({ params }: Props) {
                                 lesson={lesson}
                                 bootcampSlug={bootcampSlug}
                                 nextLessonSlug={nextLesson?.slug}
-                                onVideoComplete={() => setContentFinished(true)}
+                                onVideoComplete={() => handleComplete(lesson.id)}
                             />
                         </div>
 
