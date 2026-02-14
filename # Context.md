@@ -2534,3 +2534,58 @@ The AI must follow this strict sequence:
 - AI cannot discuss general topics until onboarding is complete.
 - If a user tries to skip required steps (username/display name), the AI must politely redirect them back.
 - AI should acknowledge every successful function call with a witty "office setup" comment (e.g., "Got it! Printing your business cards now...").
+
+
+This document provides the technical requirements for architecting the next phase of the platform. The goal is to move from a collection of isolated tools to a unified "AI Operating System" that supports a professional media production pipeline, personal identity preservation, and investor-grade data tracking.1. Identity & Likeness Architecture (The "Reference" Engine)Instead of resource-heavy LoRA training, the platform will utilize Reference-Based Likeness (e.g., InstantID or Face-Swap).User Identity Vault: Store high-resolution reference images (selfies) as "Identity Anchors."Likeness Injection: The schema must support passing a reference_image_url to the generation APIs to influence facial geometry and skin texture in real-time.Legal/Consent Logging: Every identity record must include a timestamped consent flag to comply with 2026 AI transparency regulations.2. Business Genie (Global Context Provider)The Business Genie acts as the "Strategy Brain." It populates a centralized blueprint that provides context to all other creative tools.The Blueprint Table: Must capture Core Problem, Unique Value Prop (UVP), Target Avatar, and Brand DNA.Context Middleware: Every request to the Video, Image, or Script tools must automatically fetch the user's active business_blueprint and inject it into the hidden system prompt to ensure brand consistency.3. Media Production Pipeline (Stateful Orchestration)The "Studio" workflow requires assets to flow through a multi-stage pipeline (Script $\rightarrow$ Voice $\rightarrow$ Image $\rightarrow$ Video).Asset Lineage: The assets table must track the source_script_id and source_voice_id to maintain the history of how a final video was assembled.Voice Library: Integration with ElevenLabs/Voice Engine using cloned_voice_id stored in the user profile.Asynchronous Jobs: Use a job queue status (e.g., pending, processing, completed) for high-compute tasks like Video Generation (Veo 3.1) so users can continue working while assets render.4. The "Future-Proof" Database Schema (SQL)Instruct the coding agent to execute this migration to establish the foundation for these features.
+
+-- 1. IDENTITY & LIKENESS (InstantID / Reference Mode)
+CREATE TABLE user_identities (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  identity_type TEXT DEFAULT 'human_likeness', -- 'human', 'character', 'product'
+  ref_image_url TEXT NOT NULL,
+  face_vector_id TEXT, -- For matching geometry across gens
+  consent_granted_at TIMESTAMPTZ DEFAULT now(),
+  is_active BOOLEAN DEFAULT true,
+  metadata JSONB -- Stores style preferences (e.g., "always professional attire")
+);
+
+-- 2. BUSINESS GENIE BLUEPRINTS (The Global Context)
+CREATE TABLE business_blueprints (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  business_name TEXT,
+  target_audience TEXT,
+  uvp TEXT, -- Unique Value Proposition
+  brand_tone TEXT,
+  industry_niche TEXT,
+  raw_genie_output JSONB, -- Full record of the Genie's strategy
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. MEDIA PRODUCTION PIPELINE (Stateful Assets)
+ALTER TABLE assets 
+ADD COLUMN asset_type TEXT, -- 'script', 'voiceover', 'image', 'video'
+ADD COLUMN source_script_id UUID REFERENCES assets(id),
+ADD COLUMN source_voice_id UUID REFERENCES assets(id),
+ADD COLUMN generation_params JSONB, -- Stores the exact settings/seed for reproducibility
+ADD COLUMN job_status TEXT DEFAULT 'completed'; -- For tracking long renders
+
+-- 4. INVESTOR-GRADE USAGE TRACKING (COGS & Efficiency)
+CREATE TABLE usage_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  asset_id UUID REFERENCES assets(id),
+  model_name TEXT, -- 'gemini-1.5-flash', 'veo-3.1', 'eleven-labs'
+  provider TEXT,
+  tokens_input INTEGER,
+  tokens_output INTEGER,
+  estimated_cost_usd DECIMAL(12, 6),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. PERFORMANCE INDEXING
+CREATE INDEX idx_identities_user ON user_identities(user_id);
+CREATE INDEX idx_blueprint_user ON business_blueprints(user_id);
+CREATE INDEX idx_usage_cost_analysis ON usage_logs(model_name, estimated_cost_usd);
+
