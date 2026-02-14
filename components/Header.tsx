@@ -81,7 +81,7 @@ export default function Header() {
             <header className="fixed top-0 left-0 right-0 z-50">
                 {/* Full Navbar - visible at top */}
                 <div
-                    className={`bg-background/90 border-b border-border backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
+                    className={`bg-background/90 border-b border-white/10 backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'
                         }`}
                 >
                     <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
@@ -107,7 +107,7 @@ export default function Header() {
 
                 {/* Floating Sign Up Button - visible when scrolled */}
                 <div
-                    className={`absolute top-0 left-0 right-0 bg-background/90 border-b border-border backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-0 -translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'
+                    className={`absolute top-0 left-0 right-0 bg-background/90 border-b border-white/10 backdrop-blur-md transition-all duration-500 ${isTop ? 'opacity-0 -translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'
                         }`}
                 >
                     <div className="flex justify-center py-4">
@@ -125,7 +125,7 @@ export default function Header() {
 
     return (
         <header
-            className={`fixed top-0 left-0 right-0 z-50 bg-background/90 border-b border-border backdrop-blur-md transition-transform duration-300 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
+            className={`fixed top-0 left-0 right-0 z-50 bg-background/90 border-b border-white/10 backdrop-blur-md transition-transform duration-300 ${visible ? 'translate-y-0' : '-translate-y-full'}`}
         >
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
                 {/* Logo / Brand */}

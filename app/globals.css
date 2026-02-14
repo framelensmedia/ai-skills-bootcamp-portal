@@ -50,8 +50,8 @@
   --accent-foreground: #FAFAFA;
   --destructive: #7F1D1D;
   --destructive-foreground: #FEF2F2;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.05);
+  --input: rgba(255, 255, 255, 0.05);
   --ring: #D4D4D8;
 }
 
