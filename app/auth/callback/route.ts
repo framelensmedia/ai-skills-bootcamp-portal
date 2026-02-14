@@ -36,6 +36,14 @@ export async function GET(request: Request) {
                     }
                 }
             }
+            // Check onboarding status
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single();
+                if (profile && !profile.onboarding_completed) {
+                    return NextResponse.redirect(`${origin}/onboarding`);
+                }
+            }
 
             return NextResponse.redirect(`${origin}${next}`);
         }

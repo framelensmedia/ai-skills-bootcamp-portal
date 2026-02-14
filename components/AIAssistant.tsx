@@ -1,14 +1,20 @@
 
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, cloneElement } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Minimize2, Sparkles, Menu, X, ArrowLeft } from "lucide-react";
 import StudioSidebar from "@/components/studio/StudioSidebar";
 import StudioChatInterface from "@/components/studio/StudioChatInterface";
+import OnboardingChat from "@/components/OnboardingChat";
 
-function AIAssistantContent() {
+interface AIAssistantProps {
+    onboardingMode?: boolean;
+    onboardingContent?: React.ReactNode;
+}
+
+function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantProps) {
     const supabase = createSupabaseBrowserClient();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -18,24 +24,30 @@ function AIAssistantContent() {
     const folderId = searchParams.get("folderId");
     const isNotebook = pathname?.includes("/studio/notebook");
     const isStudioChat = pathname?.includes("/studio/chat");
+    const isOnboardingPage = pathname === "/onboarding";
+
+    // Determine mode
+    const isSetupMode = onboardingMode || isOnboardingPage;
+    const activeContent = onboardingContent || (isOnboardingPage ? <OnboardingChat /> : null);
 
     // UI States
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(isSetupMode ? true : false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isIdle, setIsIdle] = useState(false);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false); // Default to false for pop-up feel
 
-    // Don't show on the actual chat page to avoid duplicate UIs
-    if (isStudioChat) return null;
+    // Don't show on the actual chat page to avoid duplicate UIs (unless onboarding)
+    if (isStudioChat && !isSetupMode) return null;
 
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Auto-hide tab logic
+    // Auto-hide tab logic (disabled in onboarding mode)
     useEffect(() => {
+        if (isSetupMode) return;
         const timer = setTimeout(() => setIsIdle(true), 3000);
         return () => clearTimeout(timer);
-    }, []);
+    }, [isSetupMode]);
 
     const handleMouseEnter = () => {
         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -60,6 +72,11 @@ function AIAssistantContent() {
         setActiveChatId(null);
     };
 
+    // Header title
+    const headerTitle = isSetupMode
+        ? "Account Setup"
+        : (folderId && isNotebook ? "AI Strategist" : "Ask AI");
+
     return (
         <>
             {/* --- IMMERSIVE CHAT OVERLAY --- */}
@@ -73,19 +90,21 @@ function AIAssistantContent() {
                 {/* Header / Layout Container */}
                 <div className="flex h-full w-full overflow-hidden relative">
 
-                    {/* SIDEBAR (Overlay on Mobile/Pop-up) */}
-                    <div className={`absolute inset-y-0 left-0 z-20 bg-black/90 backdrop-blur-xl border-r border-white/10 transition-all duration-300 flex flex-col overflow-hidden ${showSidebar ? "w-64 translate-x-0" : "w-64 -translate-x-full"}`}>
-                        <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 font-bold text-sm text-gray-300">
-                            <span>Recent Chats</span>
-                            <button onClick={() => setShowSidebar(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+                    {/* SIDEBAR (Hidden in onboarding mode) */}
+                    {!onboardingMode && (
+                        <div className={`absolute inset-y-0 left-0 z-20 bg-black/90 backdrop-blur-xl border-r border-white/10 transition-all duration-300 flex flex-col overflow-hidden ${showSidebar ? "w-64 translate-x-0" : "w-64 -translate-x-full"}`}>
+                            <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 font-bold text-sm text-gray-300">
+                                <span>Recent Chats</span>
+                                <button onClick={() => setShowSidebar(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+                            </div>
+                            <StudioSidebar
+                                activeChatId={activeChatId}
+                                onChatSelect={(id) => { setActiveChatId(id); setShowSidebar(false); }}
+                                onNewChat={() => { handleNewChat(); setShowSidebar(false); }}
+                                className="flex-1 bg-transparent" // Override background
+                            />
                         </div>
-                        <StudioSidebar
-                            activeChatId={activeChatId}
-                            onChatSelect={(id) => { setActiveChatId(id); setShowSidebar(false); }}
-                            onNewChat={() => { handleNewChat(); setShowSidebar(false); }}
-                            className="flex-1 bg-transparent" // Override background
-                        />
-                    </div>
+                    )}
 
                     {/* MAIN CONTENT */}
                     <div className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10 opacity-100 transition-opacity">
@@ -93,15 +112,17 @@ function AIAssistantContent() {
                         {/* Custom Header for Pop-up */}
                         <div className="h-14 flex items-center justify-between px-4 border-b border-white/10 shrink-0">
                             <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => setShowSidebar(!showSidebar)}
-                                    className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                                >
-                                    <Menu size={20} />
-                                </button>
+                                {!isSetupMode && (
+                                    <button
+                                        onClick={() => setShowSidebar(!showSidebar)}
+                                        className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                    >
+                                        <Menu size={20} />
+                                    </button>
+                                )}
                                 <span className="font-semibold text-gray-200 flex items-center gap-2">
                                     <Sparkles size={16} className="text-[#B7FF00]" />
-                                    {folderId && isNotebook ? "AI Strategist" : "Ask AI"}
+                                    {headerTitle}
                                 </span>
                             </div>
                             <button
@@ -113,15 +134,24 @@ function AIAssistantContent() {
                             </button>
                         </div>
 
-                        {/* Chat Interface */}
+                        {/* Chat Interface — swap content based on mode */}
                         <div className="flex-1 overflow-hidden relative">
-                            <StudioChatInterface
-                                chatId={activeChatId}
-                                onNewChatId={setActiveChatId}
-                                className="h-full"
-                                placeholderText={folderId && isNotebook ? "Ask about your project..." : "What can I create for you today?"}
-                                onInputFocus={() => setIsExpanded(true)}
-                            />
+                            {isSetupMode && activeContent ? (
+                                <div className="h-full">
+                                    {typeof activeContent === 'object' && activeContent !== null
+                                        ? cloneElement(activeContent as React.ReactElement<any>, { onInputFocus: () => setIsExpanded(true) })
+                                        : activeContent
+                                    }
+                                </div>
+                            ) : (
+                                <StudioChatInterface
+                                    chatId={activeChatId}
+                                    onNewChatId={setActiveChatId}
+                                    className="h-full"
+                                    placeholderText={folderId && isNotebook ? "Ask about your project..." : "What can I create for you today?"}
+                                    onInputFocus={() => setIsExpanded(true)}
+                                />
+                            )}
                         </div>
 
                     </div>
@@ -147,7 +177,7 @@ function AIAssistantContent() {
                     <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] whitespace-nowrap ${isIdle ? "w-0 opacity-0" : "w-auto opacity-100 pr-4"
                         }`}>
                         <span className="text-sm font-bold text-black tracking-wide">
-                            {folderId && isNotebook ? "AI Strategist" : "Ask AI"}
+                            {isSetupMode ? "Continue Setup" : (folderId && isNotebook ? "AI Strategist" : "Ask AI")}
                         </span>
                     </div>
                 </button>
@@ -156,10 +186,10 @@ function AIAssistantContent() {
     );
 }
 
-export default function AIAssistant() {
+export default function AIAssistant({ onboardingMode, onboardingContent }: AIAssistantProps = {}) {
     return (
         <Suspense fallback={null}>
-            <AIAssistantContent />
+            <AIAssistantContent onboardingMode={onboardingMode} onboardingContent={onboardingContent} />
         </Suspense>
     );
 }

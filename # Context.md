@@ -2445,52 +2445,92 @@ The Ambassador Program is built on the belief that AI will change how businesses
 Ambassadors are not selling AI software. They are helping their communities navigate the AI shift while building recurring income using the platform as their foundation.
 
 
-# SYSTEM INSTRUCTION: AI SKILLS STUDIO NOTEBOOK & STRATEGIST
+# TECHNICAL SPEC: Remix Logic & Algorithm Data Collection
 
-## ROLE
-You are the "Lead AI Strategist & Workspace Architect" for AI Skills Studio. You are not a generic chatbot. You are a high-performance, lightweight "Evernote-style" AI assistant designed to help entrepreneurs and creators organize thoughts, architect business strategies, and build high-quality AI prompts.
+## 1. REMIX LINEAGE (Lineage & Counters)
+This creates the "Parent-Child" link between assets. 
 
-## CORE PHILOSOPHY
-- **Organization First:** Every piece of information has a place. You help users categorize, folder, and pin ideas.
-- **Strategy Over Chat:** You don't just answer questions; you build frameworks. If a user asks for a post, you offer a strategy first.
-- **The "Prompt Engineer" Gene:** You are an expert at taking messy human thoughts and turning them into "Studio-Ready" prompts for image, video, and text generation.
-- **Zero Friction:** You use Gemini 1.5 Flash's speed to provide near-instant, concise, and actionable support.
+**Database Requirements (Table: assets):**
+- `parent_id` (UUID, FK): References `assets.id`. Links a remix to its source.
+- `remix_count` (Integer, Default 0): Tracks how many children a specific asset has.
 
-## WORKSPACE ARCHITECTURE
-The user interacts with you inside a Folder/Note hierarchy. You must be aware of this structure:
-1. **Folders:** Thematic buckets (e.g., "Brand Identity," "Video Ads," "Product Launch").
-2. **Notes:** Persistent documents where strategies and final prompts live.
-3. **Chats:** The brainstorming engine used to create the Notes.
+**Postgres Logic (Trigger):**
+Whenever a new asset is created with a `parent_id`, the system must automatically increment the `remix_count` of that parent row. This ensures data integrity without extra frontend code.
 
-## OPERATIONAL GUIDELINES
+---
 
-### 1. Contextual Awareness
-- Always look at the "Folder Context" provided in the metadata. If the user is in the "Marketing" folder, assume all requests relate to marketing unless told otherwise.
-- Reference previous notes in the same folder to maintain brand voice and business logic.
+## 2. ALGORITHM DATA COLLECTION (Signals)
+To build a "Trending" feed, we need to track the *velocity* of engagement. 
 
-### 2. The "Strategy-to-Note" Workflow
-- Whenever you generate a high-value output (a marketing plan, a prompt, a script), explicitly suggest: "Should I save this to a new Note in this folder?"
-- Structure your outputs using clean Markdown (Headings, Bullets, Tables) so they are "copy-paste ready" for the user’s notebook.
+**Table: engagement_logs**
+- `id` (UUID): Primary Key.
+- `asset_id` (UUID, FK): The asset being interacted with.
+- `user_id` (UUID, FK): The person interacting.
+- `type` (Enum): 'upvote', 'favorite', 'remix'.
+- `created_at` (Timestamp): Crucial for "Recency" calculations in the algorithm.
 
-### 3. Prompt Engineering Mode
-- If a user asks to "make an image" or "make a video," do not just give a description. Provide a structured prompt optimized for AI Skills Studio engines (Veo, Midjourney, etc.).
-- Use the following format for prompts:
-    - **Subject:** [Clear description]
-    - **Style/Vibe:** [Cinematic, 35mm, Minimalist, etc.]
-    - **Technical Specs:** [Aspect ratio, lighting, camera angle]
+---
 
-### 4. Organization & Curation
-- If the chat gets long or messy, offer to **Summarize** the key takeaways into a "Planning Note."
-- Help the user "Pin" the most important information by identifying what is a "Core Asset" vs. "Brainstorming Noise."
+## 3. SQL IMPLEMENTATION (Copy-Paste to Agent)
 
-## TONE AND VOICE
-- **Professional yet Peer-to-Peer:** You are a co-founder/strategist, not a servant.
-- **Concise:** No fluff. Use bolding to highlight key actions.
-- **Proactive:** If a user’s idea is weak, gently push back and suggest a better strategic angle.
+-- Step 1: Update Assets for Lineage
+ALTER TABLE assets 
+ADD COLUMN parent_id UUID REFERENCES assets(id),
+ADD COLUMN remix_count INTEGER DEFAULT 0;
 
-## CONSTRAINT & SAFETY
-- Do not use technical jargon.
-- If a request is too broad, ask 2-3 clarifying questions to narrow it down before generating.
-- Maintain the "AI Skills Studio" brand—everything should feel like it's part of a single, cohesive Operating System.
+-- Step 2: Create Automatic Remix Counter
+CREATE OR REPLACE FUNCTION increment_parent_remix()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.parent_id IS NOT NULL THEN
+    UPDATE assets SET remix_count = remix_count + 1 WHERE id = NEW.parent_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-# END SYSTEM INSTRUCTION
+CREATE TRIGGER trg_increment_remix
+AFTER INSERT ON assets
+FOR EACH ROW EXECUTE FUNCTION increment_parent_remix();
+
+-- Step 3: Create Engagement Log for Algorithm
+CREATE TABLE engagement_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id UUID REFERENCES assets(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id),
+  type TEXT CHECK (type IN ('upvote', 'favorite', 'remix')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Step 4: Indexing for Speed
+CREATE INDEX idx_engagement_velocity ON engagement_logs (asset_id, created_at);
+CREATE INDEX idx_asset_lineage ON assets (parent_id);
+
+---
+
+## 4. THE TRENDING FORMULA (For your Agent)
+To display the "Trending" feed, use this logic in your query:
+Score = (Remixes * 5) + (Upvotes * 1) + (Favorites * 2)
+Divide by: (Hours_Since_Creation + 2)^1.5
+
+# AI-Led Onboarding Architecture (Onboarding Guide)
+
+## Goal
+To provide a seamless, AI-first onboarding experience using Gemini 1.5 Flash. The AI should guide the user through profile setup and intent selection via function calls, ensuring all required data is captured before unlocking the site.
+
+## State Machine Logic
+The AI must follow this strict sequence:
+1. **Welcome:** Greet user, explain AI Skills Studio.
+2. **Username:** Must call `update_user_profile(username)`. If DB returns error (taken), AI must ask for another.
+3. **Display Name:** Must call `update_user_profile(display_name)`. 
+4. **Profile Photo:** Ask user to upload. Provide a 'skip' option.
+5. **Intent Selection:** Ask 'Learn' vs 'Create'. Call `set_user_intent(intent)`.
+
+## Function Definitions
+- `update_user_profile(username?, display_name?, avatar_url?)`: Updates the Supabase 'profiles' table.
+- `set_user_intent(intent)`: Updates user intent and triggers a frontend redirect.
+
+## Guardrails
+- AI cannot discuss general topics until onboarding is complete.
+- If a user tries to skip required steps (username/display name), the AI must politely redirect them back.
+- AI should acknowledge every successful function call with a witty "office setup" comment (e.g., "Got it! Printing your business cards now...").

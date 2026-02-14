@@ -48,6 +48,28 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
+    // AI Onboarding Check
+    // If user is logged in, check if they have completed onboarding
+    // Protected routes: /dashboard, /studio, /learn, /prompts/create, /remix
+    const protectedPrefixes = ["/dashboard", "/studio", "/learn", "/prompts/create", "/remix"];
+    const isProtectedRoute = protectedPrefixes.some(prefix => request.nextUrl.pathname.startsWith(prefix));
+
+    // Only check if user exists and is on a protected route (or root?)
+    // Actually, let's enforce it on meaningful app usage.
+    if (user && isProtectedRoute && !request.nextUrl.pathname.startsWith("/onboarding")) {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("user_id", user.id)
+            .single();
+
+        if (profile && !profile.onboarding_completed) {
+            const url = request.nextUrl.clone();
+            url.pathname = "/onboarding";
+            return NextResponse.redirect(url);
+        }
+    }
+
     // Add more protected routes here if needed (e.g. /studio requires auth but maybe handled client side? Best to protect server side too)
     // For now, sticking to what was likely intended.
 

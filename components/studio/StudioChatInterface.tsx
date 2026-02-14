@@ -162,7 +162,7 @@ export default function StudioChatInterface({
                             {/* Avatar */}
                             {msg.role === "assistant" ? (
                                 <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0">
-                                    <Bot size={18} />
+                                    <img src="/logo-symbol.png" alt="AI" className="w-5 h-5 object-contain" />
                                 </div>
                             ) : (
                                 <div className="w-8 h-8 rounded-full border border-white/10 bg-white/5 text-white flex items-center justify-center shrink-0">
@@ -197,7 +197,7 @@ export default function StudioChatInterface({
                     {/* Loading Indicator */}
                     {loading && messages[messages.length - 1]?.role === "user" && (
                         <div className="flex gap-4">
-                            <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0"><Bot size={18} /></div>
+                            <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0"><img src="/logo-symbol.png" alt="AI" className="w-5 h-5 object-contain" /></div>
                             <div className="bg-white/10 border border-white/5 rounded-2xl rounded-tl-none p-4 flex items-center gap-2 text-white/50 text-sm">
                                 <Loader2 className="animate-spin" size={16} /> Thinking...
                             </div>
