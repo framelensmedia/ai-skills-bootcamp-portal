@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 export async function DELETE(request: Request) {
     try {
         // 1. Verify Session
-        const supabase = createSupabaseServerClient();
+        const supabase = await createSupabaseServerClient();
         const {
             data: { user },
             error: authError,
