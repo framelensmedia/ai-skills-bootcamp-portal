@@ -294,12 +294,11 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         {/* 3. Audio */}
                         <div className="space-y-3">
                             <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Dialogue</label>
-                            <input
-                                type="text"
+                            <textarea
                                 value={dialogue}
                                 onChange={(e) => setDialogue(e.target.value)}
                                 placeholder="Optional spoken dialogue..."
-                                className="w-full rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20"
+                                className="w-full h-24 rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white placeholder:text-white/20 focus:border-lime-400/50 focus:outline-none focus:ring-1 focus:ring-lime-400/20 resize-none leading-relaxed"
                                 disabled={isGenerating}
                             />
                         </div>
