@@ -353,6 +353,47 @@ export default function SettingsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Danger Zone */}
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6">
+                <div className="flex items-start gap-4">
+                    <div className="rounded-lg bg-red-500/10 p-3">
+                        <Shield size={20} className="text-red-500" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-red-500">Danger Zone</h3>
+                        <p className="text-sm text-red-200/60 mt-1">
+                            Irrecoverable actions. Proceed with caution.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                if (confirm("Are you ABSOLUTELY sure? This will permanently delete your account, all created assets, and active subscriptions. This action cannot be undone.")) {
+                                    if (confirm("Last chance: Delete your account forever?")) {
+                                        try {
+                                            setLoading(true);
+                                            const res = await fetch("/api/user/delete-account", { method: "DELETE" });
+                                            if (res.ok) {
+                                                alert("Account deleted. Goodbye!");
+                                                window.location.href = "/";
+                                            } else {
+                                                const data = await res.json();
+                                                alert("Error: " + (data.error || "Failed to delete"));
+                                                setLoading(false);
+                                            }
+                                        } catch (e) {
+                                            alert("An unexpected error occurred.");
+                                            setLoading(false);
+                                        }
+                                    }
+                                }
+                            }}
+                            className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/20 transition"
+                        >
+                            Delete My Data & Account
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
