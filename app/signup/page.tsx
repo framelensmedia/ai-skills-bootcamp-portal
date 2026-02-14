@@ -46,6 +46,17 @@ export default function SignupPage() {
     // Attempt tracking referral
     await fetch("/api/ambassador/track-referral", { method: "POST" });
 
+    // Send to GHL
+    try {
+      await fetch("/api/integrations/ghl/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source: "Email Signup" }),
+      });
+    } catch (err) {
+      console.error("GHL Hook failed", err);
+    }
+
     router.push("/welcome");
   };
 

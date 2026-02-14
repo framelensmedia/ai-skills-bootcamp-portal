@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { sendGHLWebhook } from "@/lib/ghl";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -41,6 +42,17 @@ export async function GET(request: Request) {
             if (user) {
                 const { data: profile } = await supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single();
                 if (profile && !profile.onboarding_completed) {
+                    // New user from Google (or returning incomplete). Send to GHL.
+                    // We only want to send this ONCE ideally, but GHL handles dedupe.
+                    // Sending on every login until onboarding complete is safe enough.
+                    await sendGHLWebhook({
+                        email: user.email || "",
+                        firstName: user.user_metadata?.full_name?.split(" ")[0] || "",
+                        lastName: user.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
+                        source: "Google OAuth",
+                        tags: ["ai-skills-new-user"]
+                    });
+
                     return NextResponse.redirect(`${origin}/onboarding`);
                 }
             }

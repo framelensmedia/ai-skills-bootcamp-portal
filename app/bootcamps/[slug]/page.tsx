@@ -87,7 +87,7 @@ export default async function InstructorBootcampPage({ params }: { params: Promi
                             </p>
 
                             {/* Client Component for interactivity */}
-                            <BootcampInterestForm bootcampId={bootcamp.id} slug={bootcamp.slug} />
+                            <BootcampInterestForm bootcampId={bootcamp.id} slug={bootcamp.slug} bootcampTitle={bootcamp.title} />
                         </div>
                     </div>
                 </div>

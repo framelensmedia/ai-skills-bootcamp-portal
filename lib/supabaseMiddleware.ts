@@ -50,8 +50,8 @@ export async function updateSession(request: NextRequest) {
 
     // AI Onboarding Check
     // If user is logged in, check if they have completed onboarding
-    // Protected routes: /dashboard, /studio, /learn, /prompts/create, /remix
-    const protectedPrefixes = ["/dashboard", "/studio", "/learn", "/prompts/create", "/remix"];
+    // Protected routes: /dashboard, /studio, /learn, /prompts/create, /remix, /feed
+    const protectedPrefixes = ["/dashboard", "/studio", "/learn", "/prompts/create", "/remix", "/feed"];
     const isProtectedRoute = protectedPrefixes.some(prefix => request.nextUrl.pathname.startsWith(prefix));
 
     // Only check if user exists and is on a protected route (or root?)

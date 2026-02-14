@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { Loader2, Check } from "lucide-react";
 
-export default function BootcampInterestForm({ bootcampId, slug }: { bootcampId: string; slug: string }) {
+export default function BootcampInterestForm({ bootcampId, slug, bootcampTitle }: { bootcampId: string; slug: string; bootcampTitle: string }) {
     const { user } = useAuth();
     const [email, setEmail] = useState("");
+    const [firstName, setFirstName] = useState("");
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -17,18 +18,26 @@ export default function BootcampInterestForm({ bootcampId, slug }: { bootcampId:
         setError(null);
 
         try {
+            // Use user metadata for name if logged in, otherwise form input
+            const userFirstName = user ? (user.user_metadata?.full_name?.split(" ")[0] || "") : firstName;
+
             const payload = {
                 slug,
                 bootcampId,
+                bootcampName: bootcampTitle,
                 email: user ? user.email : email,
+                firstName: userFirstName,
                 userId: user?.id
             };
 
-            // TODO: Replace with actual Server Action or API call
-            // For MVP, we simulate a successful webhook trigger
-            console.log("Triggering interest webhook:", payload);
+            // Call our new API route
+            const res = await fetch("/api/bootcamps/notify-interest", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
 
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate net delay
+            if (!res.ok) throw new Error("Failed");
 
             setSuccess(true);
         } catch (err) {
@@ -53,18 +62,32 @@ export default function BootcampInterestForm({ bootcampId, slug }: { bootcampId:
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {!user && (
-                <div>
-                    <label htmlFor="email" className="sr-only">Email address</label>
-                    <input
-                        type="email"
-                        id="email"
-                        required
-                        placeholder="Enter your email address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none focus:ring-1 focus:ring-[#B7FF00] transition"
-                    />
-                </div>
+                <>
+                    <div>
+                        <label htmlFor="firstName" className="sr-only">First Name</label>
+                        <input
+                            type="text"
+                            id="firstName"
+                            required
+                            placeholder="First Name"
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none focus:ring-1 focus:ring-[#B7FF00] transition mb-4"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="email" className="sr-only">Email address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            required
+                            placeholder="Email address"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/30 focus:border-[#B7FF00] focus:outline-none focus:ring-1 focus:ring-[#B7FF00] transition"
+                        />
+                    </div>
+                </>
             )}
 
             <button
