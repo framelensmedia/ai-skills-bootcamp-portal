@@ -33,7 +33,7 @@ const SCRIPTS = {
         "What would you like to do next?"
     ],
     complete: (intent: string) => {
-        const label = intent === "learn" ? "Learn" : intent === "create" ? "Create" : "Learn & Create";
+        const label = intent === "learn" ? "Learn" : "Create";
         return [
             `**${label}** it is! You're all set. 🎫`,
             "Redirecting you now..."
@@ -168,10 +168,10 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
         await addBotMessages(SCRIPTS.photo_skip, () => setStep("intent"));
     };
 
-    const handleIntent = async (intent: "learn" | "create" | "both") => {
+    const handleIntent = async (intent: "learn" | "create") => {
         setMessages(prev => [...prev, {
             role: "user",
-            text: intent === "learn" ? "Learn" : intent === "create" ? "Create" : "Both!"
+            text: intent === "learn" ? "Learn" : "Create"
         }]);
         setLoading(true);
         try {
@@ -184,7 +184,11 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
             else {
                 setStep("complete");
                 await addBotMessages(SCRIPTS.complete(intent));
-                setTimeout(() => router.push("/dashboard"), 2000);
+                setTimeout(() => {
+                    if (intent === "learn") router.push("/learn");
+                    else if (intent === "create") router.push("/community");
+                    else router.push("/dashboard");
+                }, 2000);
             }
         } catch { await addBotMessages(SCRIPTS.error); }
         finally { setLoading(false); }
@@ -288,10 +292,6 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
                                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-white/10 hover:border-[#B7FF00]/30 hover:bg-white/5 transition-all text-white text-sm font-medium group">
                                 <Palette size={16} className="text-purple-400" /> Create
                             </button>
-                            <button onClick={() => handleIntent("both")}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-[#B7FF00]/20 bg-[#B7FF00]/5 hover:bg-[#B7FF00]/10 transition-all text-[#B7FF00] text-sm font-medium group">
-                                <Zap size={16} /> Both!
-                            </button>
                         </div>
                     )}
 
@@ -317,7 +317,7 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
                     {step === "complete" && (
                         <div className="text-center py-2">
                             <div className="flex items-center justify-center gap-2 text-[#B7FF00] text-xs font-mono">
-                                <Loader2 size={12} className="animate-spin" /> Redirecting to dashboard...
+                                <Loader2 size={12} className="animate-spin" /> Redirecting...
                             </div>
                         </div>
                     )}
