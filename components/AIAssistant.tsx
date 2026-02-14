@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, Suspense, cloneElement } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import { Minimize2, Sparkles, Menu, X, ArrowLeft } from "lucide-react";
+import { Minimize2, Sparkles, Menu, X } from "lucide-react";
 import StudioSidebar from "@/components/studio/StudioSidebar";
 import StudioChatInterface from "@/components/studio/StudioChatInterface";
 import OnboardingChat from "@/components/OnboardingChat";
@@ -26,16 +26,56 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
     const isStudioChat = pathname?.includes("/studio/chat");
     const isOnboardingPage = pathname === "/onboarding";
 
-    // Determine mode
-    const isSetupMode = onboardingMode || isOnboardingPage;
-    const activeContent = onboardingContent || (isOnboardingPage ? <OnboardingChat /> : null);
+    // Mode State
+    const [onboardingIncomplete, setOnboardingIncomplete] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(false); // Default to false for pop-up feel
+
+    // Determine Setup Mode
+    // We treat it as setup mode if:
+    // 1. Explicit prop
+    // 2. Onboarding Page
+    // 3. User's profile says incomplete (and we are not on the dashboard/community, or acceptable pages)
+    // Actually, user wants it EVERYWHERE if incomplete.
+    const isSetupMode = onboardingMode || isOnboardingPage || onboardingIncomplete;
 
     // UI States
+    // Initialize open state based on setup mode
     const [isOpen, setIsOpen] = useState(isSetupMode ? true : false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isIdle, setIsIdle] = useState(false);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const [showSidebar, setShowSidebar] = useState(false); // Default to false for pop-up feel
+
+    // Check Onboarding Status (for new flow where we land on /community)
+    useEffect(() => {
+        const checkOnboarding = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single();
+                if (profile && !profile.onboarding_completed) {
+                    setOnboardingIncomplete(true);
+                    // Force open if not already open (and presumably not manually closed in this session, though we don't track that yet)
+                    // Since isOpen is initialized once, we need to update it here.
+                    setIsOpen(true);
+                }
+            }
+        };
+        // Only run check if not already explicitly in setup mode via props/url
+        if (!onboardingMode && !isOnboardingPage) {
+            checkOnboarding();
+        }
+    }, [onboardingMode, isOnboardingPage, supabase]);
+
+
+    const activeContent = onboardingContent || (isSetupMode ? <OnboardingChat /> : null);
+
+    // Start Expanded/Open if Setup Mode detected after mount
+    useEffect(() => {
+        if (isSetupMode && !isOpen) {
+            // Optional: Force open?
+            // If user minimizes, we don't want to pop open again instantly on re-render.
+            // But valid initial state transition (false -> true) is handled in the checkOnboarding effect for the "discovery" moment.
+        }
+    }, [isSetupMode]);
 
     // Don't show on the actual chat page to avoid duplicate UIs (unless onboarding)
     if (isStudioChat && !isSetupMode) return null;
@@ -91,7 +131,7 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
                 <div className="flex h-full w-full overflow-hidden relative">
 
                     {/* SIDEBAR (Hidden in onboarding mode) */}
-                    {!onboardingMode && (
+                    {!onboardingMode && !isSetupMode && (
                         <div className={`absolute inset-y-0 left-0 z-20 bg-black/90 backdrop-blur-xl border-r border-white/10 transition-all duration-300 flex flex-col overflow-hidden ${showSidebar ? "w-64 translate-x-0" : "w-64 -translate-x-full"}`}>
                             <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 font-bold text-sm text-gray-300">
                                 <span>Recent Chats</span>

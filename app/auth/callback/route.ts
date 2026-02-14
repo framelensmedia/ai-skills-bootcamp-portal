@@ -53,7 +53,7 @@ export async function GET(request: Request) {
                         tags: ["ai-skills-new-user"]
                     });
 
-                    return NextResponse.redirect(`${origin}/onboarding`);
+                    return NextResponse.redirect(`${origin}/community`);
                 }
             }
 
