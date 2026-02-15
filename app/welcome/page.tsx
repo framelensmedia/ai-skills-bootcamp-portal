@@ -43,7 +43,7 @@ export default function WelcomePage() {
     };
 
     const continueWithFree = () => {
-        router.push("/onboarding");
+        router.push("/feed");
     };
 
     return (

@@ -53,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="dark">
       <head>
         {/* Google Tag Manager */}
         <Script id="gtm-script" strategy="afterInteractive">
