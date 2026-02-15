@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
+import { getBusinessContext } from "@/lib/businessContext"; // Agentic
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Long-running operation may take time
@@ -436,6 +437,14 @@ export async function POST(req: Request) {
         const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelId}:predictLongRunning`;
 
         let finalPrompt = prompt + (dialogue ? ` Audio: "${dialogue}"` : "");
+
+        // Agentic Memory Injection
+        const businessContext = await getBusinessContext(userId, adminAuth);
+        if (businessContext) {
+            console.log("Injecting Business Context for Video (User " + userId + ")");
+            finalPrompt += `\n\n[BUSINESS BLUEPRINT CONTEXT]\n(Apply these brand guidelines to the visual style):\n${businessContext}\n`;
+        }
+
         let instancePayload: any = {};
 
         // SEMANTIC REMIX LOGIC:

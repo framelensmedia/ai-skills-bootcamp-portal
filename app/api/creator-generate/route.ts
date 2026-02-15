@@ -1,6 +1,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getBusinessContext } from "@/lib/businessContext"; // Agentic
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -372,6 +373,13 @@ export async function POST(req: Request) {
         if (instructions) {
             finalPrompt += ` [USER INSTRUCTIONS]: ${instructions} `;
         }
+
+        // Agentic Memory: Business Context
+        const businessContext = await getBusinessContext(userId, admin);
+        if (businessContext) {
+            finalPrompt += `\n\n[BUSINESS BLUEPRINT CONTEXT - AGENTIC MEMORY]\n(Strictly adhere to these brand guidelines):\n${businessContext}\n`;
+        }
+
         if (industry_intent) {
             finalPrompt += ` [INDUSTRY CONTEXT]: The image must match the '${industry_intent}' industry. `;
         }

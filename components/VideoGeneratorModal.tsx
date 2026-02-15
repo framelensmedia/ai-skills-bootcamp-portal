@@ -7,6 +7,8 @@ import GenerationOverlay from "./GenerationOverlay";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 import SelectPill from "@/components/SelectPill";
+import RechargeModal from "./RechargeModal";
+import { useRouter } from "next/navigation";
 
 
 
@@ -22,6 +24,7 @@ type Props = {
 };
 
 export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt, initialModelId }: Props) {
+    const router = useRouter();
     const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
     const [selectedModel, setSelectedModel] = useState(initialModelId || DEFAULT_VIDEO_MODEL_ID);
@@ -42,6 +45,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     // Global Pause State
     const [generationsPaused, setGenerationsPaused] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isPro, setIsPro] = useState(false);
+    const [showRecharge, setShowRecharge] = useState(false);
 
     const [userCredits, setUserCredits] = useState<number | null>(null);
 
@@ -59,12 +64,14 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
             // 2. Fetch User Profile
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("role, credits").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("role, credits, plan").eq("user_id", user.id).maybeSingle();
                 if (profile) {
                     const role = String(profile.role || "").toLowerCase();
+                    const p = String(profile.plan || "free").toLowerCase();
                     if (role === "admin" || role === "super_admin") {
                         setIsAdmin(true);
                     }
+                    setIsPro(p === "premium");
                     setUserCredits(profile.credits ?? 0);
                 }
             }
@@ -311,23 +318,44 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 {error || creditError}
                             </div>
                         )}
-                        <button
-                            onClick={handleGenerate}
-                            disabled={!canGenerate}
-                            className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!canGenerate
-                                ? "bg-white/10 text-white/20 cursor-not-allowed"
-                                : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
-                                }`}
-                        >
-                            {isGenerating ? (
-                                "Generating Video..."
-                            ) : (
-                                <>
-                                    <Wand2 size={18} />
-                                    {sourceVideo ? "Generate Edit" : "Generate Remix"} ({isAdmin ? "∞" : VIDEO_COST} Cr)
-                                </>
-                            )}
-                        </button>
+
+                        {!hasCredits ? (
+                            <div className="flex flex-col gap-2">
+                                {isPro ? (
+                                    <button
+                                        onClick={() => setShowRecharge(true)}
+                                        className="w-full py-4 rounded-xl font-bold text-black bg-lime-400 hover:bg-lime-300 transition-all shadow-lg shadow-lime-400/20"
+                                    >
+                                        ⚡ Recharge Credits
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => router.push("/pricing")}
+                                        className="w-full py-4 rounded-xl font-bold text-black bg-[#B7FF00] hover:bg-[#a8e600] transition-all shadow-lg"
+                                    >
+                                        🚀 Upgrade for More Credits
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleGenerate}
+                                disabled={!canGenerate}
+                                className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!canGenerate
+                                    ? "bg-white/10 text-white/20 cursor-not-allowed"
+                                    : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
+                                    }`}
+                            >
+                                {isGenerating ? (
+                                    "Generating Video..."
+                                ) : (
+                                    <>
+                                        <Wand2 size={18} />
+                                        {sourceVideo ? "Generate Edit" : "Generate Remix"} ({isAdmin ? "∞" : VIDEO_COST} Cr)
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -354,6 +382,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         ) : (
                             <div className="relative w-full h-full p-4 md:p-8 flex items-center justify-center">
                                 <div className="relative w-full h-full max-h-[600px] aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-900/50 flex items-center justify-center">
+                                    {/* ... preview logic ... */}
                                     {sourceVideo ? (
                                         <video
                                             src={sourceVideo}
@@ -386,6 +415,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                 </div>
 
             </div>
+            <RechargeModal isOpen={showRecharge} onClose={() => setShowRecharge(false)} />
         </div >
     );
 }

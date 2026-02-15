@@ -3,6 +3,7 @@ import { GoogleAuth } from "google-auth-library"; // Restored
 import { createAspectGuide } from "./ar_guide"; // Import Helper
 import { NextRequest, NextResponse } from "next/server";
 import { triggerAutoRechargeIfNeeded } from "@/lib/autoRecharge";
+import { getBusinessContext } from "@/lib/businessContext"; // Agentic
 // sharp import removed (dynamic import used instead)
 
 export const runtime = "nodejs";
@@ -601,7 +602,7 @@ export async function POST(req: Request) {
         // Check Credits and Auto-Recharge settings
         const { data: userProfile, error: profileErr } = await admin
             .from("profiles")
-            .select("credits, role, auto_recharge_enabled, auto_recharge_pack_id, auto_recharge_threshold")
+            .select("credits, role, plan, auto_recharge_enabled, auto_recharge_pack_id, auto_recharge_threshold")
             .eq("user_id", userId)
             .single();
 
@@ -618,7 +619,8 @@ export async function POST(req: Request) {
             return NextResponse.json({
                 error: "Insufficient credits. Please upgrade or top up.",
                 required: IMAGE_COST,
-                available: userCredits
+                available: userCredits,
+                plan: userProfile.plan || "free"
             }, { status: 402 });
         }
 
@@ -757,6 +759,13 @@ export async function POST(req: Request) {
                 if (!subjectOutfit) {
                     finalFalPrompt += ` [AUTO-OUTFIT]: The subject's outfit is unspecified. You MUST generate professional attire appropriate for a '${industryIntent}'. Do NOT default to casual clothes.`;
                 }
+            }
+
+            // 1.8 Business Genie Context Injection (Agentic Memory)
+            const businessContext = await getBusinessContext(userId, admin);
+            if (businessContext) {
+                console.log("Injecting Business Context for User:", userId);
+                finalFalPrompt += `\n\n[BUSINESS BLUEPRINT CONTEXT - AGENTIC MEMORY]\n(Strictly adhere to the following brand guidelines):\n${businessContext}\n`;
             }
 
             let falStrength: number | undefined;

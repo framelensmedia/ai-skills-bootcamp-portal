@@ -41,6 +41,7 @@ export default function Nav() {
         .maybeSingle();
 
       if (mounted && profile) {
+        console.log("Nav Profile:", profile); // Debugging
         setAvatarUrl(profile.profile_image);
         setCredits(profile.credits ?? 0);
         setIsAdmin(profile.role === "admin" || profile.role === "super_admin");
@@ -49,8 +50,39 @@ export default function Nav() {
 
     fetchProfile();
 
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    if (user) {
+      channel = supabase
+        .channel(`credits-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            // payload.new contains the updated record
+            const newRecord = payload.new as { credits?: number; role?: string };
+            if (newRecord) {
+              if (typeof newRecord.credits === "number") {
+                setCredits(newRecord.credits);
+              }
+              if (newRecord.role) {
+                const r = newRecord.role.toLowerCase();
+                setIsAdmin(r === "admin" || r === "super_admin");
+              }
+            }
+          }
+        )
+        .subscribe();
+    }
+
     return () => {
       mounted = false;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [user, supabase, pathname]); // Refresh on navigation
 

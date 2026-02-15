@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { getBusinessContext } from "@/lib/businessContext"; // Agentic
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,12 @@ You are the "Lead AI Strategist & Workspace Architect" for AI Skills Studio.
 (System prompt truncated for brevity - keeping original logic)
 ${folderContext}
        `;
+        }
+
+        // Agentic Memory Injection
+        const businessContext = await getBusinessContext(user.id, supabase);
+        if (businessContext) {
+            systemInstructionText += `\n\n[BUSINESS BLUEPRINT CONTEXT - AGENTIC MEMORY]\n(Use this user's specific business context for all strategic advice):\n${businessContext}\n`;
         }
 
         // 2. Initialize Google AI (API Key)

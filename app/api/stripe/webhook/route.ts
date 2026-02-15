@@ -73,9 +73,33 @@ export async function POST(req: Request) {
       const { data: referral } = await supabaseAdmin.from("referrals").select("id, ambassador_id").eq("referred_user_id", profile.user_id).single();
       if (!referral) return;
 
-      // 3. Find Ambassador to get Stripe Account
-      const { data: ambassador } = await supabaseAdmin.from("ambassadors").select("stripe_account_id").eq("id", referral.ambassador_id).single();
+      // 3. Find Ambassador to get Stripe Account AND Valid Plan
+      const { data: ambassador } = await supabaseAdmin.from("ambassadors").select("stripe_account_id, user_id").eq("id", referral.ambassador_id).single();
       if (!ambassador || !ambassador.stripe_account_id) return;
+
+      // 3b. Verify Ambassador is PRO (Premium)
+      // "you have to be pro account to get revenue share"
+      const { data: ambassadorProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("plan")
+        .eq("user_id", ambassador.user_id)
+        .single();
+
+      const isEligible = ambassadorProfile && (ambassadorProfile.plan === 'premium' || ambassadorProfile.plan === 'staff_pro' || ambassadorProfile.plan === 'admin'); // Safe to assume staff/admin also get it? Usually yes, or strict 'premium'
+      // Strict check as per user request: "pro account"
+      if (ambassadorProfile?.plan !== 'premium' && ambassadorProfile?.plan !== 'staff_pro') {
+        console.log(`Commission Skipped for Ambassador ${referral.ambassador_id}: Plan is ${ambassadorProfile?.plan}`);
+
+        await supabaseAdmin.from("commissions").insert({
+          ambassador_id: referral.ambassador_id,
+          referral_id: referral.id,
+          amount: 0,
+          type: type,
+          status: "ineligible", // Track that they missed it
+          metadata: { reason: "Ambassador not on Pro plan" }
+        });
+        return;
+      }
 
       // 4. Calculate Commission Amount (Active Pro = $10 (1000 cents), Trial = $0.50 (50 cents))
       // Logic: passed in via arguments to keep this generic
@@ -113,7 +137,8 @@ export async function POST(req: Request) {
           referral_id: referral.id,
           amount: commissionAmount,
           type: type,
-          status: "failed" // Needs manual retry
+          status: "failed", // Needs manual retry
+          metadata: { error: err.message }
         });
       }
     };
@@ -264,9 +289,15 @@ export async function POST(req: Request) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        await updateByCustomerId(customerId, {
-          updated_at: new Date().toISOString(),
-        });
+        // "if payment fales after 2 attempts they go back down to free account"
+        if (invoice.attempt_count >= 2) {
+          console.log(`Payment failed 2+ times for ${customerId}. Downgrading to Free.`);
+          await updateByCustomerId(customerId, {
+            plan: "free",
+            updated_at: new Date().toISOString(),
+            credits: 40, // Reset to Free default
+          });
+        }
 
         break;
       }

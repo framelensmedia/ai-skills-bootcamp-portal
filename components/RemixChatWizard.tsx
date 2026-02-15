@@ -7,6 +7,8 @@ import SelectPill from "@/components/SelectPill";
 import SubjectControls from "@/app/studio/components/SubjectControls";
 import { GENERATION_MODELS, DEFAULT_MODEL_ID } from "@/lib/model-config";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import RechargeModal from "./RechargeModal";
+import { useRouter } from "next/navigation";
 
 export type RemixAnswers = Record<string, string>;
 
@@ -97,6 +99,7 @@ export default function RemixChatWizard({
     onGuestInteraction,
     flowMode = "full"
 }: Props) {
+    const router = useRouter();
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -209,6 +212,8 @@ export default function RemixChatWizard({
     // Fetch Credits & Role
     const [userCredits, setUserCredits] = useState<number | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isPro, setIsPro] = useState(false);
+    const [showRecharge, setShowRecharge] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -216,10 +221,12 @@ export default function RemixChatWizard({
             const supabase = createSupabaseBrowserClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase.from("profiles").select("credits, role").eq("user_id", user.id).maybeSingle();
+                const { data: profile } = await supabase.from("profiles").select("credits, role, plan").eq("user_id", user.id).maybeSingle();
                 setUserCredits(profile?.credits ?? 0);
                 const r = String(profile?.role || "").toLowerCase();
+                const p = String(profile?.plan || "free").toLowerCase();
                 setIsAdmin(r === "admin" || r === "super_admin");
+                setIsPro(p === "premium");
             }
         };
         fetchCredits();
@@ -554,13 +561,39 @@ export default function RemixChatWizard({
                                 {creditError && (
                                     <div className="text-xs text-red-400 text-center">{creditError}</div>
                                 )}
-                                <button
-                                    onClick={() => completeWorkflow(messages, answers, true)}
-                                    disabled={!hasCredits}
-                                    className={`w-full rounded-xl py-4 text-base font-bold text-black md:py-4 shadow-lg transition-all ${!hasCredits ? "bg-white/10 text-white/20 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300 shadow-lime-400/20 transform hover:scale-[1.02]"}`}
-                                >
-                                    ✨ Generate Artwork ({isAdmin ? "∞" : IMAGE_COST} Cr)
-                                </button>
+
+                                {!hasCredits ? (
+                                    <div className="flex flex-col gap-3">
+                                        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                                            <p className="text-sm font-semibold text-red-200 mb-3">
+                                                Ran out of credits!
+                                            </p>
+                                            {isPro ? (
+                                                <button
+                                                    onClick={() => setShowRecharge(true)}
+                                                    className="w-full rounded-lg bg-lime-400 py-3 text-sm font-bold text-black hover:bg-lime-300"
+                                                >
+                                                    ⚡ Recharge Credits
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => router.push("/pricing")}
+                                                    className="w-full rounded-lg bg-[#B7FF00] py-3 text-sm font-bold text-black hover:bg-[#a8e600]"
+                                                >
+                                                    🚀 Upgrade to Pro (Get More Credits)
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => completeWorkflow(messages, answers, true)}
+                                        disabled={!hasCredits}
+                                        className={`w-full rounded-xl py-4 text-base font-bold text-black md:py-4 shadow-lg transition-all ${!hasCredits ? "bg-white/10 text-white/20 cursor-not-allowed hidden" : "bg-lime-400 hover:bg-lime-300 shadow-lime-400/20 transform hover:scale-[1.02]"}`}
+                                    >
+                                        ✨ Generate Artwork ({isAdmin ? "∞" : IMAGE_COST} Cr)
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="flex flex-col gap-2">
@@ -684,6 +717,7 @@ export default function RemixChatWizard({
                     )}
                 </div>
             </div>
+            <RechargeModal isOpen={showRecharge} onClose={() => setShowRecharge(false)} />
         </div>
     );
 }
