@@ -334,7 +334,7 @@ function CreatorContent() {
             const uploadRes = await fetch(signedUrl, {
                 method: "PUT",
                 body: compressed,
-                headers: { "Content-Type": compressed.type }
+                // headers: { "Content-Type": compressed.type } // Let browser set based on File/Blob
             });
 
             if (!uploadRes.ok) {
