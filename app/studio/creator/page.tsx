@@ -331,15 +331,18 @@ function CreatorContent() {
             const { signedUrl, publicUrl } = await signRes.json();
 
             // 3. Upload to Storage
+            console.log("Uploading file:", compressed.name, "Type:", compressed.type, "Size:", compressed.size);
+
             const uploadRes = await fetch(signedUrl, {
                 method: "PUT",
                 body: compressed,
-                // headers: { "Content-Type": compressed.type } // Let browser set based on File/Blob
+                headers: { "Content-Type": compressed.type || 'application/octet-stream' }
             });
 
             if (!uploadRes.ok) {
                 const errText = await uploadRes.text();
                 console.error("Upload PUT Failed:", uploadRes.status, errText);
+                console.error("Signed URL used:", signedUrl);
                 alert(`Upload Failed (${uploadRes.status}): ${errText}`);
                 throw new Error(`Upload Failed: ${uploadRes.status} ${errText}`);
             }

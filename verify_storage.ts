@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
+import fetch from 'node-fetch'; // Ensure fetch is available in node env if not global
 
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -37,21 +38,50 @@ async function checkStorage() {
         // Test Signed URL Generation
         console.log('\nTesting Signed Upload URL generation...');
         const now = Date.now();
-        const testPath = `scratch/TEST_USER/${now}_test.txt`;
+        const testPath = `scratch/TEST_USER/${now}_verify_script.txt`;
+
+        // mimic the API: use upsert: true
         const { data: signData, error: signError } = await supabase
             .storage
             .from('generations')
-            .createSignedUploadUrl(testPath);
+            .createSignedUploadUrl(testPath, { upsert: true });
 
         if (signError) {
             console.error('Error creating signed upload URL:', signError);
-        } else {
-            console.log('Signed URL Data:', signData);
-            if (signData && signData.signedUrl.startsWith('http')) {
-                console.log('✅ Signed URL is absolute.');
-            } else {
-                console.log('⚠️ Signed URL is RELATIVE explicitly. This confirms the issue.');
+            return;
+        }
+
+        console.log('Signed URL Data:', signData);
+
+        if (signData && signData.signedUrl.startsWith('http')) {
+            console.log('✅ Signed URL is absolute.');
+
+            // 3. Try to actually UPLOAD using this URL
+            console.log('Attempting PUT upload to signed URL...');
+            try {
+                const uploadRes = await fetch(signData.signedUrl, {
+                    method: 'PUT',
+                    body: 'Hello World from Verify Script',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    }
+                });
+
+                if (uploadRes.ok) {
+                    console.log('✅ Upload SUCCESS! Status:', uploadRes.status);
+                    const text = await uploadRes.text();
+                    console.log('Upload Response:', text);
+                } else {
+                    console.error('❌ Upload FAILED. Status:', uploadRes.status);
+                    const errText = await uploadRes.text();
+                    console.error('Error Text:', errText);
+                }
+            } catch (err) {
+                console.error('❌ Fetch Error during upload:', err);
             }
+
+        } else {
+            console.log('⚠️ Signed URL is RELATIVE explicitly. This confirms the issue.');
         }
 
     } else {
