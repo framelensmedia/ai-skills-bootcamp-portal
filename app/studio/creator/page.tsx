@@ -337,7 +337,11 @@ function CreatorContent() {
                 headers: { "Content-Type": compressed.type }
             });
 
-            if (!uploadRes.ok) throw new Error("Failed to upload file to storage");
+            if (!uploadRes.ok) {
+                const errText = await uploadRes.text();
+                console.error("Upload PUT Failed:", uploadRes.status, errText);
+                throw new Error(`Upload Failed: ${uploadRes.status} ${errText}`);
+            }
 
             return publicUrl;
         } catch (error) {
