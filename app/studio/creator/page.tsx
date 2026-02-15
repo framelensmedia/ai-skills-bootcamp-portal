@@ -340,6 +340,7 @@ function CreatorContent() {
             if (!uploadRes.ok) {
                 const errText = await uploadRes.text();
                 console.error("Upload PUT Failed:", uploadRes.status, errText);
+                alert(`Upload Failed (${uploadRes.status}): ${errText}`);
                 throw new Error(`Upload Failed: ${uploadRes.status} ${errText}`);
             }
 
