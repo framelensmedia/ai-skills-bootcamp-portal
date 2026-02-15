@@ -14,10 +14,10 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aiskills.studio"),
-  title: "AI Skills Studio",
+  title: "Launch your business with AI | AI Skills Studio",
   description: "Learn high-value AI skills and build real projects.",
   openGraph: {
-    title: "AI Skills Studio",
+    title: "Launch your business with AI",
     description: "Learn high-value AI skills and build real projects.",
     url: "https://aiskills.studio",
     siteName: "AI Skills Studio",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Skills Studio",
+    title: "Launch your business with AI",
     description: "Learn high-value AI skills and build real projects.",
     images: ["/default-meta-image.png"],
   },

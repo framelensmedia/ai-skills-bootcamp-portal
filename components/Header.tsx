@@ -97,6 +97,7 @@ export default function Header() {
                             <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
                                 <span className="text-lime-400">AI Skills</span>{" "}
                                 <span className="text-foreground">Studio</span>
+                                <span className="ml-1 -mt-2 text-xs text-lime-400 font-normal opacity-75">beta</span>
                             </span>
                         </Link>
                         <div className="shrink-0">
@@ -142,6 +143,7 @@ export default function Header() {
                     <span className="min-w-0 whitespace-nowrap truncate text-lg font-bold tracking-tight sm:text-xl">
                         <span className="text-lime-400">AI Skills</span>{" "}
                         <span className="text-foreground">Studio</span>
+                        <span className="ml-1 -mt-2 text-xs text-lime-400 font-normal opacity-75">beta</span>
                     </span>
                 </Link>
 

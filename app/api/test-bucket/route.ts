@@ -22,12 +22,20 @@ export async function GET() {
         }
 
         const generationsExists = buckets?.some(b => b.name === "generations");
+        const remixExists = buckets?.some(b => b.name === "remix-images");
+        const identitiesExists = buckets?.some(b => b.name === "identities");
+        const workspaceExists = buckets?.some(b => b.name === "workspace_assets");
 
         return NextResponse.json({
             count: buckets?.length,
-            generations_exists: generationsExists,
             buckets: buckets?.map(b => b.name),
-            project_url: supabaseUrl // Verify it matches expected
+            status: {
+                generations: generationsExists,
+                remix_images: remixExists,
+                identities: identitiesExists,
+                workspace_assets: workspaceExists
+            },
+            project_url: supabaseUrl
         });
 
     } catch (e: any) {
