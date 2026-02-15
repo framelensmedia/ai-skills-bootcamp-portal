@@ -59,6 +59,10 @@ export async function POST(req: Request) {
 
     } catch (e: any) {
         console.error("Sign Upload Error:", e);
-        return NextResponse.json({ error: e.message || "Failed to sign upload" }, { status: 500 });
+        return NextResponse.json({
+            error: e.message || "Failed to sign upload",
+            details: JSON.stringify(e),
+            bucket: "generations"
+        }, { status: 500 });
     }
 }

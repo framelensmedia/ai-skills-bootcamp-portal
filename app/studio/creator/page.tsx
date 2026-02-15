@@ -324,7 +324,10 @@ function CreatorContent() {
                 })
             });
 
-            if (!signRes.ok) throw new Error("Failed to sign upload");
+            if (!signRes.ok) {
+                const errText = await signRes.text();
+                throw new Error(`Sign Failed: ${signRes.status} ${errText}`);
+            }
             const { signedUrl, publicUrl } = await signRes.json();
 
             // 3. Upload to Storage

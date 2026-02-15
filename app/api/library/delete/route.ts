@@ -3,14 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 // Use Service Role to bypass RLS if policies are missing
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Initialized lazily inside handler to prevent build errors
 
 export async function POST(req: Request) {
     try {
         const { ids, table = "prompt_generations" } = await req.json();
+
+        // Initialize admin client here to avoid build-time errors
+        const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
