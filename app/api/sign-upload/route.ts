@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         const { data, error } = await supabaseAdmin
             .storage
             .from("generations")
-            .createSignedUploadUrl(path, { upsert: true, contentType: fileType });
+            .createSignedUploadUrl(path, { upsert: true });
 
         if (error) {
             console.error("Sign Error:", error);
