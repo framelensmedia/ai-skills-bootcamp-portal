@@ -7,3 +7,4 @@ node_modules/
 vertex-credentials.json
 # security
 *-credentials.json
+migration_backup.sql
