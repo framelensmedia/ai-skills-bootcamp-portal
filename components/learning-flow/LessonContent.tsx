@@ -84,14 +84,13 @@ export default function LessonContent({ lesson, bootcampSlug, nextLessonSlug, on
     const wasCompletedRef = useRef(lesson.progress?.status === "completed");
 
     function handleCompletion() {
-        // Trigger generic completion logic (XP, progress update) -> handled by stepper/video component
-        // Notify parent
-        if (onVideoComplete) onVideoComplete();
 
         // precise check: only show modal if it WAS NOT completed when we loaded the page
         // OR if the user explicitly triggers it (e.g. re-watching doesn't trigger, but completing a new item does)
-        // For simplicity: if it was already completed, don't show modal.
         if (!wasCompletedRef.current) {
+            // Trigger generic completion logic (XP, progress update) -> handled by stepper/video component
+            // Notify parent ONLY if this is a NEW completion
+            if (onVideoComplete) onVideoComplete();
             setShowCompleteModal(true);
         }
     }

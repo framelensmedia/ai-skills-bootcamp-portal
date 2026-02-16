@@ -166,6 +166,7 @@ export default function LessonPage({ params }: Props) {
                     bootcampSlug={bootcampSlug}
                     nextLesson={completedState.nextLesson}
                     generationId={completedState.generationId}
+                    onClose={() => setCompletedState(prev => ({ ...prev, completed: false }))}
                 />
             </main>
         );

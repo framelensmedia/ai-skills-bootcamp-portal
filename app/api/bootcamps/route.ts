@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
             .from("bootcamps")
             .select("*")
             .eq("is_published", true)
+            .neq("slug", "ambassador-program") // Hide internal training from public list
             .order("created_at", { ascending: false });
 
         if (error) {

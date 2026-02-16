@@ -8,10 +8,24 @@ import Loading from "@/components/Loading";
 import {
   GraduationCap, FileText, Star, MessageSquare, Users, Settings,
   Plus, ArrowRight, BookOpen, Sparkles, TrendingUp, Clock, CheckCircle,
-  LayoutDashboard, Upload, Shield
+  LayoutDashboard, Upload, Shield, Newspaper, FolderOpen,
+  LucideIcon
 } from "lucide-react";
 
 type ProfileRow = { role: string };
+
+type ContentType = {
+  id: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  href: string;
+  color: string;
+  minRole: string;
+  stats: { table: string; label: string };
+  quickActions?: { label: string; href: string }[];
+  comingSoon?: boolean;
+};
 
 function roleRank(role: string) {
   const r = String(role || "user").toLowerCase();
@@ -21,7 +35,7 @@ function roleRank(role: string) {
 }
 
 // Content type definitions - add new content types here
-const CONTENT_TYPES = [
+const CONTENT_TYPES: ContentType[] = [
   {
     id: "bootcamps",
     title: "Bootcamps",
@@ -50,29 +64,30 @@ const CONTENT_TYPES = [
     ],
   },
   {
-    id: "reviews",
-    title: "Reviews",
-    description: "Manage user reviews and testimonials",
-    icon: Star,
-    href: "/dashboard/cms/reviews",
+    id: "blog",
+    title: "Blog & News",
+    description: "Manage news, updates, and articles",
+    icon: Newspaper,
+    href: "/dashboard/cms/blog",
     color: "#FFD93D",
     minRole: "editor",
-    stats: { table: "reviews", label: "reviews" },
+    stats: { table: "blog_posts", label: "posts" },
     quickActions: [
-      { label: "Add Review", href: "/dashboard/cms/reviews/new" },
+      { label: "New Post", href: "/dashboard/cms/blog/new" },
     ],
-    comingSoon: true,
   },
   {
-    id: "testimonials",
-    title: "Testimonials",
-    description: "Showcase success stories and feedback",
-    icon: MessageSquare,
-    href: "/dashboard/cms/testimonials",
+    id: "resources",
+    title: "Resources",
+    description: "Manage downloadable resources and files",
+    icon: FolderOpen,
+    href: "/dashboard/cms/resources",
     color: "#6BCB77",
     minRole: "editor",
-    stats: { table: "testimonials", label: "testimonials" },
-    comingSoon: true,
+    stats: { table: "resources", label: "files" },
+    quickActions: [
+      { label: "Upload File", href: "/dashboard/cms/resources/new" },
+    ],
   },
   {
     id: "instructors",
@@ -192,8 +207,8 @@ export default function CMSDashboard() {
         {[
           { label: "Bootcamps", value: stats.bootcamps || 0, icon: GraduationCap, color: "#B7FF00" },
           { label: "Prompts", value: stats.prompts || 0, icon: Sparkles, color: "#FF6B6B" },
-          { label: "Published", value: "-", icon: CheckCircle, color: "#6BCB77" },
-          { label: "Drafts", value: "-", icon: Clock, color: "#FFD93D" },
+          { label: "Posts", value: stats.blog || 0, icon: Newspaper, color: "#FFD93D" },
+          { label: "Resources", value: stats.resources || 0, icon: FolderOpen, color: "#6BCB77" },
         ].map((stat, i) => (
           <div
             key={i}
@@ -230,8 +245,8 @@ export default function CMSDashboard() {
             <div
               key={ct.id}
               className={`group relative rounded-2xl border bg-zinc-900/50 overflow-hidden transition-all ${isDisabled
-                  ? "border-white/5 opacity-60"
-                  : "border-white/10 hover:border-white/20 hover:bg-zinc-900"
+                ? "border-white/5 opacity-60"
+                : "border-white/10 hover:border-white/20 hover:bg-zinc-900"
                 }`}
             >
               {/* Coming Soon Badge */}

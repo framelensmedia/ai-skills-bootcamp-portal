@@ -3,7 +3,57 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
-import { Check, Copy, DollarSign, LayoutDashboard, Share2, TrendingUp, Users, Info, Zap, BarChart2, Globe, Loader2 } from "lucide-react";
+import { Check, Copy, DollarSign, LayoutDashboard, Share2, TrendingUp, Users, Info, Zap, BarChart2, Globe, Loader2, Play, ChevronRight } from "lucide-react";
+import ContentStepper from "@/components/learning-flow/ContentStepper";
+import { LessonContentItem } from "@/components/cms/LessonContentManager";
+
+// --- Training Step Component ---
+function TrainingStep({ onComplete }: { onComplete: () => void }) {
+    const [items, setItems] = useState<LessonContentItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            const supabase = createSupabaseBrowserClient();
+            // Fetch content for the fixed 'ambassador-training-id' (or slug 'training')
+            // Ideally we query by ID to be robust
+            const { data } = await supabase
+                .from("lesson_contents")
+                .select("*")
+                .eq("lesson_id", "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22") // Fixed UUID from SQL
+                .eq("is_published", true)
+                .order("order_index", { ascending: true });
+
+            if (data) setItems(data as LessonContentItem[]);
+            setLoading(false);
+        };
+        load();
+    }, []);
+
+    if (loading) return <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-white/50" /></div>;
+
+    if (items.length === 0) {
+        return (
+            <div className="p-8 text-center text-white/40">
+                <p>Training content is being uploaded...</p>
+                <div className="mt-4">
+                    <button onClick={onComplete} className="text-xs bg-white/10 px-3 py-1 rounded hover:bg-white/20">
+                        Skip for now
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <ContentStepper
+            items={items}
+            lessonId="b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"
+            onAllCompleted={onComplete}
+        />
+    );
+}
+
 
 const POST_TEMPLATES = [
     {
@@ -43,7 +93,16 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
     const deriveInitialStep = () => {
         if (initialAmbassador) {
             const step = initialAmbassador.onboarding_step;
-            return Math.max(1, step === 0 ? 1 : step);
+            // Old logic: 0->1, 1->2 (training), 2->3 (stripe)
+            // New Logic: 0 -> 1 (Training), 1-> (Done Training) -> 2 (Stripe)
+            // If they were on old step 1 (posts done), treat as step 1 (Training not done? or skip?)
+            // Simplify: 
+            // 0 = Fresh -> Step 1
+            // 1 = Posts Done (Old) / Training Done (New??) -> Let's map old "posts done" to "start training" -> Step 1
+            // 2 = Training Done -> Step 2
+
+            if (step >= 2) return 2; // Connect Stripe
+            return 1; // Training
         }
         return 1;
     };
@@ -386,13 +445,16 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                             <p className="text-gray-400">Welcome back! Here's how your impact is growing.</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end mt-4 md:mt-0">
-                            <button onClick={handleDisconnect} className="text-red-500 hover:text-red-400 text-xs underline px-2 whitespace-nowrap order-3 md:order-1 w-full md:w-auto text-left md:text-center mt-2 md:mt-0">
+                            <button onClick={handleDisconnect} className="text-red-500 hover:text-red-400 text-xs underline px-2 whitespace-nowrap order-4 md:order-1 w-full md:w-auto text-left md:text-center mt-2 md:mt-0">
                                 Disconnect
                             </button>
-                            <button onClick={() => { setPreviousView("dashboard"); setView("details"); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap order-1 md:order-2 flex-1 md:flex-none justify-center">
+                            <button onClick={() => { setView("onboarding"); setViewStep(1); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap order-1 md:order-2 flex-1 md:flex-none justify-center">
+                                <Play size={16} /> Training
+                            </button>
+                            <button onClick={() => { setPreviousView("dashboard"); setView("details"); }} className="bg-transparent border border-gray-800 hover:bg-gray-900 text-gray-400 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap order-2 md:order-3 flex-1 md:flex-none justify-center">
                                 <Info size={16} /> Program Info
                             </button>
-                            <button onClick={() => window.open("https://dashboard.stripe.com/login", "_blank")} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap order-2 md:order-3 flex-1 md:flex-none text-center">
+                            <button onClick={() => window.open("https://dashboard.stripe.com/login", "_blank")} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap order-3 md:order-4 flex-1 md:flex-none text-center">
                                 View Stripe Payouts
                             </button>
                         </div>
@@ -472,117 +534,100 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
         return (
             <div className="min-h-screen bg-black text-white p-6 flex flex-col items-center justify-start pt-20">
                 <div className="max-w-2xl w-full">
-                    <div className="flex justify-between items-center mb-2">
-                        <h1 className="text-3xl font-bold text-center flex-1">Let's get you set up 🚀</h1>
+                    <div className="relative flex justify-center items-center mb-8">
+                        {ambassador.onboarding_step >= 4 ? (
+                            <button
+                                onClick={() => setView("dashboard")}
+                                className="absolute left-0 text-gray-400 hover:text-white flex items-center gap-2 transition-colors"
+                            >
+                                ← Back
+                            </button>
+                        ) : null}
+                        <h1 className="text-3xl font-bold text-center">
+                            {ambassador.onboarding_step >= 4 ? "Ambassador Training" : "Let's get you set up 🚀"}
+                        </h1>
                     </div>
 
-                    <p className="text-gray-400 text-center mb-10">Complete these steps to unlock your dashboard.</p>
+                    {!ambassador.onboarding_step || ambassador.onboarding_step < 4 ? (
+                        <p className="text-gray-400 text-center mb-10">Complete these steps to unlock your dashboard.</p>
+                    ) : null}
 
-                    {/* Stepper */}
-                    <div className="flex justify-between mb-12 relative">
-                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-800 -z-10"></div>
-                        {[1, 2, 3].map((s) => {
-                            const isCompleted = s < maxReachable;
-                            const isCurrent = s === viewStep;
-                            const isLocked = s > maxReachable;
+                    {/* Stepper - Hide if already fully onboarded/dashboard unlocked, or keep as tabs? Let's keep for context but maybe simplified */}
+                    {ambassador.onboarding_step < 4 && (
+                        <div className="flex justify-between mb-12 relative">
+                            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-800 -z-10"></div>
+                            {[1, 2].map((s) => {
+                                const isCompleted = s < viewStep;
+                                const isCurrent = s === viewStep;
 
-                            return (
-                                <button
-                                    key={s}
-                                    disabled={isLocked}
-                                    onClick={() => setViewStep(s)}
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all border-2
-                                    ${isCompleted ? "bg-purple-600 border-purple-600 text-white" : ""}
-                                    ${isCurrent ? "bg-white border-white text-black scale-110 shadow-[0_0_15px_rgba(255,255,255,0.4)]" : ""}
-                                    ${!isCompleted && !isCurrent ? "bg-black border-gray-700 text-gray-500" : ""}
-                                    ${!isLocked ? "cursor-pointer hover:border-purple-400" : "cursor-not-allowed opacity-50"}
-                                    `}
-                                >
-                                    {isCompleted && !isCurrent ? <Check size={16} /> : s}
-                                </button>
-                            )
-                        })}
-                    </div>
+                                return (
+                                    <button
+                                        key={s}
+                                        onClick={() => isCompleted && setViewStep(s)}
+                                        disabled={!isCompleted && !isCurrent}
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all border-2
+                                        ${isCompleted ? "bg-purple-600 border-purple-600 text-white" : ""}
+                                        ${isCurrent ? "bg-white border-white text-black scale-110 shadow-[0_0_15px_rgba(255,255,255,0.4)]" : ""}
+                                        ${!isCompleted && !isCurrent ? "bg-black border-gray-700 text-gray-500" : ""}
+                                        ${isCompleted ? "cursor-pointer hover:border-purple-400" : "cursor-not-allowed"}
+                                        `}
+                                    >
+                                        {isCompleted && !isCurrent ? <Check size={16} /> : s}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {/* If accessing from dashboard, force showing training content directly without stepper UI complication if possible, 
+                        OR just ensure render logic allows it.
+                        The logic below checks viewStep. If came from dashboard, we set viewStep(1).
+                     */}
 
                     {/* Step Content */}
                     <div className="bg-[#111] border border-gray-800 rounded-2xl p-6 md:p-8">
                         {viewStep === 1 && (
                             <div className="space-y-6">
-                                <h2 className="text-xl font-bold">Step 1: Share 3 Social Posts</h2>
-                                <p className="text-gray-400">
-                                    To become an ambassador, you must prove you can generate attention.
-                                    Copy one of these templates, post it, and paste the link below.
-                                </p>
+                                {ambassador.onboarding_step < 4 && (
+                                    <>
+                                        <h2 className="text-xl font-bold">Ambassador Training</h2>
+                                        <p className="text-gray-400">Watch the training to understand how to succeed as an ambassador.</p>
+                                    </>
+                                )}
 
-                                <div className="space-y-6">
-                                    {POST_TEMPLATES.map((template, i) => (
-                                        <div key={i} className="bg-black/50 p-4 rounded-xl border border-gray-800">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-bold text-sm text-gray-300">{template.title}</span>
-                                                <button onClick={() => copyToClipboard(template.caption, i)} className="text-xs bg-[#222] hover:bg-[#333] px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
-                                                    {copiedIndex === i ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-                                                    {copiedIndex === i ? "Copied" : "Copy Text"}
-                                                </button>
-                                            </div>
-                                            <div className="text-xs text-gray-500 font-mono bg-black p-3 rounded-lg mb-3 whitespace-pre-wrap max-h-24 overflow-y-auto border border-gray-900">
-                                                {template.caption}
-                                            </div>
-                                            <input
-                                                placeholder={`Paste link to your "${template.title.split('–')[1].trim()}" post...`}
-                                                value={postLinks[i]}
-                                                onChange={(e) => {
-                                                    const newLinks = [...postLinks];
-                                                    newLinks[i] = e.target.value;
-                                                    setPostLinks(newLinks);
-                                                }}
-                                                className="w-full bg-[#111] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                                            />
-                                        </div>
-                                    ))}
+                                <div className="border border-gray-800 rounded-xl overflow-hidden">
+                                    <TrainingStep
+                                        onComplete={() => {
+                                            if (ambassador.onboarding_step >= 4) {
+                                                setView("dashboard");
+                                            } else {
+                                                handleTrainingComplete();
+                                            }
+                                        }}
+                                    />
                                 </div>
 
-                                <button
-                                    onClick={submitPosts}
-                                    disabled={verifying || postLinks.some(l => l.length < 5)}
-                                    className="w-full bg-white text-black py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {verifying ? "Verifying..." : "Verify Posts & Continue"}
-                                </button>
-                                <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 w-full text-center py-2">
-                                    [Admin] Skip Step
-                                </button>
+                                {ambassador.onboarding_step < 4 && (
+                                    <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 text-center w-full py-2">
+                                        [Admin] Skip Step
+                                    </button>
+                                )}
                             </div>
                         )}
 
                         {viewStep === 2 && (
                             <div className="space-y-6">
-                                <h2 className="text-xl font-bold">Step 2: Ambassador Training</h2>
-                                <p className="text-gray-400">Watch this short video to understand how to succeed as an ambassador.</p>
-
-                                <div className="aspect-video bg-black rounded-lg flex items-center justify-center border border-gray-800 mb-4">
-                                    <span className="text-gray-500">[ Video Placeholder: How To Promote ]</span>
-                                </div>
-
-                                <div className="flex flex-col gap-2">
-                                    <button onClick={handleTrainingComplete} className="w-full bg-purple-600 hover:bg-purple-500 py-3 rounded-lg font-bold transition-colors">
-                                        I Watched It - Next Step
-                                    </button>
-                                    <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 py-2">
-                                        [Admin] Skip Step
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {viewStep === 3 && (
-                            <div className="space-y-6">
-                                <h2 className="text-xl font-bold">Step 3: Connect Payouts</h2>
+                                <h2 className="text-xl font-bold">Connect Payouts</h2>
                                 <p className="text-gray-400">Link your waiting Stripe account so we can send you instant payouts.</p>
+
+                                <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg text-center mb-4">
+                                    {ambassador.onboarding_step >= 4 ? "✅ Payouts Connected" : "Connect below"}
+                                </div>
 
                                 <button
                                     onClick={handleStripeConnect}
-                                    disabled={loading}
-                                    className="w-full bg-[#635BFF] hover:bg-[#534be0] py-4 rounded-lg font-bold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    disabled={loading || ambassador.onboarding_step >= 4}
+                                    className="w-full bg-[#635BFF] hover:bg-[#534be0] py-4 rounded-lg font-bold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? (
                                         <>
@@ -590,13 +635,15 @@ export default function AmbassadorClient({ initialUser, initialProfile, initialA
                                             Connecting...
                                         </>
                                     ) : (
-                                        "Connect with Stripe"
+                                        ambassador.onboarding_step >= 4 ? "Manage on Stripe" : "Connect with Stripe"
                                     )}
                                 </button>
-                                <p className="text-xs text-center text-gray-500">You will be redirected to Stripe to verify your identity.</p>
-                                <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 py-2 w-full text-center">
-                                    [Admin] Skip Step (Force Dashboard)
-                                </button>
+
+                                {ambassador.onboarding_step < 4 && (
+                                    <button onClick={debugSkip} className="text-xs text-gray-600 hover:text-gray-400 py-2 w-full text-center">
+                                        [Admin] Skip Step (Force Dashboard)
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

@@ -670,10 +670,11 @@ export async function POST(req: Request) {
             }
         });
 
+        const GENERATIONS_BUCKET = process.env.NEXT_PUBLIC_GENERATIONS_BUCKET || "generations";
         const filePath = `videos/${userId}/${Date.now()}.mp4`;
 
         const { error: uploadError } = await admin.storage
-            .from("generations")
+            .from(GENERATIONS_BUCKET)
             .upload(filePath, uploadBody as any, { contentType: "video/mp4", upsert: false, duplex: "half" });
 
         if (uploadError) {
@@ -681,7 +682,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to save video" }, { status: 500 });
         }
 
-        const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+        const { data: pubUrl } = admin.storage.from(GENERATIONS_BUCKET).getPublicUrl(filePath);
         const videoUrl = pubUrl.publicUrl;
 
         // 9. Save DB Record
@@ -695,11 +696,11 @@ export async function POST(req: Request) {
             const buffer = Buffer.from(base64Data, "base64");
 
             const { error: thumbErr } = await admin.storage
-                .from("generations")
+                .from(GENERATIONS_BUCKET)
                 .upload(thumbPath, buffer, { contentType: "image/jpeg", upsert: false });
 
             if (!thumbErr) {
-                const { data: thumbPub } = admin.storage.from("generations").getPublicUrl(thumbPath);
+                const { data: thumbPub } = admin.storage.from(GENERATIONS_BUCKET).getPublicUrl(thumbPath);
                 thumbnailUrl = thumbPub.publicUrl;
             }
         } else if (sourceImageId) {

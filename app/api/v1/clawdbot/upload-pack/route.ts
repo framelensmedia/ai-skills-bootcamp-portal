@@ -26,10 +26,65 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
+
+        // --- BRANCH 1: LESSON CONTENT (Training Videos) ---
+        // Payload: { lesson_id: string, contents: LessonContentItem[] }
+        if (body.lesson_id && body.contents) {
+            const { lesson_id, contents } = body;
+            console.log(`[Clawdbot] Processing Lesson Content for Lesson: ${lesson_id} (${contents.length} items)`);
+
+            // 1. Process Contents (Re-host assets if needed)
+            const processedContents = await Promise.all(contents.map(async (item: any) => {
+                // Re-host Video URL if provided and external
+                if (item.type === "video" && item.content?.video_url && !item.content.video_url.includes("supabase.co")) {
+                    try {
+                        const ext = item.content.video_url.split('.').pop() || "mp4";
+                        const path = `lessons/${lesson_id}/video-${Date.now()}.${ext}`;
+                        const uploaded = await uploadFileFromUrl(item.content.video_url, path);
+                        if (uploaded) {
+                            item.content.video_url = getPublicUrl(uploaded);
+                        }
+                    } catch (e) {
+                        console.error("Failed to rehost video:", e);
+                    }
+                }
+                // Re-host Thumbnail
+                if (item.content?.thumbnail_url && !item.content.thumbnail_url.includes("supabase.co")) {
+                    try {
+                        const path = `lessons/${lesson_id}/thumb-${Date.now()}.png`;
+                        const uploaded = await uploadFileFromUrl(item.content.thumbnail_url, path);
+                        if (uploaded) {
+                            item.content.thumbnail_url = getPublicUrl(uploaded);
+                        }
+                    } catch (e) { console.error("Failed to rehost thumbnail:", e); }
+                }
+
+                return {
+                    lesson_id,
+                    type: item.type,
+                    title: item.title,
+                    order_index: item.order_index,
+                    content: item.content,
+                    is_published: item.is_published ?? true
+                };
+            }));
+
+            // 2. Insert/Upsert into lesson_contents
+            const { data, error } = await supabase
+                .from("lesson_contents")
+                .insert(processedContents)
+                .select();
+
+            if (error) throw new Error(`Lesson Content Insert Failed: ${error.message}`);
+
+            return NextResponse.json({ success: true, count: data.length, results: data });
+        }
+
+        // --- BRANCH 2: TEMPLATE PACKS (Legacy) ---
         const { pack, templates, author_id } = body;
 
         if (!pack || !pack.name || !templates || !Array.isArray(templates)) {
-            return NextResponse.json({ error: "Invalid payload: pack.name and templates array required." }, { status: 400 });
+            return NextResponse.json({ error: "Invalid payload: 'lesson_id' OR 'pack.name' required." }, { status: 400 });
         }
 
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
@@ -38,7 +93,7 @@ export async function POST(req: NextRequest) {
         const packThumbnailUrl = pack.thumbnail_url || pack.thumbnailUrl || pack.image_url || pack.imageUrl || pack.url || null;
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
 
-        // SCHEMA FIX: Use 'title' instead of 'pack_name'. 
+        // SCHEMA FIX: Use 'title' instead of 'pack_name'.
         // Also Populate legacy 'pack_name' and 'pack_id' if they exist to satisfy constraints.
         const packPayload: any = {
             title: pack.name, // Correct Column
@@ -70,7 +125,7 @@ export async function POST(req: NextRequest) {
                 try {
                     console.log(`[Clawdbot] Re-hosting Thumbnail: ${packThumbnailUrl}`);
                     const path = `packs/cover-${packRecord.id}-${Date.now()}.png`;
-                    const uploadedPath = await uploadImageFromUrl(packThumbnailUrl, path);
+                    const uploadedPath = await uploadFileFromUrl(packThumbnailUrl, path);
                     if (uploadedPath) {
                         const publicUrl = getPublicUrl(uploadedPath);
                         await supabase.from("template_packs").update({ thumbnail_url: publicUrl }).eq("id", packRecord.id);
@@ -145,38 +200,41 @@ function sanitize(str: string) {
     return str.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
-async function uploadImageFromUrl(url: string, path: string): Promise<string | null> {
+async function uploadFileFromUrl(url: string, path: string): Promise<string | null> {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for larger files
 
         const res = await fetch(url, {
             headers: {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+                "User-Agent": "Bot/1.0",
+                "Accept": "*/*"
             },
             signal: controller.signal
         });
         clearTimeout(timeoutId);
 
-        if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+        if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
         const buffer = await res.arrayBuffer();
 
+        const bucket = process.env.NEXT_PUBLIC_BOOTCAMP_ASSETS_BUCKET || "bootcamp-assets";
+
         const { error } = await supabase.storage
-            .from("bootcamp-assets")
+            .from(bucket)
             .upload(path, buffer, {
-                contentType: res.headers.get("content-type") || "image/png",
+                contentType: res.headers.get("content-type") || "application/octet-stream",
                 upsert: true
             });
 
         if (error) throw error;
         return path;
     } catch (e) {
-        console.error("Image Upload Failed:", e);
-        return null; // Don't block whole process if image fails
+        console.error("File Upload Failed:", e);
+        return null; // Don't block whole process if file upload fails
     }
 }
 
 function getPublicUrl(path: string) {
-    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/bootcamp-assets/${path}`;
+    const bucket = process.env.NEXT_PUBLIC_BOOTCAMP_ASSETS_BUCKET || "bootcamp-assets";
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 }

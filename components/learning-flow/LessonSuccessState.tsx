@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Sparkles, ArrowRight, Trophy, Flame } from "lucide-react";
+import { Check, Sparkles, ArrowRight, Trophy, Flame, X } from "lucide-react";
 import Link from "next/link";
 import { Lesson } from "@/lib/types/learning-flow";
 import { useEffect, useState } from "react";
@@ -21,7 +21,8 @@ export default function LessonSuccessState({
     generationId,
     isBootcampComplete = false,
     onContinue,
-}: LessonSuccessStateProps) {
+    onClose,
+}: LessonSuccessStateProps & { onClose?: () => void }) {
     const [showConfetti, setShowConfetti] = useState(true);
     const [showContent, setShowContent] = useState(false);
 
@@ -37,6 +38,16 @@ export default function LessonSuccessState({
 
     return (
         <div className="relative">
+            {/* Close Button */}
+            {onClose && (
+                <button
+                    onClick={onClose}
+                    className="absolute right-0 top-0 p-2 text-white/40 hover:text-white z-10 hover:bg-white/10 rounded-full transition"
+                >
+                    <X size={24} />
+                </button>
+            )}
+
             {/* Enhanced confetti effect */}
             {showConfetti && (
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -121,12 +132,12 @@ export default function LessonSuccessState({
                 <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
                     {nextLesson ? (
                         <>
-                            <Link
-                                href={`/learn/${bootcampSlug}`}
+                            <button
+                                onClick={onClose}
                                 className="px-6 py-3 rounded-xl border border-white/20 bg-white/5 text-white font-semibold hover:bg-white/10 transition"
                             >
-                                View Progress
-                            </Link>
+                                Back to Lesson
+                            </button>
                             <Link
                                 href={`/learn/${bootcampSlug}/${nextLesson.slug}`}
                                 className="group flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-[#B7FF00] text-black font-bold hover:bg-[#a3e600] transition shadow-lg shadow-[#B7FF00]/20"
@@ -137,12 +148,12 @@ export default function LessonSuccessState({
                         </>
                     ) : (
                         <>
-                            <Link
-                                href={`/learn/${bootcampSlug}`}
+                            <button
+                                onClick={onClose}
                                 className="px-6 py-3 rounded-xl border border-white/20 bg-white/5 text-white font-semibold hover:bg-white/10 transition"
                             >
-                                View Bootcamp
-                            </Link>
+                                Back to Lesson
+                            </button>
                             <Link
                                 href="/learn"
                                 className="group flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-[#B7FF00] text-black font-bold hover:bg-[#a3e600] transition shadow-lg shadow-[#B7FF00]/20"

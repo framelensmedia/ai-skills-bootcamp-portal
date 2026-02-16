@@ -271,6 +271,16 @@ export default function EditBootcampPage({ params }: Props) {
                                 >
                                     Premium
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleChange("access_level", "ambassador")}
+                                    className={`px-4 py-2 rounded-lg border text-sm transition ${form.access_level === "ambassador"
+                                        ? "border-purple-500 bg-purple-500/10 text-purple-400"
+                                        : "border-white/10 text-white/60"
+                                        }`}
+                                >
+                                    Ambassador
+                                </button>
                             </div>
                         </div>
 

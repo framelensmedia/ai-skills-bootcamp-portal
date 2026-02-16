@@ -6,7 +6,7 @@ export type Bootcamp = {
     slug: string;
     description: string | null;
     thumbnail_url: string | null;
-    access_level: 'free' | 'premium';
+    access_level: 'free' | 'premium' | 'ambassador';
     lesson_count: number;
     total_duration_minutes: number;
     is_published: boolean;
