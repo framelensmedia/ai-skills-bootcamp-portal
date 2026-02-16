@@ -2,7 +2,7 @@
 
 import { Lesson, LessonWithProgress } from "@/lib/types/learning-flow";
 import { Play, FileText, Clock, Loader2 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import VideoStepper from "./VideoStepper"; // Keep for legacy if needed, or remove if fully migrated
 import ContentStepper from "./ContentStepper";
@@ -80,12 +80,20 @@ export default function LessonContent({ lesson, bootcampSlug, nextLessonSlug, on
         }
     }
 
+    // Track initial completion status to prevent auto-opening modal on revisit
+    const wasCompletedRef = useRef(lesson.progress?.status === "completed");
+
     function handleCompletion() {
         // Trigger generic completion logic (XP, progress update) -> handled by stepper/video component
         // Notify parent
         if (onVideoComplete) onVideoComplete();
-        // Show modal
-        setShowCompleteModal(true);
+
+        // precise check: only show modal if it WAS NOT completed when we loaded the page
+        // OR if the user explicitly triggers it (e.g. re-watching doesn't trigger, but completing a new item does)
+        // For simplicity: if it was already completed, don't show modal.
+        if (!wasCompletedRef.current) {
+            setShowCompleteModal(true);
+        }
     }
 
     // Prepare progress set

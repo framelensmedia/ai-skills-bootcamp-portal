@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Check, ArrowRight, Sparkles, Users, BookOpen } from "lucide-react";
+import { Check, ArrowRight, Sparkles, Users, BookOpen, X } from "lucide-react";
 import Confetti from "react-confetti";
 import { useWindowSize } from "react-use";
 
@@ -41,7 +41,13 @@ export default function LessonCompleteModal({
 
             <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-[#B7FF00]/30 bg-zinc-900 shadow-2xl animate-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="bg-[#B7FF00]/10 p-8 text-center border-b border-[#B7FF00]/10">
+                <div className="bg-[#B7FF00]/10 p-8 text-center border-b border-[#B7FF00]/10 relative">
+                    <button
+                        onClick={onClose}
+                        className="absolute right-4 top-4 p-2 text-white/40 hover:text-white transition rounded-full hover:bg-white/10"
+                    >
+                        <X size={20} />
+                    </button>
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#B7FF00]/20 text-[#B7FF00]">
                         <Check size={32} strokeWidth={3} />
                     </div>

@@ -186,7 +186,7 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
                 await addBotMessages(SCRIPTS.complete(intent));
                 setTimeout(() => {
                     if (intent === "learn") router.push("/learn");
-                    else if (intent === "create") router.push("/community");
+                    else if (intent === "create") router.push("/feed");
                     else router.push("/dashboard");
                 }, 2000);
             }
