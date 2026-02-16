@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
 import { Menu, Coins } from "lucide-react";
 import GamificationStatus from "./GamificationStatus";
+import PWAInstallButton from "./PWAInstallButton";
 
 
 export default function Nav() {
@@ -284,7 +285,13 @@ export default function Nav() {
                 </div>
 
                 {/* Auth (mobile) */}
-                <div className="mt-4 border-t border-border pt-4">
+                <div className="mt-4 border-t border-border pt-4 space-y-4">
+
+                  {/* PWA Install Button (Mobile Only) */}
+                  <div className="w-full">
+                    <PWAInstallButton />
+                  </div>
+
                   {loading ? (
                     <div className="h-10 w-full animate-pulse rounded-xl border border-border bg-secondary" />
                   ) : loggedIn ? (
