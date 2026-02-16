@@ -24,6 +24,8 @@ export default function Nav() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasBlog, setHasBlog] = useState(false);
+  const [hasResources, setHasResources] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -49,7 +51,27 @@ export default function Nav() {
       }
     }
 
+    async function checkContent() {
+      // Check for at least one published blog post
+      const { count: blogCount } = await supabase
+        .from("blog_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("is_published", true);
+
+      // Check for at least one public resource
+      const { count: resourceCount } = await supabase
+        .from("resources")
+        .select("id", { count: "exact", head: true })
+        .eq("is_public", true);
+
+      if (mounted) {
+        setHasBlog((blogCount || 0) > 0);
+        setHasResources((resourceCount || 0) > 0);
+      }
+    }
+
     fetchProfile();
+    checkContent();
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -124,9 +146,18 @@ export default function Nav() {
     { href: "/learn", label: "Learn" },
     { href: "/studio/creator", label: "Studio" },
     { href: "/prompts", label: "Prompts" },
-    { href: "/library", label: "My Library" },
-    { href: "/pricing", label: "Pricing" },
   ];
+
+  if (hasBlog) {
+    links.push({ href: "/blog", label: "Blog" });
+  }
+
+  if (hasResources) {
+    links.push({ href: "/resources", label: "Resources" });
+  }
+
+  links.push({ href: "/library", label: "My Library" });
+  links.push({ href: "/pricing", label: "Pricing" });
 
   if (loggedIn) {
     links.push({ href: "/feed", label: "Community" });
