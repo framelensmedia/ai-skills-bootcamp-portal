@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
         name: "AI Skills Studio",
         short_name: "AI Skills",
         description: "Launch your business with AI",
-        start_url: "/",
+        start_url: "/feed",
         display: "standalone",
         background_color: "#000000",
         theme_color: "#000000",
