@@ -124,7 +124,7 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
                 className={`fixed z-[100] flex flex-col transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${isOpen ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
                     } ${isExpanded
                         ? "inset-0 bg-black flex overflow-hidden" // Full Screen (App Mode)
-                        : "inset-[5%] md:inset-[10%] rounded-[10px] bg-black/95 backdrop-blur-2xl border border-[#B7FF00]/40 shadow-[0_0_50px_rgba(183,255,0,0.25)] flex overflow-hidden" // Modal Mode (Glow)
+                        : "inset-0 sm:inset-[5%] md:inset-[10%] rounded-none sm:rounded-[10px] bg-black sm:bg-black/95 backdrop-blur-2xl border-0 sm:border border-[#B7FF00]/40 shadow-[0_0_50px_rgba(183,255,0,0.25)] flex overflow-hidden" // Modal Mode (Glow) - Fullscreen on mobile
                     }`}
             >
                 {/* Header / Layout Container */}
@@ -133,7 +133,10 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
                     {/* SIDEBAR (Hidden in onboarding mode) */}
                     {!onboardingMode && !isSetupMode && (
                         <div className={`absolute inset-y-0 left-0 z-20 bg-black/90 backdrop-blur-xl border-r border-white/10 transition-all duration-300 flex flex-col overflow-hidden ${showSidebar ? "w-64 translate-x-0" : "w-64 -translate-x-full"}`}>
-                            <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 font-bold text-sm text-gray-300">
+                            <div
+                                className="min-h-14 border-b border-white/10 flex items-center justify-between px-4 font-bold text-sm text-gray-300 shrink-0"
+                                style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                            >
                                 <span>Recent Chats</span>
                                 <button onClick={() => setShowSidebar(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
                             </div>
@@ -150,7 +153,10 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
                     <div className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10 opacity-100 transition-opacity">
 
                         {/* Custom Header for Pop-up */}
-                        <div className="h-14 flex items-center justify-between px-4 border-b border-white/10 shrink-0">
+                        <div
+                            className="min-h-14 flex items-center justify-between px-4 border-b border-white/10 shrink-0"
+                            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                        >
                             <div className="flex items-center gap-3">
                                 {!isSetupMode && (
                                     <button
