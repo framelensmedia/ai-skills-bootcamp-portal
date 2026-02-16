@@ -38,6 +38,11 @@ export const metadata: Metadata = {
     description: "Learn high-value AI skills and build real projects.",
     images: ["/default-meta-image.png"],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "AI Skills",
+  },
 };
 export const viewport = {
   themeColor: "black",
