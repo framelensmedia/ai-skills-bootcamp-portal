@@ -46,6 +46,7 @@ export default function RemixClient({ initialRemix }: Props) {
     const [communityRemixes, setCommunityRemixes] = useState<RemixDetail[]>([]);
     const [loading, setLoading] = useState(!initialRemix);
     const [error, setError] = useState<string | null>(null);
+    const [currentUser, setCurrentUser] = useState<any>(null);
     const [copied, setCopied] = useState(false);
     const [isFavorited, setIsFavorited] = useState(false);
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
@@ -137,6 +138,9 @@ export default function RemixClient({ initialRemix }: Props) {
                         created_at: ""
                     }
                 };
+
+                const { data: { user } } = await supabase.auth.getUser();
+                setCurrentUser(user);
 
                 setRemix(fullRemixData);
                 currentRemix = fullRemixData;
@@ -712,10 +716,10 @@ export default function RemixClient({ initialRemix }: Props) {
                             </button>
                         </div>
 
-                        {/* Prompt Data (Optional) */}
-                        {remix.combined_prompt_text && (
+                        {/* Prompt Data (Hidden for Public) */}
+                        {remix.combined_prompt_text && currentUser?.id === remix.user_id && (
                             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Prompt Used</div>
+                                <div className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Prompt Used (Visible only to you)</div>
                                 <p className="font-mono text-sm leading-relaxed text-white/80 line-clamp-6">
                                     {cleanPrompt(remix.combined_prompt_text)}
                                 </p>

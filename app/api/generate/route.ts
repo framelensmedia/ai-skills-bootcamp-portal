@@ -150,7 +150,7 @@ async function urlToBase64(url: string) {
         const match = url.match(/\/generations\/(.+)$/);
         if (match && match[1]) {
             const decodedPath = decodeURIComponent(match[1]);
-            console.log(`Fallback: Downloading private file from path: ${decodedPath}`);
+            // console.log(`Fallback: Downloading private file from path: ${decodedPath}`);
 
             const { data, error } = await supabaseAdmin
                 .storage
@@ -273,7 +273,7 @@ async function generateFalImage(
         if (imagesToSend.length > 0) {
             actualEndpoint = `https://queue.fal.run/${modelId}/edit`;
             payload.image_urls = imagesToSend;
-            console.log(`NANO BANANA EDIT: Sending ${imagesToSend.length} images. subjectFirst=${subjectFirst}. Image 1: ${imagesToSend[0]?.slice(0, 60)}, Image 2: ${imagesToSend[1]?.slice(0, 60) || 'NONE'}`);
+            // console.log(`NANO BANANA EDIT: Sending ${imagesToSend.length} images. subjectFirst=${subjectFirst}. Image 1: ${imagesToSend[0]?.slice(0, 60)}, Image 2: ${imagesToSend[1]?.slice(0, 60) || 'NONE'}`);
         } else {
             // T2I MODE (Base Endpoint)
             // MUST NOT send empty image_urls or image_url
@@ -287,11 +287,11 @@ async function generateFalImage(
         }
     }
 
-    console.log(`Fal Image Request (${modelId}):`, {
-        prompt: prompt.slice(0, 50),
-        endpoint: actualEndpoint,
-        hasImages: !!(payload.image_url || payload.image_urls?.length)
-    });
+    // console.log(`Fal Image Request (${modelId}):`, {
+    //     prompt: prompt.slice(0, 50),
+    //     endpoint: actualEndpoint,
+    //     hasImages: !!(payload.image_url || payload.image_urls?.length)
+    // });
 
     // 1. Submit Request
     const res = await fetch(actualEndpoint, {
@@ -557,7 +557,7 @@ export async function POST(req: Request) {
         // DEFAULT TO Fal (Nano Banana) for all image gen if not specified, as Vertex Gemini Preview is unstable/404ing
         let model = requestedModel || process.env.VERTEX_MODEL_ID || "fal-ai/nano-banana-pro";
 
-        console.log(`GENERATE: requestedModel=${requestedModel}, resolved model=${model}`);
+        // console.log(`GENERATE: requestedModel=${requestedModel}, resolved model=${model}`);
 
         // Handle "Nano Banana Pro" -> Fal mapping if client sends friendly name
         // Note: /edit suffix is added by generateFalImage when image_url is provided
@@ -566,31 +566,31 @@ export async function POST(req: Request) {
 
         // User requested to keep nano-banana-pro even for T2I
         // Logging to debug why image might be missing
-        console.log("DEBUG: Model Resolution", {
-            model,
-            hasImageFiles: imageFiles.length,
-            hasImageUrls: imageUrls.length,
-            templateRef: template_reference_image,
-            canvasFile: !!canvasFile,
-            canvasUrl: !!canvasUrl
-        });
+        // console.log("DEBUG: Model Resolution", {
+        //     model,
+        //     hasImageFiles: imageFiles.length,
+        //     hasImageUrls: imageUrls.length,
+        //     templateRef: template_reference_image,
+        //     canvasFile: !!canvasFile,
+        //     canvasUrl: !!canvasUrl
+        // });
 
         // AUTO-SWITCH T2I Logic: Nano Banana only supports /edit endpoint (no base T2I)
         // If no input images are provided, switch to Seedream v4.5 for high quality T2I
         const hasInputImages = (imageFiles.length > 0 || imageUrls.length > 0 || template_reference_image || canvasFile || canvasUrl);
         if (model.includes("nano-banana") && !hasInputImages) {
-            console.log("Auto-switching T2I request from Nano Banana to Seedream v4.5 (Nano Banana only supports /edit)");
+            // console.log("Auto-switching T2I request from Nano Banana to Seedream v4.5 (Nano Banana only supports /edit)");
             model = "fal-ai/bytedance/seedream/v4.5/text-to-image";
         }
 
         // AUTO-SWITCH REMIX Logic: Flux does not support multi-image subject replacement easily.
         // If we have both a Template AND a Subject, we MUST use Nano Banana (Gemini) which supports this via /edit.
         if (!model.includes("nano-banana") && template_reference_image && (imageFiles.length > 0 || imageUrls.length > 0)) {
-            console.log("Auto-switching Remix request to Nano Banana (Flux lacks multi-image support)");
+            // console.log("Auto-switching Remix request to Nano Banana (Flux lacks multi-image support)");
             model = "fal-ai/nano-banana-pro";
         }
 
-        console.log(`GENERATE: final model after mapping=${model}`);
+        // console.log(`GENERATE: final model after mapping=${model}`);
 
         // Setup Supabase Admin (needed for both branches)
         const supabaseUrl = mustEnv("NEXT_PUBLIC_SUPABASE_URL");
@@ -626,7 +626,7 @@ export async function POST(req: Request) {
 
         // --- BRANCH: FAL.AI MODELS ---
         if (model.startsWith("fal-ai/")) {
-            console.log(`Using Fal Model: ${model}`);
+            // console.log(`Using Fal Model: ${model}`);
 
             // Check Global Pause first
             try {
@@ -666,14 +666,14 @@ export async function POST(req: Request) {
                 if (!uploadErr) {
                     const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
                     refImageUrl = pubUrl.publicUrl;
-                    console.log("FAL: Using uploaded canvasFile as base image:", refImageUrl);
+                    // console.log("FAL: Using uploaded canvasFile as base image:", refImageUrl);
                 } else {
                     console.warn("Failed to upload canvas image for Fal:", uploadErr);
                 }
             } else if (canvasUrl) {
                 // Canvas URL already provided (Studio flow)
                 refImageUrl = canvasUrl;
-                console.log("FAL: Using canvasUrl as base image:", refImageUrl);
+                // console.log("FAL: Using canvasUrl as base image:", refImageUrl);
             } else if (imageFiles.length > 0) {
                 // Upload first image to Supabase to get a public URL for Fal
                 const firstFile = imageFiles[0];
@@ -699,16 +699,16 @@ export async function POST(req: Request) {
             }
 
             // 🔍 IMAGE ROUTING DEBUG
-            console.log("=== IMAGE ROUTING DEBUG ===");
-            console.log("imageFiles.length:", imageFiles.length);
-            console.log("imageUrls.length:", imageUrls.length);
-            console.log("imageUrls:", imageUrls);
-            console.log("canvasUrl:", canvasUrl?.slice(0, 60));
-            console.log("canvasFile:", !!canvasFile);
-            console.log("refImageUrl:", refImageUrl?.slice(0, 60));
-            console.log("template_reference_image:", template_reference_image?.slice(0, 60));
-            console.log("refImageUrl === template_reference_image:", refImageUrl === template_reference_image);
-            console.log("=== END IMAGE ROUTING DEBUG ===");
+            // console.log("=== IMAGE ROUTING DEBUG ===");
+            // console.log("imageFiles.length:", imageFiles.length);
+            // console.log("imageUrls.length:", imageUrls.length);
+            // console.log("imageUrls:", imageUrls);
+            // console.log("canvasUrl:", canvasUrl?.slice(0, 60));
+            // console.log("canvasFile:", !!canvasFile);
+            // console.log("refImageUrl:", refImageUrl?.slice(0, 60));
+            // console.log("template_reference_image:", template_reference_image?.slice(0, 60));
+            // console.log("refImageUrl === template_reference_image:", refImageUrl === template_reference_image);
+            // console.log("=== END IMAGE ROUTING DEBUG ===");
 
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
@@ -764,7 +764,7 @@ export async function POST(req: Request) {
             // 1.8 Business Genie Context Injection (Agentic Memory)
             const businessContext = await getBusinessContext(userId, admin);
             if (businessContext) {
-                console.log("Injecting Business Context for User:", userId);
+                // console.log("Injecting Business Context for User:", userId);
                 finalFalPrompt += `\n\n[BUSINESS BLUEPRINT CONTEXT - AGENTIC MEMORY]\n(Strictly adhere to the following brand guidelines):\n${businessContext}\n`;
             }
 
@@ -777,7 +777,7 @@ export async function POST(req: Request) {
             const isSimplifiedEdit = isNano && !template_reference_image && (canvasFile || canvasUrl);
 
             if (isSimplifiedEdit) {
-                console.log("Using Simplified Direct Edit Prompt");
+                // console.log("Using Simplified Direct Edit Prompt");
                 finalFalPrompt = rawPrompt + ". Update this image based on the instruction but keep everything else exactly the same. Do not change the composition or background.";
                 // No subjectInstruction, no FACE LOCK, no remix logic
                 subjectInstruction = "";
