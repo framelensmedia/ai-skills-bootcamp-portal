@@ -132,6 +132,11 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-[#B7FF00]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#B7FF00] animate-pulse"></span>
             System Active • {role}
+            {hasProAccess && (
+              <span className="ml-2 inline-flex items-center justify-center rounded bg-[#B7FF00] px-1.5 py-0.5 text-[10px] font-bold text-black border border-[#B7FF00]">
+                PRO
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4 mt-1">
             <div className="h-12 w-12 rounded-full bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
