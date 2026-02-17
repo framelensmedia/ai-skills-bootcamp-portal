@@ -254,7 +254,7 @@ export async function POST(req: Request) {
         const isActive = sub.status === "active" || sub.status === "trialing";
 
         // Determine credits based on new plan status
-        // If becoming active premium -> 200
+        // If becoming active premium OR trialing -> 200
         // If not active (free) -> 40
         const credits = isActive ? 200 : 40;
 
@@ -267,6 +267,11 @@ export async function POST(req: Request) {
           updated_at: new Date().toISOString(),
           credits: credits,
         });
+
+        // Force log for debugging
+        if (sub.status === 'trialing') {
+          console.log(`Webhook: Trial started for customer ${customerId}. Upgraded to Premium + 200 credits.`);
+        }
 
         break;
       }
