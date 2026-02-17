@@ -55,13 +55,34 @@ export async function POST(req: Request) {
   );
 
   try {
-    const updateByCustomerId = async (customerId: string, data: any) => {
+    const updateProfile = async (session: Stripe.Checkout.Session | Stripe.Subscription, data: any) => {
+      const customerId = session.customer as string;
+      // Try to find user by metadata first (most reliable)
+      const supabaseUserId = (session as any).metadata?.supabase_user_id;
+
+      if (supabaseUserId) {
+        console.log(`Webhook: Updating profile for user ${supabaseUserId} (from metadata)`);
+        // Ensure stripe_customer_id is set
+        const { error } = await supabaseAdmin
+          .from("profiles")
+          .update({ ...data, stripe_customer_id: customerId }) // Sync ID too
+          .eq("user_id", supabaseUserId);
+
+        if (!error) return; // Success
+        console.error("Webhook: Failed to update by user_id, falling back to customer_id", error);
+      }
+
+      // Fallback: Update by stripe_customer_id
+      console.log(`Webhook: Updating profile for customer ${customerId}`);
       const { error } = await supabaseAdmin
         .from("profiles")
         .update(data)
         .eq("stripe_customer_id", customerId);
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Webhook: Failed to update profile for customer ${customerId}`, error);
+        throw error;
+      }
     };
 
     const processCommission = async (customerId: string, amountPaidCents: number, type: 'trial_bonus' | 'monthly_recurring', eventId: string) => {
@@ -195,7 +216,7 @@ export async function POST(req: Request) {
           ((sub.items?.data?.[0]?.price as Stripe.Price | undefined)?.id as string | undefined) ??
           null;
 
-        await updateByCustomerId(customerId, {
+        await updateProfile(session, {
           plan: "premium",
           stripe_subscription_id: subscriptionId,
           subscription_status: sub.status,
@@ -237,7 +258,7 @@ export async function POST(req: Request) {
         // If not active (free) -> 40
         const credits = isActive ? 200 : 40;
 
-        await updateByCustomerId(customerId, {
+        await updateProfile(sub, {
           plan: isActive ? "premium" : "free",
           stripe_subscription_id: sub.id,
           subscription_status: sub.status,
@@ -256,10 +277,20 @@ export async function POST(req: Request) {
 
         // Refill credits on successful payment (monthly renewal)
         if ((invoice as any).subscription) {
-          await updateByCustomerId(customerId, {
-            credits: 200,
-            updated_at: new Date().toISOString(),
-          });
+          // Manually handle invoice updates (no metadata usually on invoice object directly, but maybe on subscription)
+          // For simplicity, we just use customerId here or try to fetch sub
+          const subId = (invoice as any).subscription as string;
+          // We can't use updateProfile easily here without fetching sub, so let's just use the fallback logic inline or simpler
+          // Actually, let's just use customerId for invoices as they are subsequent events
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              credits: 200,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("stripe_customer_id", customerId);
+
+          if (error) console.error("Failed to update credits on invoice", error);
 
           // RECURRING COMMISSION
           // If amount_paid > 100 (more than $1), assume it's the monthly fee ($29+)
@@ -274,7 +305,7 @@ export async function POST(req: Request) {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
-        await updateByCustomerId(customerId, {
+        await updateProfile(sub, {
           plan: "free",
           subscription_status: sub.status,
           current_period_end: null,
@@ -292,11 +323,15 @@ export async function POST(req: Request) {
         // "if payment fales after 2 attempts they go back down to free account"
         if (invoice.attempt_count >= 2) {
           console.log(`Payment failed 2+ times for ${customerId}. Downgrading to Free.`);
-          await updateByCustomerId(customerId, {
-            plan: "free",
-            updated_at: new Date().toISOString(),
-            credits: 40, // Reset to Free default
-          });
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              plan: "free",
+              updated_at: new Date().toISOString(),
+              credits: 40,
+            })
+            .eq("stripe_customer_id", customerId);
+          if (error) console.error("Failed to downgrade on invoice fail", error);
         }
 
         break;
