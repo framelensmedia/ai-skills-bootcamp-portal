@@ -339,7 +339,14 @@ export default function Nav() {
                           {avatarUrl ? <img src={avatarUrl} className="h-full w-full object-cover" /> : null}
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-foreground">Edit Profile</span>
+                          <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                            Edit Profile
+                            {isPro && (
+                              <span className="inline-flex items-center rounded-md bg-[#B7FF00]/10 px-1.5 py-0.5 text-[10px] font-bold ring-1 ring-inset ring-[#B7FF00]/20 text-[#B7FF00]">
+                                PRO
+                              </span>
+                            )}
+                          </span>
                           {credits !== null && <span className="text-xs text-primary font-mono">{isAdmin ? "∞" : credits} Credits</span>}
                         </div>
                       </Link>

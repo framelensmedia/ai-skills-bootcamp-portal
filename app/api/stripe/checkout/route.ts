@@ -22,12 +22,31 @@ export async function POST() {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("stripe_customer_id,email")
+    .select("stripe_customer_id, email, plan, subscription_status")
     .eq("user_id", user.id)
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Check for active subscription
+  const isActive =
+    profile?.plan === "premium" ||
+    profile?.plan === "staff_pro" ||
+    profile?.plan === "admin" ||
+    profile?.subscription_status === "active" ||
+    profile?.subscription_status === "trialing";
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aiskills.studio";
+
+  if (isActive && profile?.stripe_customer_id) {
+    // Create Portal Session instead
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${siteUrl}/dashboard`,
+    });
+    return NextResponse.json({ url: portalSession.url });
   }
 
   let customerId = (profile?.stripe_customer_id as string | null) ?? null;
@@ -64,7 +83,7 @@ export async function POST() {
     }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aiskills.studio";
+
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
