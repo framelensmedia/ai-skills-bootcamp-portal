@@ -61,15 +61,20 @@ export async function POST(req: Request) {
       const supabaseUserId = (session as any).metadata?.supabase_user_id;
 
       if (supabaseUserId) {
-        console.log(`Webhook: Updating profile for user ${supabaseUserId} (from metadata)`);
+        console.log(`Webhook: Updating profile for user ${supabaseUserId} (from metadata). Data:`, JSON.stringify(data));
         // Ensure stripe_customer_id is set
         const { error } = await supabaseAdmin
           .from("profiles")
           .update({ ...data, stripe_customer_id: customerId }) // Sync ID too
           .eq("user_id", supabaseUserId);
 
-        if (!error) return; // Success
+        if (!error) {
+          console.log(`Webhook: Successfully updated profile for user ${supabaseUserId}`);
+          return;
+        }
         console.error("Webhook: Failed to update by user_id, falling back to customer_id", error);
+      } else {
+        console.log("Webhook: No supabase_user_id in metadata. Attempting fallback to stripe_customer_id.");
       }
 
       // Fallback: Update by stripe_customer_id
@@ -82,6 +87,8 @@ export async function POST(req: Request) {
       if (error) {
         console.error(`Webhook: Failed to update profile for customer ${customerId}`, error);
         throw error;
+      } else {
+        console.log(`Webhook: Successfully updated profile for customer ${customerId}`);
       }
     };
 
@@ -257,6 +264,8 @@ export async function POST(req: Request) {
         // If becoming active premium OR trialing -> 200
         // If not active (free) -> 40
         const credits = isActive ? 200 : 40;
+
+        console.log(`Webhook: Subscription ${sub.id} is ${sub.status}. Granting ${credits} credits. isActive=${isActive}`);
 
         await updateProfile(sub, {
           plan: isActive ? "premium" : "free",
