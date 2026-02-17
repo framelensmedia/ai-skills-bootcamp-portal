@@ -64,7 +64,7 @@ export async function POST() {
     }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://signup.aiskills.studio";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aiskills.studio";
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
