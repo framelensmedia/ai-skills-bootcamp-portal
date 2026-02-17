@@ -11,6 +11,7 @@ import BackToTop from "@/components/BackToTop";
 import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import PullToRefresh from "@/components/PullToRefresh";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aiskills.studio"),
@@ -85,6 +86,7 @@ export default function RootLayout({
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
             <ToastContextProvider>
+              <PullToRefresh />
               {/* Header */}
               <Header />
 

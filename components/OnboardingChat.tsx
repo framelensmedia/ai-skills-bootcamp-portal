@@ -185,9 +185,13 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
                 setStep("complete");
                 await addBotMessages(SCRIPTS.complete(intent));
                 setTimeout(() => {
-                    if (intent === "learn") router.push("/learn");
-                    else if (intent === "create") router.push("/feed");
-                    else router.push("/dashboard");
+                    if (intent === "learn") {
+                        window.location.href = "/learn";
+                    } else if (intent === "create") {
+                        window.location.href = "/feed";
+                    } else {
+                        window.location.href = "/dashboard";
+                    }
                 }, 2000);
             }
         } catch { await addBotMessages(SCRIPTS.error); }
