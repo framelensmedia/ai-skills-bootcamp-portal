@@ -98,6 +98,8 @@ export default function Header() {
                                 <span className="text-lime-400">AI Skills</span>{" "}
                                 <span className="text-foreground">Studio</span>
                                 <span className="ml-1 -mt-2 text-xs text-lime-400 font-normal opacity-75">beta</span>
+                                {/* PRO Badge if applicable - check role/plan if needed */}
+                                {/* For simplicity, we can check a simple prop or just leave it for now until we have global state for pro */}
                             </span>
                         </Link>
                         <div className="shrink-0">

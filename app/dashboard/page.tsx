@@ -276,7 +276,7 @@ export default function DashboardPage() {
             <div className="mt-8 rounded-xl border border-white/10 bg-zinc-900/20 p-6">
               <div className="mb-4 flex items-center gap-2">
                 <Shield size={16} className="text-[#B7FF00]" />
-                <h2 className="text-sm font-bold uppercase tracking-wide text-white">Administrative Tools</h2>
+                <h2 className="text-sm font-bold uppercase tracking-wide text-white">Administrative Tools ({role})</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <Link href="/dashboard/cms" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">

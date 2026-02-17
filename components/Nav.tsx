@@ -26,6 +26,7 @@ export default function Nav() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasBlog, setHasBlog] = useState(false);
   const [hasResources, setHasResources] = useState(false);
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -39,7 +40,7 @@ export default function Nav() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("profile_image, credits, role")
+        .select("profile_image, credits, role, plan")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -48,6 +49,7 @@ export default function Nav() {
         setAvatarUrl(profile.profile_image);
         setCredits(profile.credits ?? 0);
         setIsAdmin(profile.role === "admin" || profile.role === "super_admin");
+        setIsPro(profile.plan === "premium" || profile.plan === "staff_pro" || profile.role === "admin" || profile.role === "super_admin");
       }
     }
 
@@ -200,6 +202,11 @@ export default function Nav() {
               >
                 <div className="hidden md:block">
                   <GamificationStatus />
+                  {isPro && (
+                    <span className="ml-2 inline-flex items-center rounded-md bg-[#B7FF00]/10 px-2 py-1 text-xs font-bold ring-1 ring-inset ring-[#B7FF00]/20 text-[#B7FF00]">
+                      PRO
+                    </span>
+                  )}
                 </div>
                 {credits !== null && (
                   <div className="hidden md:flex items-center gap-1.5 bg-secondary border border-border rounded-full px-3 py-1 text-xs font-semibold text-primary">
