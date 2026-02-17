@@ -111,6 +111,9 @@ export async function POST() {
     ],
     subscription_data: {
       trial_period_days: 7,
+      metadata: {
+        supabase_user_id: user.id
+      }
     },
     success_url: `${siteUrl}/dashboard?paid=1`,
     cancel_url: `${siteUrl}/pricing?canceled=1`,
