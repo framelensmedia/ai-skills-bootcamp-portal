@@ -323,6 +323,12 @@ export default function DashboardPage() {
                     <span className="text-sm font-medium text-white">User Admin</span>
                   </Link>
                 )}
+                {isAdminPlus && (
+                  <Link href="/dashboard/admin/analytics" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
+                    <LayoutGrid size={18} className="text-green-400" />
+                    <span className="text-sm font-medium text-white">Site Analytics</span>
+                  </Link>
+                )}
               </div>
             </div>
           )}
