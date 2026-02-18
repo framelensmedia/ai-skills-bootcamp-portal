@@ -73,6 +73,29 @@ export default function DashboardPage() {
     }
   }, [initialized, user, router]);
 
+  // PAYMENT & REFERRAL CHECK
+  useEffect(() => {
+    if (!initialized || !user) return;
+
+    // 1. Referral Safety Net
+    // Fire and forget - ensures we capture referral if cookie exists but DB record missing
+    fetch("/api/ambassador/track-referral", { method: "POST" })
+      .catch(err => console.error("Referral track error:", err));
+
+    // 2. Handle Payment Return
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('paid') === '1') {
+      // Force refresh of router to clear server cache
+      router.refresh();
+      // Also locally trigger a reload of profile data
+      setLoadingProfile(true);
+      // Clear the param to avoid re-triggering
+      window.history.replaceState({}, '', '/dashboard');
+      // Ideally show a toast here, but simple alert or console for now is fine since UI updates
+      console.log("Payment successful, refreshing profile...");
+    }
+  }, [initialized, user, router]);
+
   // Load Profile Data
   useEffect(() => {
     let cancelled = false;

@@ -41,14 +41,18 @@ export async function GET(request: Request) {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data: profile } = await supabase.from("profiles").select("onboarding_completed").eq("user_id", user.id).single();
-                if (profile && !profile.onboarding_completed) {
+
+                // If profile is missing (race condition) OR incomplete, send webhook
+                if (!profile || !profile.onboarding_completed) {
+                    console.log("GHL Webhook triggered for new user via Google:", user.email);
+
                     // New user from Google (or returning incomplete). Send to GHL.
                     // We only want to send this ONCE ideally, but GHL handles dedupe.
                     // Sending on every login until onboarding complete is safe enough.
                     await sendGHLWebhook({
                         email: user.email || "",
-                        firstName: user.user_metadata?.full_name?.split(" ")[0] || "",
-                        lastName: user.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
+                        firstName: user.user_metadata?.full_name?.split(" ")[0] || user.user_metadata?.name?.split(" ")[0] || "",
+                        lastName: user.user_metadata?.full_name?.split(" ").slice(1).join(" ") || user.user_metadata?.name?.split(" ").slice(1).join(" ") || "",
                         source: "Google OAuth",
                         tags: ["ai-skills-new-user"]
                     });

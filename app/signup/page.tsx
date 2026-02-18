@@ -10,6 +10,7 @@ import { Eye, EyeOff } from "lucide-react";
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +33,11 @@ export default function SignupPage() {
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
     });
 
     setLoading(false);
@@ -48,10 +54,20 @@ export default function SignupPage() {
 
     // Send to GHL
     try {
+      // Split name for GHL
+      const nameParts = fullName.trim().split(" ");
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(" ");
+
       await fetch("/api/integrations/ghl/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, source: "Email Signup" }),
+        body: JSON.stringify({
+          email,
+          firstName,
+          lastName,
+          source: "Email Signup"
+        }),
       });
     } catch (err) {
       console.error("GHL Hook failed", err);
@@ -89,6 +105,18 @@ export default function SignupPage() {
         </p>
 
         <form onSubmit={onSubmit} className="space-y-4 shadow-lg">
+          <div className="space-y-2">
+            <label className="text-sm text-white/80">Full Name</label>
+            <input
+              type="text"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-white/25"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              placeholder="John Doe"
+            />
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm text-white/80">Email</label>
             <input
