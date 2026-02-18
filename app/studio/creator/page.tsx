@@ -174,8 +174,8 @@ function CreatorContent() {
     // Community Feed handled by StudioCommunityFeed component now
 
     const previewAspectClass = useMemo(() => {
-        // Force 1:1 if showing the placeholder orb
-        if (previewImage === "/orb-neon.gif") return "aspect-square";
+        // Force 1:1 if showing the placeholder orb -> REMOVED to show aspect ratio change
+        // if (previewImage === "/orb-neon.gif") return "aspect-square";
 
         if (aspectRatio === "9:16") return "aspect-[9/16]";
         if (aspectRatio === "16:9") return "aspect-[16/9]";

@@ -1187,7 +1187,7 @@ function StudioContent() {
               <GenerationOverlay label={animating ? "CREATING VIDEO" : "GENERATING ARTWORK"} />
             )}
             <div
-              className="relative aspect-[9/16] w-full cursor-pointer"
+              className={`relative w-full cursor-pointer ${aspectRatio === "16:9" ? "aspect-video" : aspectRatio === "1:1" ? "aspect-square" : aspectRatio === "4:5" ? "aspect-[4/5]" : "aspect-[9/16]"}`}
               onClick={() => setLightboxOpen(true)}
             >
               {videoResult ? (
