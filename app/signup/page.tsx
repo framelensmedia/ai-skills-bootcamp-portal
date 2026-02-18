@@ -73,6 +73,13 @@ export default function SignupPage() {
       console.error("GHL Hook failed", err);
     }
 
+    // Failsafe: Explicitly update profile name in case DB trigger missed metadata
+    // (This ensures the name is saved even if the SQL trigger wasn't updated)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("profiles").update({ full_name: fullName }).eq("user_id", user.id);
+    }
+
     router.push("/welcome");
   };
 
