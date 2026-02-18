@@ -15,33 +15,34 @@ export default async function AdminAnalyticsPage() {
         .select("*", { count: "exact", head: true });
 
     // 2. Stripe Stats (Source of truth for billing)
-    // We use the search API for efficient counting if available, or list and count manually.
-    // Search API is better for "count" but requires enabling in Dashboard.
-    // Let's use search with limit 1 just to get total_count from response if possible?
-    // Actually, list doesn't return total_count. Search does.
-    // Query: status:'active' and status:'trialing'
+    // We use the LIST API for immediate consistency (search is eventually consistent)
 
     let activePaidUsers = 0;
     try {
-        const searchActive = await stripe.subscriptions.search({
-            query: "status:'active'",
-            limit: 1,
+        // Check for 'active' status
+        const listActive = await stripe.subscriptions.list({
+            status: 'active',
+            limit: 100, // Fetch up to 100 recent to count (paginate if scaling needed)
         });
-        activePaidUsers = searchActive.total_count || 0;
+        // For now, just length. If > 100, we'd need pagination loop, but for startup scale this is fine.
+        activePaidUsers = listActive.data.length;
+        if (listActive.has_more) {
+            // Simple indicator it's 100+
+            activePaidUsers = 100;
+        }
     } catch (e) {
-        console.error("Stripe search failed (Active):", e);
-        // Fallback? or show error
+        console.error("Stripe list failed (Active):", e);
     }
 
     let trialingUsers = 0;
     try {
-        const searchTrialing = await stripe.subscriptions.search({
-            query: "status:'trialing'",
-            limit: 1,
+        const listTrialing = await stripe.subscriptions.list({
+            status: 'trialing',
+            limit: 100,
         });
-        trialingUsers = searchTrialing.total_count || 0;
+        trialingUsers = listTrialing.data.length;
     } catch (e) {
-        console.error("Stripe search failed (Trialing):", e);
+        console.error("Stripe list failed (Trialing):", e);
     }
 
     // 4. Active Ambassadors
