@@ -158,6 +158,27 @@ export async function POST(req: Request) {
           stripe_transfer_id: transfer.id,
           status: "paid"
         });
+
+        // 7. Trigger Ambassador Webhook
+        try {
+          // We need ambassador email and referred user email
+          const { data: ambssUser } = await supabaseAdmin.from("profiles").select("email").eq("user_id", ambassador.user_id).single();
+          const { data: refUser } = await supabaseAdmin.from("profiles").select("email, full_name, username").eq("user_id", profile.user_id).single();
+
+          if (ambssUser?.email && refUser?.email) {
+            // Need to import dynamically or at top of file
+            const { sendAmbassadorWebhook } = await import("@/lib/ghl");
+            await sendAmbassadorWebhook({
+              ambassador_id: referral.ambassador_id,
+              ambassador_email: ambssUser.email,
+              referred_user_email: refUser.email,
+              referred_user_name: refUser.full_name || refUser.username || "Referred User",
+              type: "referral_success"
+            });
+          }
+        } catch (webhookErr) {
+          console.error("Failed to trigger ambassador GHL webhook:", webhookErr);
+        }
       } catch (err: any) {
         console.error("Commission Transfer Failed:", err);
         await supabaseAdmin.from("commissions").insert({

@@ -84,15 +84,26 @@ export default function DashboardPage() {
 
     // 2. Handle Payment Return
     const params = new URLSearchParams(window.location.search);
-    if (params.get('paid') === '1') {
+    const paid = params.get('paid');
+    const creditsAdded = params.get('credits_added');
+
+    if (paid === '1' || creditsAdded) {
       // Force refresh of router to clear server cache
       router.refresh();
       // Also locally trigger a reload of profile data
       setLoadingProfile(true);
-      // Clear the param to avoid re-triggering
+
+      // Clean up the URL
       window.history.replaceState({}, '', '/dashboard');
-      // Ideally show a toast here, but simple alert or console for now is fine since UI updates
-      console.log("Payment successful, refreshing profile...");
+
+      if (paid === '1') {
+        console.log("Payment successful, refreshing profile...");
+        // Provide user feedback that upgrade worked
+        alert("Success! Your account has been upgraded.");
+      } else if (creditsAdded) {
+        console.log(`Successfully added ${creditsAdded} credits, refreshing...`);
+        alert(`Success! Added ${creditsAdded} credits to your account.`);
+      }
     }
   }, [initialized, user, router]);
 

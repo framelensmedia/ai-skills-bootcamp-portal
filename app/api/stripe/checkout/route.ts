@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
-export async function POST() {
+export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
   }
@@ -38,7 +38,10 @@ export async function POST() {
     profile?.subscription_status === "active" ||
     profile?.subscription_status === "trialing";
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://aiskills.studio";
+  // Detect base URL dynamically to prevent localhost/hardcoded redirects
+  const host = req.headers.get("host") || "localhost:3000";
+  const protocol = host.includes("localhost") ? "http" : "https";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
 
   if (isActive && profile?.stripe_customer_id) {
     // Create Portal Session instead

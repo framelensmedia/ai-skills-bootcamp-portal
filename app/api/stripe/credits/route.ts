@@ -85,7 +85,10 @@ export async function POST(req: Request) {
             .eq("user_id", user.id);
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    // Detect base URL dynamically to prevent localhost redirects in production
+    const host = req.headers.get("host") || "localhost:3000";
+    const protocol = host.includes("localhost") ? "http" : "https";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
 
     // Create one-time payment checkout session
     const session = await stripe.checkout.sessions.create({

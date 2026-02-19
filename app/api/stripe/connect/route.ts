@@ -65,17 +65,9 @@ export async function POST(req: Request) {
         }
 
         // 5. Generate Account Link (Onboarding)
-        // Order: Env Var -> Vercel URL -> Request Origin -> Localhost
-        let origin = process.env.NEXT_PUBLIC_SITE_URL;
-
-        // Vercel Preview/Production Url Support (auto-https)
-        if (!origin && process.env.VERCEL_URL) {
-            origin = `https://${process.env.VERCEL_URL}`;
-        }
-
-        if (!origin) {
-            origin = req.headers.get("origin") || "http://localhost:3000";
-        }
+        const host = req.headers.get("host") || "localhost:3000";
+        const protocol = host.includes("localhost") ? "http" : "https";
+        let origin = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
 
         // Remove trailing slash if present
         if (origin.endsWith("/")) origin = origin.slice(0, -1);
