@@ -85,6 +85,15 @@ export default async function PromptsPage({
 
   const { data: prompts, error } = await query;
 
+  // Fetch Trending Templates (Top 6)
+  const { data: trendingPrompts } = await supabase
+    .from("prompts_public")
+    .select(
+      "id,title,slug,summary,category,access_level,image_url,featured_image_url,media_url,created_at,pack_name,pack_slug"
+    )
+    .order("created_at", { ascending: false })
+    .limit(6);
+
   if (error) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-10 text-white">
@@ -140,35 +149,84 @@ export default async function PromptsPage({
         </div>
       </div>
 
-      {/* Pack Carousel */}
-      <div className="mt-12">
+      {/* Section 1: Trending Prompts */}
+      <div className="mt-8">
+        <div className="mb-8 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <Wand2 size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Trending Templates</h2>
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
+              <span className="text-purple-400 flex-shrink-0">●</span>
+              <span className="text-xs font-medium text-white">Most popular templates right now</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {(trendingPrompts ?? []).map((p) => {
+            const image = p.featured_image_url || p.image_url || p.media_url || null;
+            return (
+              <PromptCard
+                key={p.id}
+                id={p.id}
+                title={p.title}
+                summary={p.summary || ""}
+                slug={p.slug}
+                featuredImageUrl={image}
+                category={p.category || undefined}
+                accessLevel={p.access_level || undefined}
+                packName={p.pack_name || undefined}
+                packSlug={p.pack_slug || undefined}
+                initialFavorited={favoriteIds.has(p.id)}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Section 2: Pack Carousel */}
+      <div className="mt-16 pt-8 border-t border-white/10">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#B7FF00]/10 border border-[#B7FF00]/20 text-[#B7FF00]">
+            <Layers size={24} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Prompt Packs</h2>
+            <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
+              <span className="text-[#B7FF00] flex-shrink-0">●</span>
+              <span className="text-xs font-medium text-white">Curated collections for specific workflows</span>
+            </div>
+          </div>
+        </div>
         <PackCarousel packs={packs} />
       </div>
 
-      {/* Toolbar */}
-      <div className="mt-12">
+      {/* Section 3: All Templates (Toolbar + Grid) */}
+      <div className="mt-16 pt-8 border-t border-white/10">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
+              <Palette size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-1">All Templates</h2>
+              <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
+                <span className="text-blue-400 flex-shrink-0">●</span>
+                <span className="text-xs font-medium text-white">Search and filter our entire library</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <PromptsToolbar
           initialQuery={q}
           initialCategory={category}
           initialSort={sort}
           categories={categories}
         />
-      </div>
 
-      {/* Individual Templates */}
-      <div className="mt-8">
-        <div className="mb-8 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#B7FF00]/5 border border-[#B7FF00]/20 text-[#B7FF00]">
-            <Palette size={24} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Professional Templates</h2>
-            <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm transition hover:bg-white/5 cursor-default">
-              <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
-              <span className="text-xs font-medium text-white">Pick a prompt and remix it</span>
-            </div>
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {(prompts ?? []).map((p) => {

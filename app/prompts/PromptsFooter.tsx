@@ -184,67 +184,6 @@ export default function PromptsFooter() {
 
     return (
         <div className="flex flex-col gap-12">
-            {/* Trending Prompts */}
-            {/* Trending Prompts Carousel */}
-            {trendingPrompts.length > 0 && (
-                <div className="pt-12 border-t border-white/10 group/slider">
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="flex-shrink-0 flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400">
-                                <TrendingUp size={24} />
-                            </div>
-                            <div className="min-w-0">
-                                <h2 className="text-2xl font-bold text-white mb-1 truncate">Trending Prompts</h2>
-                                <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm transition hover:bg-white/5 cursor-default max-w-full">
-                                    <span className="text-purple-400 flex-shrink-0">●</span>
-                                    <span className="text-xs font-medium text-white truncate">Most popular templates right now</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Controls - Hidden on mobile, visible on tablet+ */}
-                        <div className="hidden sm:flex gap-2 opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300">
-                            <button
-                                onClick={() => scroll("left")}
-                                disabled={!canScrollLeft}
-                                className="rounded-full bg-white/5 p-3 text-white/60 backdrop-blur-md transition hover:bg-white/10 hover:text-[#B7FF00] disabled:opacity-30 border border-white/5"
-                                aria-label="Scroll left"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <button
-                                onClick={() => scroll("right")}
-                                disabled={!canScrollRight}
-                                className="rounded-full bg-white/5 p-3 text-white/60 backdrop-blur-md transition hover:bg-white/10 hover:text-[#B7FF00] disabled:opacity-30 border border-white/5"
-                                aria-label="Scroll right"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div
-                        ref={scrollRef}
-                        className="flex gap-6 overflow-x-auto pb-8 pt-2 scrollbar-hide snap-x snap-mandatory"
-                        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                    >
-                        {trendingPrompts.map((p) => (
-                            <div key={p.id} className="min-w-[300px] w-[300px] snap-center">
-                                <PromptCard
-                                    id={p.id}
-                                    title={p.title}
-                                    summary={p.summary || ""}
-                                    slug={p.slug}
-                                    featuredImageUrl={p.featured_image_url || p.image_url || p.media_url}
-                                    category={p.category}
-                                    accessLevel={p.access_level}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {/* Infinite Community Remixes */}
             {communityRemixes.length > 0 && (
                 <div className="pt-12 border-t border-white/10 relative">

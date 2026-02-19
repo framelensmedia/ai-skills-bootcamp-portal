@@ -95,12 +95,10 @@ export default function PackCarousel({ packs }: { packs: Pack[] }) {
                     <Link
                         key={pack.id}
                         href={pack.slug === "#" ? "#" : `/prompts/packs/${pack.slug}`}
-                        className="group relative flex-shrink-0 snap-center 
-              w-[75%] sm:w-[45%] md:w-[35%] lg:w-[28%] xl:w-[22%] 
-              transition-all duration-500 ease-out"
+                        className="group relative flex-shrink-0 snap-center w-[45%] sm:w-[30%] md:w-[25%] lg:w-[20%] xl:w-[16%] transition-all duration-500 ease-out"
                     >
                         {/* The Card Container */}
-                        <div className="relative aspect-[5/6] overflow-hidden rounded-[2rem] bg-zinc-900 border border-white/10 shadow-2xl transition-all duration-500 group-hover:scale-105 group-hover:shadow-[#B7FF00]/20 group-hover:border-[#B7FF00]/40">
+                        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl transition-all duration-500 group-hover:scale-105 group-hover:shadow-[#B7FF00]/20 group-hover:border-[#B7FF00]/40">
 
                             {/* Image */}
                             {pack.thumbnail_url ? (
@@ -113,44 +111,44 @@ export default function PackCarousel({ packs }: { packs: Pack[] }) {
                                 />
                             ) : (
                                 <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-black flex items-center justify-center">
-                                    <Layers className="w-16 h-16 text-white/10 group-hover:text-[#B7FF00]/50 transition-colors" />
+                                    <Layers className="w-8 h-8 text-white/10 group-hover:text-[#B7FF00]/50 transition-colors" />
                                 </div>
                             )}
 
                             {/* Overlay Gradient for Text Readability */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-90" />
 
                             {/* Content */}
-                            <div className="absolute inset-0 flex flex-col justify-end p-6">
+                            <div className="absolute inset-0 flex flex-col justify-end p-4">
                                 {/* Floating Badge */}
-                                <div className="absolute top-4 right-4 translate-y-[-10px] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                                    <span className="rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1 text-xs font-bold text-[#B7FF00] backdrop-blur-md">
+                                <div className="absolute top-3 right-3 translate-y-[-5px] opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 hidden sm:block">
+                                    <span className="rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-2 py-0.5 text-[10px] font-bold text-[#B7FF00] backdrop-blur-md">
                                         VIEW PACK
                                     </span>
                                 </div>
 
                                 {/* Pro Badge */}
                                 {pack.access_level === "premium" && (
-                                    <div className="absolute top-4 left-4">
-                                        <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-3 py-1 text-xs font-bold text-purple-300 backdrop-blur-md">
+                                    <div className="absolute top-3 left-3">
+                                        <span className="rounded-full border border-purple-500/30 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-300 backdrop-blur-md">
                                             PRO
                                         </span>
                                     </div>
                                 )}
 
-                                <div className="transform transition-transform duration-300 group-hover:-translate-y-2">
-                                    <div className="flex items-center gap-2 mb-2 opacity-80">
-                                        <Sparkles className="w-3 h-3 text-[#B7FF00]" />
-                                        <span className="text-[10px] uppercase tracking-wider font-bold text-[#B7FF00]">
+                                <div className="transform transition-transform duration-300 group-hover:-translate-y-1">
+                                    <div className="flex items-center gap-1.5 mb-1.5 opacity-80">
+                                        <Sparkles className="w-2.5 h-2.5 text-[#B7FF00]" />
+                                        <span className="text-[9px] uppercase tracking-wider font-bold text-[#B7FF00]">
                                             {pack.template_count || 0} Templates
                                         </span>
                                     </div>
 
-                                    <h3 className="text-2xl font-bold text-white leading-tight mb-2 group-hover:text-[#B7FF00] transition-colors">
+                                    <h3 className="text-base sm:text-lg font-bold text-white leading-tight mb-1 group-hover:text-[#B7FF00] transition-colors line-clamp-2">
                                         {pack.pack_name}
                                     </h3>
 
-                                    <p className="text-sm text-white/60 line-clamp-2 leading-relaxed group-hover:text-white/80">
+                                    <p className="text-xs text-white/50 line-clamp-2 leading-snug group-hover:text-white/70 hidden sm:block">
                                         {pack.pack_description}
                                     </p>
                                 </div>
