@@ -36,11 +36,39 @@ export default function TourGuide({ tourId, steps, runOnMount = true, startTrigg
                 localStorage.setItem(`tour_seen_${tourId}`, "true");
                 if (onComplete) onComplete();
 
-                // FIX: Force cleanup of pointer-events that driver.js sometimes leaves behind on iOS/PWA
-                document.documentElement.style.pointerEvents = "";
-                document.body.style.pointerEvents = "";
-                // Also remove the driver-active class just in case it gets stuck
-                document.body.classList.remove("driver-active", "driver-active-body");
+                // FIX: Aggressive cleanup of driver.js artifacts for iOS PWA
+                // Driver.js sometimes leaves DOM states that prevent input focus on mobile
+                const cleanup = () => {
+                    document.documentElement.style.pointerEvents = "";
+                    document.body.style.pointerEvents = "";
+                    document.body.style.overflow = "";
+                    document.body.style.userSelect = "";
+
+                    // Specific to Safari/iOS
+                    if (typeof document.body.style.webkitUserSelect !== "undefined") {
+                        document.body.style.webkitUserSelect = "";
+                    }
+                    if (typeof document.body.style.touchAction !== "undefined") {
+                        document.body.style.touchAction = "";
+                    }
+
+                    // Remove driver active classes
+                    document.body.classList.remove("driver-active", "driver-active-body", "driver-active-html");
+
+                    // Remove any stuck driver elements from the DOM
+                    document.querySelectorAll('.driver-overlay, .driver-popover, .driver-stage-no-animation').forEach(el => el.remove());
+
+                    // Remove pointer-events from any elements driver.js might have highlighted
+                    document.querySelectorAll('.driver-highlighted-element').forEach((el) => {
+                        el.classList.remove('driver-highlighted-element');
+                        (el as HTMLElement).style.pointerEvents = "";
+                    });
+                };
+
+                // Run immediately and after a short delay to ensure driver finishes its own internal destruction
+                cleanup();
+                setTimeout(cleanup, 100);
+                setTimeout(cleanup, 500);
             }
         });
     }, [steps, tourId, onComplete]);
