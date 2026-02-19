@@ -212,9 +212,9 @@ export default function PromptCard({
           <div className="mt-auto pt-4 flex items-center justify-between">
             <div className="text-xs text-muted-foreground/70">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>
 
-            {/* Icon-only Remix Button (Subtle) */}
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full border ${isAuthed ? "border-primary/30 text-primary bg-primary/5" : "border-border text-muted-foreground bg-secondary"} transition group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:scale-110 shadow-sm`}>
-              <RefreshCw size={14} />
+            {/* Standard Remix Button (Matches RemixCard) - Rendered solid immediately to prevent delay pop-in */}
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#B7FF00] text-black transition-transform shadow-lg group-hover:scale-105 shadow-lime-500/20">
+              <RefreshCw size={16} strokeWidth={2.5} />
             </div>
           </div>
         </div>
