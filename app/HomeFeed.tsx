@@ -490,9 +490,25 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
             {recentRemixes && recentRemixes.length > 0 && (
                 <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16">
                     <div className="mt-24 pt-8 border-t border-white/10">
-                        <div className="mb-6 flex items-center gap-4">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                                <RefreshCw size={24} />
+                        {/* Mobile Layout */}
+                        <div className="mb-6 md:hidden">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00] text-black shadow-[0_0_20px_-5px_#B7FF00]">
+                                    <RefreshCw size={24} strokeWidth={2.5} />
+                                </div>
+                                <h3 className="text-2xl font-bold text-foreground">See What the Community Is&nbsp;Creating</h3>
+                            </div>
+                            <p className="text-muted-foreground">
+                                See how our members are launching and growing their businesses with AI&nbsp;Skills&nbsp;Studio.
+                                <br />
+                                <span className="text-sm opacity-70">Get inspired, remix ideas, and create your own version in minutes.</span>
+                            </p>
+                        </div>
+
+                        {/* Desktop Layout */}
+                        <div className="mb-6 hidden md:flex items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00] text-black shadow-[0_0_20px_-5px_#B7FF00]">
+                                <RefreshCw size={24} strokeWidth={2.5} />
                             </div>
                             <div>
                                 <h3 className="text-2xl font-bold text-foreground mb-1">See What the Community Is&nbsp;Creating</h3>
