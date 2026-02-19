@@ -35,6 +35,12 @@ export default function TourGuide({ tourId, steps, runOnMount = true, startTrigg
                 // Mark as seen in localStorage
                 localStorage.setItem(`tour_seen_${tourId}`, "true");
                 if (onComplete) onComplete();
+
+                // FIX: Force cleanup of pointer-events that driver.js sometimes leaves behind on iOS/PWA
+                document.documentElement.style.pointerEvents = "";
+                document.body.style.pointerEvents = "";
+                // Also remove the driver-active class just in case it gets stuck
+                document.body.classList.remove("driver-active", "driver-active-body");
             }
         });
     }, [steps, tourId, onComplete]);
