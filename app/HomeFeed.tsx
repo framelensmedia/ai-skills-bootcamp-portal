@@ -453,7 +453,15 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </p>
                     </div>
 
-                    <Link href="/prompts" className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0">
+                    <Link
+                        href="/prompts"
+                        onClick={() => {
+                            import("@/lib/gtm").then(({ trackEvent }) =>
+                                trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })
+                            );
+                        }}
+                        className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0"
+                    >
                         <span>Use Free Templates</span>
                         <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
                     </Link>
@@ -480,7 +488,15 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                 </div>
 
                 <div className="mt-6 flex justify-center md:hidden">
-                    <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80">
+                    <Link
+                        href="/prompts"
+                        onClick={() => {
+                            import("@/lib/gtm").then(({ trackEvent }) =>
+                                trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })
+                            );
+                        }}
+                        className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80"
+                    >
                         <span>Use Free Templates</span>
                     </Link>
                 </div>
@@ -527,7 +543,15 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </div>
 
                         <div className="mt-8 flex justify-center">
-                            <Link href="/feed" className="group flex items-center gap-2 rounded-full bg-[#B7FF00] px-8 py-3 text-sm font-bold text-black transition-all hover:opacity-90">
+                            <Link
+                                href="/feed"
+                                onClick={() => {
+                                    import("@/lib/gtm").then(({ trackEvent }) =>
+                                        trackEvent("cta_click_create_yours_now", { section: "community", label: "Create Yours Now" })
+                                    );
+                                }}
+                                className="group flex items-center gap-2 rounded-full bg-[#B7FF00] px-8 py-3 text-sm font-bold text-black transition-all hover:opacity-90"
+                            >
                                 <span>Create Yours Now</span>
                                 <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                             </Link>

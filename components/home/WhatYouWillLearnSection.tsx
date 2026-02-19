@@ -56,6 +56,12 @@ export default function WhatYouWillLearnSection() {
             <div className="flex justify-center">
                 <Link
                     href={user ? "/prompts" : "/signup"}
+                    onClick={() => {
+                        import("@/lib/gtm").then(({ trackEvent }) => {
+                            if (!user) trackEvent("cta_click_signup_free", { section: "benefits", label: "Sign Up Free and Start Now" });
+                            trackEvent("cta_click_start_now", { section: "benefits", label: "Sign Up Free and Start Now" });
+                        });
+                    }}
                     className="inline-flex items-center justify-center rounded-md bg-[#B7FF00] px-8 py-4 text-base font-bold text-black hover:opacity-90 transition-opacity"
                 >
                     Sign Up Free and Start Now

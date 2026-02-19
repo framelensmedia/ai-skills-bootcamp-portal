@@ -80,6 +80,10 @@ export default function SignupPage() {
       await supabase.from("profiles").update({ full_name: fullName }).eq("user_id", user.id);
     }
 
+    import("@/lib/gtm").then(({ trackEvent }) => {
+      trackEvent("signup_completed", { method: "email" });
+    });
+
     router.push("/welcome");
   };
 
