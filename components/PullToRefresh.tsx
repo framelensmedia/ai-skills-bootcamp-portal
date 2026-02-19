@@ -20,6 +20,13 @@ export default function PullToRefresh() {
         if (typeof window === "undefined" || !("ontouchstart" in window)) return;
 
         const handleTouchStart = (e: TouchEvent) => {
+            // Disable pull-to-refresh if touching inside a scrollable container or modal
+            const target = e.target as Element;
+            if (target && target.closest('.overflow-y-auto, .overflow-auto, [data-no-pull], .fixed.z-\\[100\\]')) {
+                setPulling(false);
+                return;
+            }
+
             if (window.scrollY === 0) {
                 setStartY(e.touches[0].clientY);
                 setPulling(true);
