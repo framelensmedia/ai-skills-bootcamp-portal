@@ -116,11 +116,7 @@ export default function Header() {
                     <div className="flex justify-center py-4">
                         <Link
                             href="/signup"
-                            onClick={() => {
-                                import("@/lib/gtm").then(({ trackEvent }) =>
-                                    trackEvent("cta_click_signup_free", { section: "header", label: "Sign Up Free" })
-                                );
-                            }}
+                            onClick={() => trackEvent("cta_click_signup_free", { section: "header", label: "Sign Up Free" })}
                             className="inline-flex items-center justify-center rounded-full bg-lime-400 px-6 py-3 text-sm font-bold tracking-wider text-black uppercase hover:bg-lime-300 shadow-lg shadow-lime-400/20 transition-all hover:scale-105"
                         >
                             Sign Up Free

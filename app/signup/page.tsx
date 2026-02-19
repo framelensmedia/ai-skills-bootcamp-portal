@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Eye, EyeOff } from "lucide-react";
+import { trackEvent } from "@/lib/gtm";
 
 
 export default function SignupPage() {
@@ -80,9 +81,7 @@ export default function SignupPage() {
       await supabase.from("profiles").update({ full_name: fullName }).eq("user_id", user.id);
     }
 
-    import("@/lib/gtm").then(({ trackEvent }) => {
-      trackEvent("signup_completed", { method: "email" });
-    });
+    trackEvent("signup_completed", { method: "email" });
 
     router.push("/welcome");
   };

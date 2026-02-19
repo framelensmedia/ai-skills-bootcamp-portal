@@ -2,6 +2,7 @@
 
 // ... existing imports ...
 import Link from "next/link";
+import { trackEvent } from "@/lib/gtm";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
@@ -455,11 +456,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
                     <Link
                         href="/prompts"
-                        onClick={() => {
-                            import("@/lib/gtm").then(({ trackEvent }) =>
-                                trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })
-                            );
-                        }}
+                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
                         className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0"
                     >
                         <span>Use Free Templates</span>
@@ -490,11 +487,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                 <div className="mt-6 flex justify-center md:hidden">
                     <Link
                         href="/prompts"
-                        onClick={() => {
-                            import("@/lib/gtm").then(({ trackEvent }) =>
-                                trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })
-                            );
-                        }}
+                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
                         className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80"
                     >
                         <span>Use Free Templates</span>
@@ -545,11 +538,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         <div className="mt-8 flex justify-center">
                             <Link
                                 href="/feed"
-                                onClick={() => {
-                                    import("@/lib/gtm").then(({ trackEvent }) =>
-                                        trackEvent("cta_click_create_yours_now", { section: "community", label: "Create Yours Now" })
-                                    );
-                                }}
+                                onClick={() => trackEvent("cta_click_create_yours_now", { section: "community", label: "Create Yours Now" })}
                                 className="group flex items-center gap-2 rounded-full bg-[#B7FF00] px-8 py-3 text-sm font-bold text-black transition-all hover:opacity-90"
                             >
                                 <span>Create Yours Now</span>
