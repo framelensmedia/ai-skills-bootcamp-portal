@@ -59,6 +59,9 @@ function TypeWriter({ text }: { text: string }) {
     );
 }
 
+import TourGuide from "@/components/TourGuide";
+import { DriveStep } from "driver.js";
+
 function CreatorContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -626,8 +629,66 @@ function CreatorContent() {
         }
     };
 
+    const studioTourSteps: DriveStep[] = [
+        {
+            element: '.tour-studio-welcome',
+            popover: {
+                title: 'This is the AI Studio',
+                description: 'This is where you can create from scratch.',
+                side: "bottom",
+                align: 'start'
+            }
+        },
+        {
+            element: '.tour-studio-media-type',
+            popover: {
+                title: '1. Choose Media Type',
+                description: 'Select whether you want to generate an Image or a Video.',
+                side: "top",
+                align: 'start'
+            }
+        },
+        {
+            element: '.tour-studio-aspect-ratio',
+            popover: {
+                title: '2. Pick a Size',
+                description: 'Choose the aspect ratio that fits your needs (Square, Portrait, Landscape).',
+                side: "top",
+                align: 'start'
+            }
+        },
+        {
+            element: '.tour-studio-reference',
+            popover: {
+                title: '3. Upload Reference (Optional)',
+                description: 'Choose from your existing library or upload something new to guide the AI.',
+                side: "right",
+                align: 'start'
+            }
+        },
+        {
+            element: '.tour-studio-prompt',
+            popover: {
+                title: '4. Type Your Idea',
+                description: 'Just describe what you want to see in plain English. No coding needed!',
+                side: "bottom",
+                align: 'start'
+            }
+        },
+        {
+            element: '.tour-studio-generate',
+            popover: {
+                title: '5. Click Generate',
+                description: 'Hit this button and wait a few seconds to see your creation appear!',
+                side: "top",
+                align: 'start'
+            }
+        }
+    ];
+
     return (
         <main className="mx-auto w-full max-w-7xl px-4 py-8">
+            <TourGuide tourId="studio_tour_v5" steps={studioTourSteps} triggerParamName="studio" />
             {/* Page Header */}
             <div className="mb-8">
                 <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
@@ -661,7 +722,7 @@ function CreatorContent() {
                 {/* LEFT COLUMN: Controls */}
                 <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold text-foreground">Prompt Tool</h2>
+                        <h2 className="tour-studio-welcome text-lg font-bold text-foreground">Prompt Tool</h2>
                         <div className="text-xs font-bold text-primary uppercase tracking-wider">AI Studio</div>
                     </div>
 
@@ -670,7 +731,7 @@ function CreatorContent() {
                     </p>
 
                     {/* Settings Card */}
-                    <div className="rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
+                    <div className="tour-studio-settings rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2">
                                 <div className="text-sm font-bold text-foreground">Settings</div>
@@ -680,7 +741,7 @@ function CreatorContent() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="tour-studio-media-type grid grid-cols-2 gap-3">
                             <SelectPill
                                 label="Image"
                                 selected={mediaType === "image"}
@@ -715,7 +776,7 @@ function CreatorContent() {
                         )}
 
                         <div className="mt-4 pt-4 border-t border-border">
-                            <div className="grid grid-cols-4 gap-2">
+                            <div className="tour-studio-aspect-ratio grid grid-cols-4 gap-2">
                                 <SelectPill
                                     label="9:16"
                                     description="Vertical"
@@ -865,7 +926,7 @@ function CreatorContent() {
                         {/* MANUAL MODE */}
                         <div className={`relative transition-all duration-500`}>
                             {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
-                                <div className="mb-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="tour-studio-reference mb-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
                                         {mediaType === "video" ? "Start Frame" : "Reference Images"}
                                     </div>
@@ -907,7 +968,7 @@ function CreatorContent() {
 
                             <textarea
                                 onChange={(e) => setManualPrompt(e.target.value)}
-                                className="w-full rounded-2xl border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                                className="tour-studio-prompt w-full rounded-2xl border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
                                 rows={8}
                                 placeholder="Describe your image..."
                                 value={manualPrompt}
@@ -934,7 +995,7 @@ function CreatorContent() {
                     {mediaType === "video" ? (
                         <button
                             className={[
-                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
                                 animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={handleAnimate}
@@ -955,7 +1016,7 @@ function CreatorContent() {
                     ) : (
                         <button
                             className={[
-                                "w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
                                 generating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={mode === "auto" ? undefined : handleManualGenerate}

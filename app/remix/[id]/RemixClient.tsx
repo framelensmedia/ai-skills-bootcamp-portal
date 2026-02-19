@@ -582,7 +582,7 @@ export default function RemixClient({ initialRemix }: Props) {
                     {/* Media Column */}
                     <div
                         onClick={() => remix.mediaType !== "video" && setIsLightboxOpen(true)}
-                        className={`relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last ${remix.mediaType !== "video" ? "cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]" : ""}`}
+                        className={`tour-remix-media relative aspect-[9/16] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-2xl md:aspect-[3/4] lg:aspect-square md:order-last ${remix.mediaType !== "video" ? "cursor-zoom-in transition-transform hover:scale-[1.01] active:scale-[0.99]" : ""}`}
                     >
                         {remix.mediaType === "video" && remix.video_url ? (
                             <video
@@ -669,7 +669,7 @@ export default function RemixClient({ initialRemix }: Props) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 onClick={handleRemix}
-                                className="flex items-center justify-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-sm font-bold text-black transition-transform hover:scale-[1.02] hover:bg-lime-300 shadow-[0_0_20px_-5px_#B7FF00] sm:col-span-2"
+                                className="tour-remix-detail-remix-button flex items-center justify-center gap-2 rounded-xl bg-lime-400 px-6 py-4 text-sm font-bold text-black transition-transform hover:scale-[1.02] hover:bg-lime-300 shadow-[0_0_20px_-5px_#B7FF00] sm:col-span-2"
                             >
                                 <Sparkles size={18} />
                                 Remix This

@@ -1,14 +1,16 @@
 "use client";
 
+// ... existing imports ...
 import Link from "next/link";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
-import { Wand2, ArrowRight, Flame, RefreshCw } from "lucide-react";
+import { Wand2, ArrowRight, Flame, RefreshCw, Search, Star } from "lucide-react";
 import Image from "next/image";
 import SuccessStories from "@/components/home/SuccessStories";
 import BasicTrainingSection from "@/components/home/BasicTrainingSection";
+import WhatYouWillLearnSection from "@/components/home/WhatYouWillLearnSection";
 
 // --- Subcomponents ---
 
@@ -267,6 +269,10 @@ function Typewriter({ text, className = "", gradientWords = [] }: { text: string
     );
 }
 
+
+
+// ... existing imports ...
+
 // --- Main UI Component ---
 
 type HomeFeedProps = {
@@ -278,6 +284,9 @@ type HomeFeedProps = {
 
 export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteIds, recentRemixes = [] }: HomeFeedProps) {
     const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+
+    // Tour Steps
+
 
     // Auth Logic for CTA
     const [user, setUser] = useState<any>(null);
@@ -331,75 +340,73 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
     return (
         <>
-            {/* HERO */}
+
+            {/* 1) HERO */}
             <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
                     <div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/5 px-3 py-1.5 backdrop-blur-sm">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1.5 backdrop-blur-sm">
                             <span className="relative flex h-2 w-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#B7FF00] opacity-75"></span>
                                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#B7FF00]"></span>
                             </span>
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B7FF00]">No technical skills required</span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B7FF00]">NO TECHNICAL SKILLS REQUIRED</span>
                         </div>
 
                         <h1 className="mt-6 text-5xl font-bold tracking-tight text-foreground md:text-7xl">
                             <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
                         </h1>
 
+                        <h2 className="mt-6 text-3xl md:text-4xl font-black tracking-tight text-foreground">
+                            Learn. Create. Grow.
+                        </h2>
+
                         <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-muted-foreground md:text-xl">
-                            The all-in-one platform to launch your business with AI, and master the skills.
+                            We show you how to use AI to get more customers, make better content, and save time in your business.
                         </p>
 
-                        {/* MOBILE ONLY: slider goes above search/CTA */}
+                        {/* Search Bar */}
+                        <div className="relative mt-8 w-full max-w-md">
+                            <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
+                                className="w-full rounded-xl border border-white/10 bg-white/5 py-3.5 pl-12 pr-4 text-white placeholder:text-muted-foreground focus:border-[#B7FF00]/50 focus:outline-none focus:ring-1 focus:ring-[#B7FF00]/50 transition-all"
+                            />
+                        </div>
+
+                        {/* MOBILE ONLY: slider goes above CTA */}
                         <div className="mt-6 md:hidden">
                             {sliderPrompts.length > 0 ? (
                                 <FeaturedPromptSlider items={sliderPrompts} />
                             ) : (
-                                <div className="rounded-2xl border border-border bg-card p-4 text-muted-foreground text-xs">No featured prompts.</div>
+                                <div className="rounded-2xl border border-border bg-card p-4 text-muted-foreground text-xs">No featured bootcamps.</div>
                             )}
                         </div>
 
                         {/* CONTROLS */}
-                        <div className="mt-6 max-w-xl">
-                            {/* Search (full width) */}
-                            <div className="mb-4 flex w-full items-center gap-2 rounded-md border border-input bg-background/50 px-4 py-3 shadow-sm">
-                                <span className="text-xs text-muted-foreground">🔎</span>
-                                <input
-                                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none"
-                                    placeholder="Search prompts (flyers, ads, product photos, thumbnails...)"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            window.location.href = `/prompts?q=${encodeURIComponent(e.currentTarget.value)}`;
-                                        }
-                                    }}
-                                />
-                            </div>
+                        <div className="mt-6 flex flex-col sm:flex-row gap-4">
+                            <Link
+                                href="/prompts"
+                                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-[#B7FF00] px-8 py-3.5 text-sm font-bold text-black hover:opacity-90 transition-opacity"
+                            >
+                                Browse Prompts <ArrowRight size={16} />
+                            </Link>
 
-                            {/* CTA Row (matches search width exactly) */}
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <Link
-                                    href="/prompts"
-                                    className="inline-flex w-full items-center justify-center rounded-md bg-[#B7FF00] px-6 py-4 text-sm font-semibold text-black hover:opacity-90"
-                                >
-                                    Browse Prompts →
-                                </Link>
-
-                                <Link
-                                    href="/studio/creator"
-                                    className="inline-flex w-full items-center justify-center rounded-md border border-border bg-card px-6 py-4 text-sm font-semibold text-foreground hover:bg-accent"
-                                >
-                                    Open Creator Studio →
-                                </Link>
-                            </div>
+                            <Link
+                                href="/studio/creator"
+                                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-colors"
+                            >
+                                Open Creator Studio <ArrowRight size={16} />
+                            </Link>
                         </div>
 
-
-                        <div className="mt-5 flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted">
-                                ★
-                            </span>
-                            Built for entrepreneurs and creators
+                        {/* Footer Text */}
+                        <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-muted-foreground">
+                                <Star size={12} fill="currentColor" />
+                            </div>
+                            <span>Built for entrepreneurs and creators</span>
                         </div>
                     </div>
 
@@ -408,18 +415,26 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         {sliderPrompts.length > 0 ? (
                             <FeaturedPromptSlider items={sliderPrompts} />
                         ) : (
-                            <div className="rounded-2xl border border-border bg-card p-4 text-muted-foreground text-xs">No featured prompts.</div>
+                            <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted-foreground">
+                                Instructor-Led Bootcamps coming soon.
+                            </div>
                         )}
                     </div>
                 </div>
             </section>
 
-            {/* BASIC TRAINING - Inserted after hero */}
+            {/* 2) INSTRUCTOR-LED BOOTCAMPS (Slider in Hero now, so this might be empty or just the section I removed?) 
+                Actually the helper comment says "Slider is now in Hero".
+            */}
+
+            {/* 3) AI BASICS COURSE (Moved Above) */}
             <BasicTrainingSection />
 
-            {/* TRENDING PROMPTS */}
-            <section className="mx-auto max-w-6xl px-4 py-8">
-                {/* ... existing trending prompt header ... */}
+            {/* 4) WHAT YOU'LL LEARN */}
+            <WhatYouWillLearnSection />
+
+            {/* 5) PROMPT TEMPLATES */}
+            <section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-border pb-8">
                     <div>
                         <div className="flex items-center gap-2 mb-3">
@@ -431,31 +446,17 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             </span>
                         </div>
                         <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight mb-3">
-                            Remix & Create
+                            Free Templates
                         </h2>
                         <p className="text-lg text-muted-foreground max-w-2xl">
-                            Pick a professional template or find inspiration from the community to remix.
+                            Pick a template, customize it for your business, and post it today.
                         </p>
                     </div>
 
                     <Link href="/prompts" className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0">
-                        <span>View All Prompts</span>
+                        <span>Use Free Templates</span>
                         <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
                     </Link>
-                </div>
-
-                {/* Trending Community Sub-header */}
-                <div className="mb-6 flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#B7FF00]/5 border border-[#B7FF00]/20 text-[#B7FF00]">
-                        <Flame size={24} />
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-foreground mb-1">Trending Prompts</h3>
-                        <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-border bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
-                            <Wand2 className="h-3.5 w-3.5 text-[#B7FF00]" />
-                            <span>Create pro level content in just a few clicks</span>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -480,103 +481,74 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
                 <div className="mt-6 flex justify-center md:hidden">
                     <Link href="/prompts" className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80">
-                        <span>View More Prompts</span>
+                        <span>Use Free Templates</span>
                     </Link>
                 </div>
+            </section>
 
-                {/* --- NEW SECTION: COMMUNITY REMIXES --- */}
-                {recentRemixes && recentRemixes.length > 0 && (
-                    <div className="mt-16 pt-8 border-t border-white/10">
-                        {/* Header similar to Trending Prompts */}
+            {/* 5) COMMUNITY CREATIONS */}
+            {recentRemixes && recentRemixes.length > 0 && (
+                <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16">
+                    <div className="mt-24 pt-8 border-t border-white/10">
                         <div className="mb-6 flex items-center gap-4">
                             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
                                 <RefreshCw size={24} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-foreground mb-1">Community Remixes</h3>
-                                <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-border bg-popover px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
-                                    <span className="text-blue-400">●</span>
-                                    <span>Fresh inspiration made by creators like you</span>
-                                </div>
+                                <h3 className="text-2xl font-bold text-foreground mb-1">See What the Community Is&nbsp;Creating</h3>
+                                <p className="text-muted-foreground">
+                                    See how our members are launching and growing their businesses with AI&nbsp;Skills&nbsp;Studio.
+                                    <br />
+                                    <span className="text-sm opacity-70">Get inspired, remix ideas, and create your own version in minutes.</span>
+                                </p>
                             </div>
                         </div>
 
-                        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             {recentRemixes.map((remix) => (
                                 <RemixCard key={remix.id} item={remix} />
                             ))}
                         </div>
 
-                        <div className="mt-6 flex justify-center">
-                            <Link href="/feed" className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80">
-                                <span>View Community Feed</span>
-                                <ArrowRight size={14} className="opacity-50 group-hover:translate-x-0.5 transition-transform" />
+                        <div className="mt-8 flex justify-center">
+                            <Link href="/feed" className="group flex items-center gap-2 rounded-full bg-[#B7FF00] px-8 py-3 text-sm font-bold text-black transition-all hover:opacity-90">
+                                <span>Create Yours Now</span>
+                                <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
                             </Link>
                         </div>
                     </div>
-                )}
-                {/* --- END NEW SECTION --- */}
+                </section>
+            )}
 
-            </section>
-
-            {/* SUCCESS STORIES - Replaces Basic Training */}
+            {/* 6) SUCCESS STORIES */}
             <SuccessStories />
 
-            {/* TESTIMONIAL STRIP */}
-            <section className="mx-auto max-w-6xl px-4 pb-10 md:pb-14">
-                <div className="rounded-2xl border border-border bg-card p-6 text-center md:p-10">
-                    <p className="text-sm text-foreground/70">
-                        “I stopped guessing and started executing. The prompts and remix tool paid for themselves fast.”
-                    </p>
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-                        Member, AI Skills Studio
-                    </p>
-                </div>
-            </section >
-
-            {/* FINAL CTA */}
-            < section className="mx-auto max-w-6xl px-4 pb-14" >
-                <div className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-6 text-center md:p-10">
-                    <h2 className="text-2xl font-black md:text-4xl text-foreground">
-                        READY TO <span className="text-[#B7FF00]">CREATE?</span>
+            {/* 7) FINAL CTA */}
+            <section className="mx-auto max-w-6xl px-4 pb-24">
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 p-12 text-center backdrop-blur-sm">
+                    <h2 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">
+                        READY TO <span className="text-[#B7FF00]">CREATE</span>?
                     </h2>
-                    <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
+                    <p className="mx-auto max-w-2xl text-lg text-white/60 mb-10">
                         Start with free prompts. Upgrade for Pro prompts and the fastest workflow for content production.
                     </p>
-
-                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                        <Link
-                            href="/prompts"
-                            className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${browseStyle}`}
-                        >
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                        <Link href="/prompts" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors">
                             Browse Prompts
                         </Link>
-                        <Link
-                            href="/studio/creator"
-                            className="inline-flex w-full justify-center rounded-md border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground hover:bg-accent sm:w-auto"
-                        >
+                        <Link href="/studio/creator" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors">
                             Open Creator Studio
                         </Link>
-
-                        {!loadingAuth && !user ? (
-                            <Link
-                                href="/signup"
-                                className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${themePrimary}`}
-                            >
+                        {!user && (
+                            <Link href="/signup" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-[#B7FF00] text-black font-bold hover:opacity-90 transition-opacity">
                                 Sign Up
                             </Link>
-                        ) : !loadingAuth && user && !isPro ? (
-                            <Link
-                                href="/pricing"
-                                className={`inline-flex w-full justify-center rounded-md px-5 py-3 text-sm font-semibold sm:w-auto ${themePrimary}`}
-                            >
-                                Upgrade to Pro
-                            </Link>
-                        ) : null}
+                        )}
                     </div>
-                    <p className="mt-4 text-xs text-muted-foreground/60">Free tier available. Upgrade anytime.</p>
+                    <p className="text-xs text-white/30">Free tier available. Upgrade anytime.</p>
                 </div>
-            </section >
+            </section>
         </>
     );
 }
+

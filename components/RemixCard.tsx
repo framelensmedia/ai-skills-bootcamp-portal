@@ -88,7 +88,7 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
     };
 
     return (
-        <div className="relative group rounded-2xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 hover:bg-white/10 transition-all duration-300">
+        <div className="tour-remix-card relative group rounded-2xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 hover:bg-white/10 transition-all duration-300">
             {/* Image Area - Link to Detail Page */}
             <Link href={`/remix/${item.id}`} className="block relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/40">
                 {item.mediaType === "video" && item.videoUrl ? (
@@ -171,17 +171,17 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
                     </div>
                 </div>
 
-                <div className="mt-auto pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-white/5">
+                <div className="mt-auto pt-3 flex items-center justify-between gap-3 border-t border-white/5">
                     <span className="text-xs text-white/40">
                         {new Date(item.createdAt).toLocaleDateString()}
                     </span>
 
                     <button
                         onClick={handleRemixClick}
-                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1.5 text-xs font-bold text-[#B7FF00] transition hover:bg-[#B7FF00] hover:text-black"
+                        title="Click to remix this design"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#B7FF00] text-black transition-transform hover:scale-105 hover:bg-[#B7FF00] hover:text-black shadow-lg shadow-lime-500/20"
                     >
-                        <RefreshCw size={12} />
-                        Remix This
+                        <RefreshCw size={16} strokeWidth={2.5} />
                     </button>
                 </div>
             </div>

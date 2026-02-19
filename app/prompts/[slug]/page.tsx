@@ -12,6 +12,8 @@ import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_
 import { RefineChat } from "@/components/RefineChat";
 import ImageUploader from "@/components/ImageUploader";
 import Link from "next/link";
+import TourGuide from "@/components/TourGuide";
+import { DriveStep } from "driver.js";
 import { ArrowRight, Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, TriangleAlert } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
@@ -990,6 +992,36 @@ function PromptContent() {
     setOverridePreviewUrl(null);
   }
 
+  const promptTourSteps: DriveStep[] = [
+    {
+      element: '.tour-prompt-welcome',
+      popover: {
+        title: 'This is the Remix Tool',
+        description: 'Here you can take an existing style and make it your own.',
+        side: "bottom",
+        align: 'start'
+      }
+    },
+    {
+      element: '.tour-prompt-media',
+      popover: {
+        title: 'The Inspiration',
+        description: 'This is the style you will be remixing.',
+        side: "left",
+        align: 'center'
+      }
+    },
+    {
+      element: '.tour-prompt-remix-trigger',
+      popover: {
+        title: 'Make it Yours',
+        description: 'Click Remix and follow the prompts to make it yours.',
+        side: "top",
+        align: 'center'
+      }
+    }
+  ];
+
   if (loading) {
     return <Loading />;
   }
@@ -1032,6 +1064,8 @@ function PromptContent() {
 
   return (
     <>
+      <TourGuide tourId="prompt_page_tour_v4" steps={promptTourSteps} triggerParamName="remix" />
+
       <RemixChatWizard
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
@@ -1163,7 +1197,7 @@ function PromptContent() {
               >
                 <div
                   className={[
-                    "relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 group-hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]",
+                    "tour-prompt-media relative w-full overflow-hidden rounded-none bg-black/50 shadow-2xl transition-all duration-500 group-hover:shadow-[0_0_30px_-5px_rgba(183,255,0,0.1)]",
                     previewAspectClass,
                   ].join(" ")}
                 >
@@ -1255,7 +1289,7 @@ function PromptContent() {
           {/* TOOL PANEL */}
           <section className="order-2 lg:order-1 p-0 sm:p-2 space-y-4">
             <div className="flex items-center justify-between px-2">
-              <div className="text-xl font-bold tracking-tight text-white">Prompt Tool</div>
+              <div className="tour-prompt-welcome text-xl font-bold tracking-tight text-white">Remix Tool</div>
               {manualMode ? (
                 <button
                   type="button"
@@ -1316,7 +1350,7 @@ function PromptContent() {
                     <button
                       type="button"
                       onClick={handleRemixFocus}
-                      className="group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
+                      className="tour-prompt-remix-trigger group flex w-36 items-center justify-center gap-2 rounded-full bg-lime-400 py-2.5 text-xs font-bold uppercase tracking-wide text-black shadow-[0_0_15px_-5px_#B7FF00] transition-all hover:scale-105 hover:bg-lime-300 hover:shadow-[0_0_20px_-5px_#B7FF00]"
                     >
                       <span>Remix</span>
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-black">

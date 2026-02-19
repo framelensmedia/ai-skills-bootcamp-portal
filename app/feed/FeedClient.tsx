@@ -460,16 +460,16 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
     return (
         <main className="mx-auto w-full max-w-4xl px-4 py-8 text-white font-sans pb-32 relative">
-            <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
+            <div className="mb-8 border-b border-white/10 pb-6 flex flex-col gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Community Feed</h1>
-                    <div className="flex items-center gap-2 text-sm text-white/50 font-mono uppercase tracking-wide">
-                        <span>Discover what others are creating</span>
+                    <div className="text-base text-white/50 font-mono tracking-wide items-center">
+                        <span>Discover what others are creating.<br className="sm:hidden" /> Just click <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-[#B7FF00] text-black align-middle mx-0.5"><RefreshCw size={10} strokeWidth={3} /></span> to remix it and make it your&nbsp;own.</span>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 items-end">
                     {/* Main Sort Tabs */}
-                    <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+                    <div className="flex bg-zinc-900 p-1 rounded-lg">
                         <button
                             onClick={() => handleSort("newest")}
                             className={`px-4 py-1.5 text-xs font-bold uppercase rounded flex items-center gap-2 ${sort === "newest" ? "bg-[#B7FF00] text-black" : "text-white/50 hover:text-white"}`}
@@ -486,7 +486,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
                     {/* Time Filter Tabs - Only show when Trending is active */}
                     {sort === "trending" && (
-                        <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+                        <div className="flex bg-zinc-900 p-1 rounded-lg">
                             <button
                                 onClick={() => handleTimeFilter("today")}
                                 className={`px-3 py-1 text-[10px] font-bold uppercase rounded ${timeFilter === "today" ? "bg-white/20 text-white" : "text-white/40 hover:text-white"}`}
@@ -579,10 +579,10 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
 
                             <button
                                 onClick={() => handleRemixClick(item)}
-                                className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#B7FF00] text-black hover:bg-[#a3e600] transition active:scale-95"
-                                title="Remix this"
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#B7FF00] text-black transition-transform hover:scale-105 hover:bg-[#B7FF00] hover:text-black shadow-lg shadow-lime-500/20"
+                                title="Click to remix this design"
                             >
-                                <RefreshCw size={18} />
+                                <RefreshCw size={16} strokeWidth={2.5} />
                             </button>
                         </div>
                     </article>

@@ -1,6 +1,8 @@
 import { Metadata, ResolvingMetadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import RemixClient, { RemixDetail } from "./RemixClient";
+import TourGuide from "@/components/TourGuide";
+import { DriveStep } from "driver.js";
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -156,10 +158,36 @@ export default async function RemixPage({ params }: Props) {
         }
     }
 
+    const tourSteps: DriveStep[] = [
+        {
+            element: '.tour-remix-media',
+            popover: {
+                title: 'The Inspiration',
+                description: 'This is what was created. You can use it as a starting point.',
+                side: "left",
+                align: 'center'
+            }
+        },
+        {
+            element: '.tour-remix-detail-remix-button',
+            popover: {
+                title: 'Make it Yours',
+                description: 'Click "Remix This" to use this style and make your own version.',
+                side: "bottom",
+                align: 'center'
+            }
+        }
+    ];
+
     if (!fullRemixData) {
         return <RemixClient initialRemix={null} />;
     }
 
-    return <RemixClient key={id} initialRemix={fullRemixData} />;
+    return (
+        <>
+            <TourGuide tourId="remix_page_tour_v2" steps={tourSteps} triggerParamName="remix" />
+            <RemixClient key={id} initialRemix={fullRemixData} />
+        </>
+    );
 }
 

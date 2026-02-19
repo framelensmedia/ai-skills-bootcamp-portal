@@ -27,13 +27,12 @@ export default async function HomePage() {
       ? supabase.from("prompt_favorites").select("prompt_id").eq("user_id", user.id)
       : Promise.resolve({ data: [] }),
 
-    // Optimized Remix Fetch: Single query with JOIN, get recent 50 then shuffle
+    // Optimized Remix Fetch: Fetch remixes first, then profiles manually to avoid FK issues
     supabase
       .from("prompt_generations")
       .select(`
            id, image_url, created_at, upvotes_count, settings, original_prompt_text, remix_prompt_text, combined_prompt_text,
-           user_id, prompt_id,
-           profiles!user_id ( full_name, username, profile_image )
+           user_id, prompt_id
         `)
       .eq("is_public", true)
       .order("created_at", { ascending: false })
@@ -47,6 +46,24 @@ export default async function HomePage() {
   let recentRemixes: any[] = [];
   if (remixesRes.data) {
     const raw = remixesRes.data as any[];
+
+    // Fetch profiles manually
+    const userIds = Array.from(new Set(raw.map(r => r.user_id).filter(Boolean)));
+    let profilesMap: Record<string, any> = {};
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, username, profile_image")
+        .in("user_id", userIds);
+
+      if (profiles) {
+        profiles.forEach(p => {
+          profilesMap[p.user_id] = p;
+        });
+      }
+    }
+
     // Shuffle
     for (let i = raw.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -54,7 +71,7 @@ export default async function HomePage() {
     }
     // Slice top 8
     recentRemixes = raw.slice(0, 8).map((r) => {
-      const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles || {};
+      const profile = profilesMap[r.user_id] || {};
       const settings = r.settings || {};
       return {
         id: r.id,

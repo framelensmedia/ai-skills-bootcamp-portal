@@ -25,14 +25,11 @@ export default function SuccessStories() {
     return (
         <section className="mx-auto max-w-6xl px-4 py-20 pb-10 md:py-32 md:pb-14">
             <div className="text-center mb-12">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#B7FF00]">
-                    Real Results
-                </p>
-                <h2 className="mt-2 text-3xl font-bold md:text-4xl text-white">
+                <h2 className="text-3xl font-bold md:text-4xl text-white mb-4">
                     Success Stories
                 </h2>
-                <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-                    See how our members are launching and growing their businesses with AI Skills Studio.
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                    See how our members are launching and growing their businesses with <span className="whitespace-nowrap">AI Skills Studio</span>.
                 </p>
             </div>
 

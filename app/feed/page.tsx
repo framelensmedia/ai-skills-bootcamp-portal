@@ -1,11 +1,17 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import FeedClient, { FeedItem } from "./FeedClient";
 
+import Link from "next/link"; // Need Link if we add a call to action or just text
+import { Sparkles } from "lucide-react";
+
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
+
+    // --- NEW: Feed Header Messaging ---
+
 
     // 1. Fetch Image Generations (Page 0, 8 items, Newest)
     const { data: generations, error } = await supabase
@@ -135,6 +141,10 @@ export default async function FeedPage() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ).slice(0, 12); // Limit to 12 initial items
 
-    return <FeedClient initialItems={allItems} />;
+    return (
+        <div className="mx-auto max-w-6xl px-4 py-8">
+            <FeedClient initialItems={allItems} />
+        </div>
+    );
 }
 
