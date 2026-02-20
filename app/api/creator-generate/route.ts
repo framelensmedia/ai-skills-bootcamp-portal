@@ -33,9 +33,18 @@ async function generateFalImage(
     };
 
     // Ratio Fallback
-    if (typeof imageSize === 'string' && imageSize.includes('16_9')) payload.aspect_ratio = "16:9";
-    if (typeof imageSize === 'string' && imageSize.includes('9_16')) payload.aspect_ratio = "9:16";
-    if (typeof imageSize === 'string' && imageSize.includes('square')) payload.aspect_ratio = "1:1";
+    if (typeof imageSize === 'string') {
+        if (imageSize.includes('16_9') || imageSize.includes('landscape')) payload.aspect_ratio = "16:9";
+        else if (imageSize.includes('9_16') || imageSize.includes('portrait')) payload.aspect_ratio = "9:16";
+        else if (imageSize.includes('square') || imageSize.includes('1_1')) payload.aspect_ratio = "1:1";
+        else if (imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
+        else if (imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
+    } else if (imageSize && typeof imageSize === 'object') {
+        if (imageSize.width > imageSize.height) payload.aspect_ratio = "16:9";
+        else if (imageSize.width === imageSize.height) payload.aspect_ratio = "1:1";
+        else if (imageSize.width === 832 && imageSize.height === 1024) payload.aspect_ratio = "4:5";
+        else payload.aspect_ratio = "9:16";
+    }
 
     const isNanoBanana = modelId.includes("nano-banana");
 
@@ -73,9 +82,7 @@ async function generateFalImage(
 
         // Force 9:16 for Remixes if not square
         if (!payload.aspect_ratio) {
-            if (imageSize === "portrait_16_9") payload.aspect_ratio = "9:16";
-            else if (imageSize === "landscape_16_9") payload.aspect_ratio = "16:9";
-            else payload.aspect_ratio = "9:16"; // Default
+            payload.aspect_ratio = "9:16"; // Default
         }
     } else {
         if (mainImageUrl) payload.image_url = mainImageUrl;
@@ -327,7 +334,8 @@ export async function POST(req: Request) {
 
         let falImageSize: any = { width: 832, height: 1216 }; // Default 9:16
         if (aspectRatio === "16:9") falImageSize = { width: 1216, height: 832 };
-        if (aspectRatio === "1:1") falImageSize = { width: 1024, height: 1024 };
+        else if (aspectRatio === "1:1") falImageSize = { width: 1024, height: 1024 };
+        else if (aspectRatio === "4:5") falImageSize = { width: 832, height: 1024 };
 
         const refImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 

@@ -223,6 +223,12 @@ async function generateFalImage(
             else if (imageSize.includes('4_3')) payload.aspect_ratio = "4:3";
             else if (imageSize.includes('3_4')) payload.aspect_ratio = "3:4";
             else payload.aspect_ratio = "auto";
+        } else if (imageSize && typeof imageSize === 'object') {
+            payload.image_size = imageSize;
+            if (imageSize.width > imageSize.height) payload.aspect_ratio = "16:9";
+            else if (imageSize.width === imageSize.height) payload.aspect_ratio = "1:1";
+            else if (imageSize.width === 832 && imageSize.height === 1024) payload.aspect_ratio = "4:5";
+            else payload.aspect_ratio = "9:16";
         } else {
             payload.aspect_ratio = "9:16";
         }
@@ -726,12 +732,14 @@ export async function POST(req: Request) {
                 if (ratio === "9:16") falImageSize = { width: 832, height: 1216 };
                 else if (ratio === "16:9") falImageSize = { width: 1216, height: 832 };
                 else if (ratio === "1:1") falImageSize = { width: 1024, height: 1024 };
+                else if (ratio === "4:5") falImageSize = { width: 832, height: 1024 };
                 else falImageSize = { width: 832, height: 1216 }; // Default
             } else {
                 // Use Explicit Pixels for Flux
                 if (ratio === "1:1") falImageSize = { width: 1024, height: 1024 };
                 else if (ratio === "16:9") falImageSize = { width: 1216, height: 832 }; // Flux Optimized
                 else if (ratio === "9:16") falImageSize = { width: 832, height: 1216 }; // Flux Optimized
+                else if (ratio === "4:5") falImageSize = { width: 832, height: 1024 }; // Flux Optimized
                 else if (ratio === "4:3") falImageSize = { width: 1024, height: 768 };
                 else if (ratio === "3:4") falImageSize = { width: 768, height: 1024 };
                 else if (ratio === "21:9") falImageSize = { width: 1536, height: 640 };
