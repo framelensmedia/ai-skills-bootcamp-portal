@@ -232,6 +232,12 @@ async function uploadFileFromUrl(url: string, path: string): Promise<string | nu
         clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error(`Failed to fetch file: ${res.status}`);
+
+        const contentType = res.headers.get("content-type") || "application/octet-stream";
+        if (contentType.includes("text/html")) {
+            throw new Error(`Expected an image file, but the source URL returned a webpage (HTML).`);
+        }
+
         const buffer = await res.arrayBuffer();
 
         const bucket = process.env.NEXT_PUBLIC_BOOTCAMP_ASSETS_BUCKET || "bootcamp-assets";

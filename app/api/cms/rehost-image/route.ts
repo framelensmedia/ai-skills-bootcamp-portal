@@ -33,8 +33,13 @@ export async function POST(req: NextRequest) {
             }
         });
         if (!res.ok) throw new Error(`Failed to fetch external image: ${res.status} ${res.statusText}`);
-        const buffer = await res.arrayBuffer();
+
         const contentType = res.headers.get("content-type") || "image/png";
+        if (contentType.includes("text/html")) {
+            throw new Error(`Failed to secure image: Expected an image file, but the source URL returned a webpage (HTML). The link might be expired or require a login.`);
+        }
+
+        const buffer = await res.arrayBuffer();
 
         // 3. Upload to Supabase Storage (use Service Role to bypass RLS)
         const adminClient = createClient(

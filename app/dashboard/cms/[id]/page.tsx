@@ -458,6 +458,19 @@ export default function CmsPromptEditorPage() {
             <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*" />
           </Card>
 
+          {/* Manual URL Input (Always visible) */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40 flex items-center gap-1.5">
+              <Globe size={10} /> Image URL
+            </span>
+            <Input
+              value={featuredImageUrl}
+              onChange={(e: any) => setFeaturedImageUrl(e.target.value)}
+              placeholder="Paste image URL here..."
+              className="font-mono text-xs"
+            />
+          </div>
+
           {/* Summary */}
           <div>
             <Label icon={LayoutGrid}>Description / Summary</Label>
