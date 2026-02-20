@@ -132,27 +132,50 @@ export default function StudioChatInterface({
                                 <MessageSquare size={32} className="text-[#B7FF00]" />
                             </div>
                             <h2 className="text-2xl font-bold mb-2">AI Strategist</h2>
-                            <p className="text-sm max-w-md text-gray-400 mb-8">I can help you audit your business, write content, or plan your next launch. What's on your mind?</p>
+                            <p className="text-sm max-w-md text-gray-400 mb-8">I can help you write an image prompt, draft a script, or plan a marketing campaign! What do you need help with?</p>
 
-                            <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                                {[
-                                    "Plan a product launch",
-                                    "Audit my current strategy",
-                                    "Write a welcome email",
-                                    "Draft a social media calendar"
-                                ].map((suggestion) => (
-                                    <button
-                                        key={suggestion}
-                                        onClick={() => {
-                                            setInput(suggestion);
-                                            // Optional: automatically send
-                                            // sendMessage(); 
-                                        }}
-                                        className="px-4 py-2 bg-white/5 hover:bg-[#B7FF00]/10 border border-white/10 hover:border-[#B7FF00]/50 rounded-full text-sm text-gray-300 hover:text-[#B7FF00] transition-all"
-                                    >
-                                        {suggestion}
-                                    </button>
-                                ))}
+                            <div className="flex flex-col gap-4 items-center w-full max-w-md">
+                                <button
+                                    onClick={() => {
+                                        const query = "Help me write a prompt for an image or video";
+                                        setInput(query);
+                                        // Wait briefly for state tick, then send. Alternatively, just call the API.
+                                        setTimeout(() => {
+                                            const button = document.getElementById('chat-send-btn');
+                                            if (button) button.click();
+                                        }, 50);
+                                    }}
+                                    className="w-full px-6 py-4 bg-[#B7FF00] hover:bg-[#c4ff4d] text-black font-bold rounded-2xl shadow-[0_0_20px_rgba(183,255,0,0.2)] transition-all transform hover:scale-105"
+                                >
+                                    Help me write a prompt
+                                </button>
+
+                                <div className="flex w-full items-center gap-4 py-2">
+                                    <div className="h-px bg-white/10 flex-1"></div>
+                                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Or try these</span>
+                                    <div className="h-px bg-white/10 flex-1"></div>
+                                </div>
+                                <div className="flex flex-wrap gap-2 justify-center w-full">
+                                    {[
+                                        "Draft a video script",
+                                        "Plan a marketing campaign",
+                                        "Brainstorm content ideas"
+                                    ].map((suggestion) => (
+                                        <button
+                                            key={suggestion}
+                                            onClick={() => {
+                                                setInput(suggestion);
+                                                setTimeout(() => {
+                                                    const button = document.getElementById('chat-send-btn');
+                                                    if (button) button.click();
+                                                }, 50);
+                                            }}
+                                            className="px-4 py-2 bg-white/5 hover:bg-[#B7FF00]/10 border border-white/10 hover:border-[#B7FF00]/50 rounded-full text-sm text-gray-300 hover:text-[#B7FF00] transition-all"
+                                        >
+                                            {suggestion}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -225,6 +248,7 @@ export default function StudioChatInterface({
                         className="w-full bg-white/5 border border-white/10 rounded-xl pl-4 pr-12 py-3 text-white focus:outline-none focus:border-[#B7FF00]/50 focus:bg-black/50 resize-none h-[52px] max-h-[200px] placeholder:text-white/30"
                     />
                     <button
+                        id="chat-send-btn"
                         onClick={sendMessage}
                         disabled={!input.trim() || loading}
                         className="absolute right-2 top-2 p-2 bg-[#B7FF00] text-black rounded-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -236,6 +260,6 @@ export default function StudioChatInterface({
                     AI can make mistakes. Verify important info.
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

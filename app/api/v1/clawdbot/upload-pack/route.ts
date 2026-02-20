@@ -140,10 +140,27 @@ export async function POST(req: NextRequest) {
 
         const templatesPromise = Promise.all(templates.map(async (t: any) => {
             try {
-                // SIMPLIFICATION: Skip Image Download/Upload. Use raw URL.
-                // ROBUSTNESS: Check multiple common keys
-                const previewUrl = t.image_url || t.imageUrl || t.url || t.featured_image_url || null;
-                const previewPath = null; // No storage path if using external URL
+                // REHOST IMAGE: Download the image and save to Supabase
+                let previewUrl = t.image_url || t.imageUrl || t.url || t.featured_image_url || null;
+                let previewPath = null;
+
+                if (previewUrl && !previewUrl.includes("supabase.co")) {
+                    console.log(`[Clawdbot] Re-hosting Template Image: ${previewUrl}`);
+                    try {
+                        // Generate a safe filename
+                        const safeTitle = sanitize(t.title || "template");
+                        const targetPath = `templates/${packRecord.id}-${safeTitle}-${Date.now()}.jpg`;
+
+                        const uploadedPath = await uploadFileFromUrl(previewUrl, targetPath);
+                        if (uploadedPath) {
+                            previewPath = uploadedPath;
+                            previewUrl = getPublicUrl(uploadedPath);
+                        }
+                    } catch (e) {
+                        console.error(`[Clawdbot] Template Image Rehost Failed (${t.title}):`, e);
+                        // Fall back to the original URL if upload fails
+                    }
+                }
 
                 const promptPayload: any = {
                     template_pack_id: packRecord.id,
