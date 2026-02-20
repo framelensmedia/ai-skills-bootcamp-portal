@@ -5,6 +5,7 @@ import Image from "next/image";
 import Nav from "@/components/Nav";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import { trackEvent } from "@/lib/gtm";
 
 export default function Header() {
     const { user } = useAuth();
