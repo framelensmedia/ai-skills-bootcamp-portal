@@ -202,7 +202,7 @@ export default function PromptCard({
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <div className="flex flex-1 flex-col p-4 sm:p-5 w-full">
           <div className="text-lg font-semibold leading-tight pr-6">{title}</div>
 
           <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">
