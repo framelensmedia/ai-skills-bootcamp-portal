@@ -141,7 +141,7 @@ export default async function PromptsPage({
             </span>
           </div>
           <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight mb-3">
-            Prompt Packs
+            Free Templates
           </h1>
           <p className="text-xl text-white/60 max-w-2xl">
             Curated collections of high-performance prompts. One click to remix and make them yours.

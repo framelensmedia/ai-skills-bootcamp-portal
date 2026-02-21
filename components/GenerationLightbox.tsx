@@ -240,7 +240,8 @@ export default function GenerationLightbox({
         </div>
         <button
           onClick={() => setIsFullScreen(false)}
-          className="absolute top-4 right-4 z-[210] rounded-full bg-black/40 p-2 text-white/60 backdrop-blur-md hover:bg-white/20 hover:text-white transition-all"
+          className="absolute z-[210] rounded-full bg-black/40 p-2 text-white/60 backdrop-blur-md hover:bg-white/20 hover:text-white transition-all"
+          style={{ top: "calc(1rem + env(safe-area-inset-top))", right: "calc(1rem + env(safe-area-inset-right))" }}
           title="Close Full Screen"
         >
           <X className="w-6 h-6" />
