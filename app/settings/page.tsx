@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import {
@@ -11,18 +11,22 @@ import {
     XCircle,
     Shield,
     CreditCard,
-    ArrowLeft
+    ArrowLeft,
+    Share2
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Loading from "@/components/Loading";
 
-export default function SettingsPage() {
+function SettingsContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [email, setEmail] = useState("");
+    const [socialAccounts, setSocialAccounts] = useState<any[]>([]);
 
     // Form State
     const [username, setUsername] = useState("");
@@ -35,6 +39,19 @@ export default function SettingsPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
     const [checkingUsername, setCheckingUsername] = useState(false);
+
+    // Initial URL Messages
+    useEffect(() => {
+        const success = searchParams.get("success");
+        const error = searchParams.get("error");
+        const desc = searchParams.get("desc");
+
+        if (success === "meta_connected") {
+            setMessage({ type: 'success', text: "Meta accounts connected successfully!" });
+        } else if (error) {
+            setMessage({ type: 'error', text: `Connection failed: ${desc || error}` });
+        }
+    }, [searchParams]);
 
     // Debounce username check
     useEffect(() => {
@@ -95,6 +112,15 @@ export default function SettingsPage() {
                 setUsername(data.username || "");
                 setFullName(data.full_name || "");
                 setAvatarUrl(data.profile_image || null);
+            }
+
+            const { data: socialData } = await supabase
+                .from("social_accounts")
+                .select("*")
+                .eq("user_id", user.id);
+
+            if (!cancelled && socialData) {
+                setSocialAccounts(socialData);
             }
 
             setLoading(false);
@@ -330,6 +356,60 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
+                {/* Connected Accounts Section */}
+                <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-6">
+                    <div className="mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                        <Share2 size={18} className="text-[#B7FF00]" />
+                        <h2 className="text-sm font-bold uppercase tracking-wide text-white">Connected Accounts</h2>
+                    </div>
+
+                    <p className="text-sm text-white/60 mb-6">
+                        Connect your social media accounts to publish generated media directly from the Studio.
+                    </p>
+
+                    <div className="space-y-4">
+                        {/* Meta / Instagram / Facebook */}
+                        <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black p-4">
+                            <div>
+                                <h3 className="font-bold text-white text-sm">Meta (Instagram & Facebook)</h3>
+                                {socialAccounts.some(a => a.platform === "instagram" || a.platform === "facebook") ? (
+                                    <p className="text-xs text-[#B7FF00] mt-1">Connected</p>
+                                ) : (
+                                    <p className="text-xs text-white/40 mt-1">Not connected</p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    window.location.href = "/api/social/auth/meta";
+                                }}
+                                className="rounded-lg border border-white/10 bg-zinc-800 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-700 transition"
+                            >
+                                {socialAccounts.some(a => a.platform === "instagram" || a.platform === "facebook") ? "Reconnect" : "Connect Meta"}
+                            </button>
+                        </div>
+
+                        {/* TikTok */}
+                        <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black p-4">
+                            <div>
+                                <h3 className="font-bold text-white text-sm">TikTok</h3>
+                                {socialAccounts.some(a => a.platform === "tiktok") ? (
+                                    <p className="text-xs text-[#B7FF00] mt-1">Connected</p>
+                                ) : (
+                                    <p className="text-xs text-white/40 mt-1">Not connected</p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    window.location.href = "/api/social/auth/tiktok";
+                                }}
+                                className="rounded-lg border border-white/10 bg-zinc-800 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-700 transition"
+                            >
+                                {socialAccounts.some(a => a.platform === "tiktok") ? "Reconnect" : "Connect TikTok"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Zone Info / Billing */}
                 <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-6 opacity-60 hover:opacity-100 transition">
                     <div className="flex items-center gap-4">
@@ -395,5 +475,13 @@ export default function SettingsPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={<Loading />}>
+            <SettingsContent />
+        </Suspense>
     );
 }

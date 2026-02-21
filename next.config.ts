@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
+      allowedOrigins: ['localhost:3000', 'drucilla-ectrodactylous-barefootedly.ngrok-free.dev', '*.ngrok-free.dev'],
     },
   },
 };

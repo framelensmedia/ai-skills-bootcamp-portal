@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize, ExternalLink } from "lucide-react";
+import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize, ExternalLink, Send } from "lucide-react";
 import { cleanPrompt } from "@/lib/stringUtils";
+import SocialPublisherModal from "./studio/SocialPublisherModal";
 
 type Props = {
   open: boolean;
@@ -139,6 +140,9 @@ export default function GenerationLightbox({
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(title);
+
+  // Social Publisher
+  const [isSocialModalOpen, setIsSocialModalOpen] = useState(false);
 
   // Video controls
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -369,6 +373,20 @@ export default function GenerationLightbox({
                 </button>
               )}
 
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsSocialModalOpen(true);
+                }}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 p-2 md:px-4 md:py-2 text-xs font-bold uppercase tracking-wider text-[#B7FF00] hover:bg-[#B7FF00]/20 hover:border-[#B7FF00]/60 transition-colors"
+                title="Publish to Socials"
+              >
+                <span className="hidden md:block">Publish</span>
+                <Send className="w-4 h-4" />
+              </button>
+
 
 
               <button
@@ -553,6 +571,17 @@ export default function GenerationLightbox({
           </div>
         </div>
       </div>
+
+      {isSocialModalOpen && (
+        <SocialPublisherModal
+          isOpen={isSocialModalOpen}
+          onClose={() => setIsSocialModalOpen(false)}
+          assetUrl={safeVideoUrl || safeUrl}
+          assetId={id}
+          mediaType={isVideo ? "video" : "image"}
+          initialCaption={c || o || ""}
+        />
+      )}
     </div>
   );
 }
