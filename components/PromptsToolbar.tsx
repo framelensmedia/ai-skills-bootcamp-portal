@@ -42,14 +42,14 @@ export default function PromptsToolbar({
     if (finalSort && finalSort !== "newest") params.set("sort", finalSort);
     else params.delete("sort");
 
-    router.push(`/prompts?${params.toString()}`);
+    router.push(`/prompts?${params.toString()}`, { scroll: false });
   }
 
   function handleReset() {
     setQ("");
     setCategory("all");
-    setSort("newest");
-    router.push(`/prompts`);
+    setSort("random");
+    router.push(`/prompts`, { scroll: false });
   }
 
   return (
@@ -117,6 +117,7 @@ export default function PromptsToolbar({
               }}
               className="h-10 w-full appearance-none rounded-lg border border-white/10 bg-zinc-900 pl-3 pr-10 text-sm text-white outline-none focus:border-white/20 transition-colors"
             >
+              <option value="random" className="bg-zinc-900 text-white">Random</option>
               <option value="newest" className="bg-zinc-900 text-white">Newest</option>
               <option value="oldest" className="bg-zinc-900 text-white">Oldest</option>
               <option value="title_az" className="bg-zinc-900 text-white">A-Z</option>
@@ -126,7 +127,7 @@ export default function PromptsToolbar({
           </div>
 
           {/* Reset */}
-          {(category !== "all" || sort !== "newest" || q) && (
+          {(category !== "all" || (sort !== "random" && sort !== "newest") || q) && (
             <button
               onClick={handleReset}
               className="h-10 shrink-0 px-4 rounded-lg border border-white/10 bg-zinc-900 text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-colors"

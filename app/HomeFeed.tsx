@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
-import { Wand2, ArrowRight, Flame, RefreshCw, Search, Star } from "lucide-react";
+import { Wand2, ArrowRight, Flame, RefreshCw, Search, Star, Users } from "lucide-react";
 import Image from "next/image";
 import SuccessStories from "@/components/home/SuccessStories";
 import BasicTrainingSection from "@/components/home/BasicTrainingSection";
@@ -434,6 +434,23 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
             {/* 4) WHAT YOU'LL LEARN */}
             <WhatYouWillLearnSection />
 
+            {/* 4.5) MASTERMIND COMMUNITY BANNER */}
+            <section className="mx-auto max-w-6xl px-4 py-6 md:py-8">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-[#B7FF00]/20 bg-zinc-950/80 p-6 shadow-[0_0_30px_rgba(183,255,0,0.03)]">
+                    <div className="flex items-center gap-4 text-center sm:text-left w-full justify-center sm:justify-start">
+                        <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00]/10 text-[#B7FF00]">
+                            <Users size={24} />
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-white mb-1">Elite Mastermind Community</p>
+                            <p className="text-muted-foreground text-sm">
+                                Join an elite mastermind community and network with other entrepreneurs just like you.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* 5) PROMPT TEMPLATES */}
             <section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-border pb-8">
@@ -492,6 +509,71 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     >
                         <span>Use Free Templates</span>
                     </Link>
+                </div>
+            </section>
+
+
+            {/* 5.5) PROFESSIONAL TOOLS */}
+            <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16 mt-12 md:mt-20">
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 overflow-hidden backdrop-blur-sm relative group/section">
+                    {/* Background glow */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-purple-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 relative z-10">
+                        <div className="p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                            <div className="inline-flex items-center gap-2 mb-6 rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-4 py-1.5 w-max">
+                                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#B7FF00]">Pro Creator Studio</span>
+                            </div>
+                            <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight mb-6 leading-tight">
+                                Your Very Own <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400">Design Studio</span>
+                            </h2>
+                            <p className="text-lg font-medium text-muted-foreground mb-8 leading-relaxed">
+                                Create stunning ads, flyers, and social posts to get more customers. You don't need to be a tech expert to make your business look amazing online. Everything you need is right here!
+                            </p>
+
+                            <ul className="space-y-4 mb-10">
+                                {[
+                                    "Make beautiful, high-quality images for your business",
+                                    "Remove tricky backgrounds with just one click",
+                                    "Turn simple photos into eye-catching short videos",
+                                    "Add big bold words and stylish layouts easily"
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-start gap-4">
+                                        <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#B7FF00]/20 text-[#B7FF00]">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        </div>
+                                        <span className="text-foreground/90 font-medium">{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+
+                            <div>
+                                <Link
+                                    href="/studio/creator"
+                                    className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-8 py-3.5 text-sm font-bold text-white transition-all hover:bg-white/10"
+                                >
+                                    <span>Try the Studio</span>
+                                    <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                                </Link>
+                            </div>
+                        </div>
+                        <div className="relative min-h-[350px] md:min-h-full bg-black/40 border-t md:border-t-0 md:border-l border-white/10 p-8 md:p-12 flex items-center justify-center overflow-hidden [perspective:1500px]">
+                            <div
+                                className="relative w-full aspect-[4/3] rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5),_0_0_50px_rgba(183,255,0,0.05)] overflow-hidden transition-all duration-700 ease-out group-hover/section:[transform:rotateY(-5deg)_rotateX(2deg)_scale(1.02)]"
+                                style={{ transform: "rotateY(-15deg) rotateX(5deg) scale(1.05)", transformStyle: "preserve-3d" }}
+                            >
+                                <Image
+                                    src="/images/studio-screenshot.png"
+                                    alt="Professional AI Creator Studio"
+                                    fill
+                                    className="object-cover object-top"
+                                    sizes="(max-width: 768px) 100vw, 50vw"
+                                />
+                                {/* Curved reflection effect overlay */}
+                                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-black/40 pointer-events-none mix-blend-overlay"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -25,7 +25,10 @@ export default async function PromptsPage({
 
   const q = (qParam ?? "").trim();
   const category = (catParam ?? "all").trim().toLowerCase();
-  const sort = (sortParam ?? "newest").trim();
+
+  const hasFilters = q.length > 0 || (category !== "all" && category !== "");
+  const defaultSort = hasFilters ? "newest" : "random";
+  const sort = (sortParam ?? defaultSort).trim();
 
   // Fetch published packs with template counts
   const { data: packsData } = await supabase
@@ -81,9 +84,18 @@ export default async function PromptsPage({
   if (sort === "oldest") query = query.order("created_at", { ascending: true });
   else if (sort === "title_az") query = query.order("title", { ascending: true });
   else if (sort === "title_za") query = query.order("title", { ascending: false });
-  else query = query.order("created_at", { ascending: false });
+  else if (sort === "newest") query = query.order("created_at", { ascending: false });
 
-  const { data: prompts, error } = await query;
+  const { data: rawPrompts, error } = await query;
+
+  let prompts = rawPrompts || [];
+  if (sort === "random") {
+    // Shuffle prompts in memory
+    for (let i = prompts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [prompts[i], prompts[j]] = [prompts[j], prompts[i]];
+    }
+  }
 
   // Fetch Trending Templates (Top 6)
   const { data: trendingPrompts } = await supabase
@@ -149,17 +161,17 @@ export default async function PromptsPage({
         </div>
       </div>
 
-      {/* Section 1: Trending Prompts */}
+      {/* Section 1: Latest Prompts */}
       <div className="mt-8">
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400">
             <Wand2 size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Trending Templates</h2>
+            <h2 className="text-2xl font-bold text-white mb-1">Latest Templates</h2>
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
               <span className="text-purple-400 flex-shrink-0">●</span>
-              <span className="text-xs font-medium text-white">Most popular templates right now</span>
+              <span className="text-xs font-medium text-white">Newest additions to our library</span>
             </div>
           </div>
         </div>
