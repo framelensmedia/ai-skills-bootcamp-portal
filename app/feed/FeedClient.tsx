@@ -46,8 +46,11 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     const [sort, setSort] = useState<"newest" | "trending">("newest");
     const [timeFilter, setTimeFilter] = useState<"today" | "week" | "all">("all");
     const [page, setPage] = useState(0);
-    const [hasMore, setHasMore] = useState(true); // Assume more unless initial fetch was empty? 
-    // Actually if initialItems < 8, we know there's no more.
+    const [hasMore, setHasMore] = useState(true);
+
+    // Random offset tracking for infinite scroll
+    const [totalImages, setTotalImages] = useState(0);
+    const [totalVideos, setTotalVideos] = useState(0);
 
     // We need to track if we've done the client-side mount fetch or if we rely on initial.
     // Ideally: Page 0 is provided. We only fetch if Page > 0 OR Sort changes.
@@ -113,6 +116,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
             // Although page requires auth generally.
 
             let qImages;
+            let qVideos;
 
             if (sort === "trending") {
                 // Use trending views based on time filter
@@ -127,7 +131,29 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                     `)
                     .range(page * 12, (page + 1) * 12 - 1)
                     .order("trending_score", { ascending: false });
+
+                qVideos = supabase
+                    .from("video_generations")
+                    .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id, thumbnail_url, prompt_generations!source_image_id(image_url)`)
+                    .eq("is_public", true)
+                    .eq("status", "completed")
+                    .range(page * 12, (page + 1) * 12 - 1)
+                    .order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
             } else {
+                // NEWEST TAB LOGIC
+                let imageOffsetStart = page * 12;
+                let videoOffsetStart = page * 12;
+
+                // For page 0, optionally fetch exact count to know our boundaries for future random offsets
+                if (page === 0) {
+                    supabase.from("prompt_generations").select("*", { count: "exact", head: true }).eq("is_public", true).then((res: any) => res.count && setTotalImages(res.count));
+                    supabase.from("video_generations").select("*", { count: "exact", head: true }).eq("is_public", true).eq("status", "completed").then((res: any) => res.count && setTotalVideos(res.count));
+                } else if (page > 0) {
+                    // Randomize offset for infinite scroll
+                    if (totalImages > 12) imageOffsetStart = Math.floor(Math.random() * (totalImages - 12));
+                    if (totalVideos > 12) videoOffsetStart = Math.floor(Math.random() * (totalVideos - 12));
+                }
+
                 qImages = supabase
                     .from("prompt_generations")
                     .select(`
@@ -135,21 +161,16 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                         user_id, prompt_id
                     `)
                     .eq("is_public", true)
-                    .range(page * 12, (page + 1) * 12 - 1)
+                    .range(imageOffsetStart, imageOffsetStart + 11)
                     .order("created_at", { ascending: false });
-            }
 
-            let qVideos = supabase
-                .from("video_generations")
-                .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id, thumbnail_url, prompt_generations!source_image_id(image_url)`)
-                .eq("is_public", true)
-                .eq("status", "completed")
-                .range(page * 12, (page + 1) * 12 - 1);
-
-            if (sort === "newest") {
-                qVideos = qVideos.order("created_at", { ascending: false });
-            } else {
-                qVideos = qVideos.order("upvotes_count", { ascending: false }).order("created_at", { ascending: false });
+                qVideos = supabase
+                    .from("video_generations")
+                    .select(`id, video_url, created_at, upvotes_count, prompt, dialogue, is_public, user_id, source_image_id, thumbnail_url, prompt_generations!source_image_id(image_url)`)
+                    .eq("is_public", true)
+                    .eq("status", "completed")
+                    .range(videoOffsetStart, videoOffsetStart + 11)
+                    .order("created_at", { ascending: false });
             }
 
             const [resImages, resVideos] = await Promise.all([qImages, qVideos]);
@@ -213,6 +234,18 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
                 }
                 return (b.upvotes_count || 0) - (a.upvotes_count || 0);
             });
+
+            // Randomize after the first 18 items (approx 6 rows of 3 on desktop) 
+            // OR fully randomize if page > 0 because infinite scroll items should feel completely fresh
+            if (sort === "newest") {
+                if (page === 0) {
+                    const topItems = combinedData.slice(0, 18);
+                    const restItems = combinedData.slice(18).sort(() => Math.random() - 0.5);
+                    combinedData = [...topItems, ...restItems];
+                } else {
+                    combinedData = combinedData.sort(() => Math.random() - 0.5);
+                }
+            }
 
             // Since we fetched 12 of each, we might have too many. 
             // In a simple naive pagination without cursor, we just append them all.

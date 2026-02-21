@@ -209,11 +209,11 @@ export default function PromptCard({
             {summary && summary.trim().length > 0 ? summary : "Open to view and use this prompt."}
           </div>
 
-          <div className="mt-auto pt-4 flex items-center justify-between">
+          <div className="mt-auto pt-4 flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground/70">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>
 
             {/* Standard Remix Button shape (rounded-lg) without the loud green color */}
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary text-muted-foreground border border-border transition-transform shadow-sm group-hover:scale-105">
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-secondary text-muted-foreground border border-border transition-transform shadow-sm group-hover:scale-105 shrink-0 ml-auto">
               <RefreshCw size={16} strokeWidth={2.5} />
             </div>
           </div>
