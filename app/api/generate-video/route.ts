@@ -560,7 +560,7 @@ export async function POST(req: Request) {
         const parameters: any = {
             sampleCount: 1,
             durationSeconds,
-            negativePrompt: "distortion, low quality, shaky, blurry",
+            negativePrompt: "distortion, low quality, shaky, blurry, text, gibberish, watermark, writing",
             personGeneration: "allow_all",
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
