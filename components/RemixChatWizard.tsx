@@ -752,7 +752,7 @@ function UploadStepWrapper({
 }) {
     return (
         <div className="w-full min-w-0">
-            <ImageUploader files={files} onChange={setFiles} maxFiles={10} />
+            <ImageUploader files={files} onChange={setFiles} maxFiles={7} />
             {files.length > 0 && (
                 <SubjectControls
                     subjectMode={subjectMode}
