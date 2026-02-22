@@ -409,16 +409,26 @@ export async function POST(req: Request) {
                 subjectInstruction += " [PROP LOCK]: IF the person in Image 1 is holding something (drink, phone, etc), the subject MUST still be holding it. Do NOT remove props from their hands. ";
 
             } else {
-                // STANDARD / GENERIC LOGIC
-                // (kept for backward compatibility or direct edit modes)
-                if (subjectOutfit && subjectOutfit.trim().length > 0) {
-                    subjectInstruction += ` OUTFIT: The subject is wearing ${subjectOutfit}. REWRITE the body. `;
-                } else if (keepOutfit) {
-                    subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
+                // MULTI-SUBJECT MODE: 2+ uploaded images, no separate template
+                const subjectCount = falImages.filter(u => u !== falLogoUrl).length;
+                if (subjectCount >= 2) {
+                    subjectInstruction += ` [MULTI-PERSON MANDATE]: You have been given ${subjectCount} reference images of different people. `;
+                    subjectInstruction += ` You MUST include ALL ${subjectCount} people in the final image. `;
+                    subjectInstruction += ` Each person corresponds to one reference image (Image 1 = Person 1, Image 2 = Person 2, etc.). `;
+                    subjectInstruction += ` Maintain each individual's EXACT facial identity. Do NOT blend or composite their faces. `;
+                    subjectInstruction += ` Arrange them naturally together in the scene described by the prompt. `;
+                    subjectInstruction += ` FACE LOCK: Each person's face must be 100% faithful to their reference image. `;
                 } else {
-                    subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. ";
+                    // STANDARD / GENERIC LOGIC (single subject, no template)
+                    if (subjectOutfit && subjectOutfit.trim().length > 0) {
+                        subjectInstruction += ` OUTFIT: The subject is wearing ${subjectOutfit}. REWRITE the body. `;
+                    } else if (keepOutfit) {
+                        subjectInstruction += " PRESERVE OUTFIT: Keep the subject's clothing exactly as it is in the reference image. ";
+                    } else {
+                        subjectInstruction += " CHANGE OUTFIT: The subject must wear a COMPLETELY NEW OUTFIT that fits the context of the scene. ";
+                    }
+                    subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
                 }
-                subjectInstruction += " FACE LOCK: Maintain the exact eye line, camera angle, and facial identity of the subject. ";
             }
         }
 
