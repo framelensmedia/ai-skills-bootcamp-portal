@@ -16,7 +16,7 @@ async function generateFalImage(
     modelId: string,
     prompt: string,
     imageSize: any,
-    mainImageUrl?: string | null,
+    mainImageUrl?: string | string[] | null,
     template_reference_image?: string | null,
     strength?: number,
     negativePrompt?: string
@@ -49,32 +49,26 @@ async function generateFalImage(
     const isNanoBanana = modelId.includes("nano-banana");
 
     if (isNanoBanana) {
-        // Nano Banana Pro Logic
+        let imagesToSend: string[] = [];
+        const mainImages = Array.isArray(mainImageUrl) ? mainImageUrl : (mainImageUrl ? [mainImageUrl] : []);
+
         if (template_reference_image) {
-            // Remix Mode: Base = Template, Ref = Subject
-            // CRITICAL FIX: The base canvas must be the TEMPLATE, not the Selfie.
-            payload.image_url = template_reference_image;
-
-            // The reference is the Subject (Main Image)
-            // We do NOT include the template in image_urls, as it is already the base.
-            if (mainImageUrl && mainImageUrl !== template_reference_image) {
-                payload.image_urls = [mainImageUrl];
-            } else {
-                payload.image_urls = []; // Fallback (shouldn't happen in remix)
+            imagesToSend.push(template_reference_image);
+            for (const img of mainImages) {
+                if (img !== template_reference_image) {
+                    imagesToSend.push(img);
+                }
             }
-
-
-        } else {
-            // Direct Edit / Selfie Mode
-            // Here, the Selfie IS the base.
-            if (mainImageUrl) {
-                payload.image_url = mainImageUrl;
-                payload.image_urls = [mainImageUrl]; // REQUIRED: Matches input for single image
-            } else {
-                payload.image_urls = [];
-            }
-            // Use passed strength or default
+        } else if (mainImages.length > 0) {
+            imagesToSend.push(...mainImages);
             payload.strength = strength || 0.75;
+        }
+
+        if (imagesToSend.length > 0) {
+            payload.image_urls = imagesToSend;
+        } else {
+            delete payload.image_urls;
+            delete payload.image_url;
         }
 
         // Apply override if provided (covers Remix case too)
@@ -85,11 +79,12 @@ async function generateFalImage(
             payload.aspect_ratio = "9:16"; // Default
         }
     } else {
-        if (mainImageUrl) payload.image_url = mainImageUrl;
+        const mainImages = Array.isArray(mainImageUrl) ? mainImageUrl : (mainImageUrl ? [mainImageUrl] : []);
+        if (mainImages.length > 0) payload.image_url = mainImages[0];
     }
 
     // Use /edit endpoint if image provided
-    const actualEndpoint = isNanoBanana && payload.image_url
+    const actualEndpoint = isNanoBanana && payload.image_urls?.length > 0
         ? `https://queue.fal.run/${modelId}/edit`
         : endpoint;
 
@@ -288,39 +283,44 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
         }
 
-        // 3. Handle Image Uploads (Server Side fallback for FormData)
-        if (imageFiles.length > 0) {
-            const firstFile = imageFiles[0];
-            const ab = await firstFile.arrayBuffer();
-            const buffer = Buffer.from(ab);
-            const filePath = `fal-uploads/${userId}/${Date.now()}.jpg`;
+        // 3. Handle Image Uploads and Multi-Image Array
+        let falImages: string[] = [];
 
-            const { error: uploadErr } = await admin.storage
-                .from("generations")
-                .upload(filePath, buffer, { contentType: firstFile.type || "image/jpeg", upsert: false });
-
+        for (const file of imageFiles) {
+            const ab = await file.arrayBuffer();
+            const filePath = `fal-uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+            const { error: uploadErr } = await admin.storage.from("generations").upload(filePath, Buffer.from(ab), { contentType: file.type || "image/jpeg", upsert: false });
             if (!uploadErr) {
                 const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
-                imageUrls.push(pubUrl.publicUrl);
-            } else {
-                console.warn("Failed to upload reference image for Fal:", uploadErr);
+                falImages.push(pubUrl.publicUrl);
             }
         }
 
-        // Handle Logo Upload (Server Side fallback)
+        // Add imageUrls from JSON body
+        for (const url of imageUrls) {
+            if (!falImages.includes(url)) falImages.push(url);
+        }
+
+        // Handle Logo Upload
+        let falLogoUrl: string | null = null;
         if (logoFile) {
             const ab = await logoFile.arrayBuffer();
-            const buffer = Buffer.from(ab);
-            const filePath = `fal-uploads/${userId}/logo-${Date.now()}.png`;
-            const { error: uploadErr } = await admin.storage
-                .from("generations")
-                .upload(filePath, buffer, { contentType: logoFile.type || "image/png", upsert: false });
-
+            const filePath = `fal-uploads/${userId}/logo-${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+            const { error: uploadErr } = await admin.storage.from("generations").upload(filePath, Buffer.from(ab), { contentType: logoFile.type || "image/png", upsert: false });
             if (!uploadErr) {
                 const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
-                logoUrl = pubUrl.publicUrl;
+                falLogoUrl = pubUrl.publicUrl;
             }
+        } else if (logoUrl) {
+            falLogoUrl = logoUrl;
         }
+
+        if (falLogoUrl) {
+            falImages.push(falLogoUrl);
+            // Append instruction to finalPrompt later
+        }
+
+        let refImageUrl = falImages.length > 0 ? falImages[0] : null;
 
         // 3. Prepare Prompt Engine
         let finalPrompt = prompt;
@@ -336,8 +336,6 @@ export async function POST(req: Request) {
         if (aspectRatio === "16:9") falImageSize = { width: 1216, height: 832 };
         else if (aspectRatio === "1:1") falImageSize = { width: 1024, height: 1024 };
         else if (aspectRatio === "4:5") falImageSize = { width: 832, height: 1024 };
-
-        const refImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
 
         // Subject Lock Logic
         if (refImageUrl && subjectLock) {
@@ -410,15 +408,18 @@ export async function POST(req: Request) {
             if (promotion) textPrompt += `Offer: "${promotion}". `;
             if (business_name) textPrompt += `Business Name: "${business_name}". `;
 
-            // LOGO INSTRUCTION (Best effort for Fal)
-            // Only generate if no specific logo was uploaded
-            if (business_name && !logoUrl) {
+            if (falLogoUrl) {
+                textPrompt += " [LOGO MANDATE] You MUST place the final reference image (the Logo) onto the design. Maintain its aspect ratio and place it prominently. ";
+            } else if (business_name && !logoUrl) {
                 textPrompt += ` LOGO CREATION: You MUST generate a world-class, award-winning logo for the brand '${business_name}'. The logo should be a masterpiece of modern design—minimalist, iconic, and vector-style. Think Paul Rand meets Apple. Use bold geometry, negative space, and a premium color palette. It should look like a $10,000 corporate identity. Place it prominently and tastefully in the composition. `;
             }
 
             textPrompt += "Typography must be legible, sharp, and integrated into the scene. ";
 
             finalPrompt += textPrompt;
+        } else if (falLogoUrl) {
+            // Case where they uploaded a logo but no other text
+            finalPrompt += " [LOGO MANDATE] You MUST place the final reference image (the Logo) onto the design. Maintain its aspect ratio and place it prominently. ";
         }
 
         // Determine Final Strength
@@ -434,7 +435,8 @@ export async function POST(req: Request) {
             }
         }
 
-        const imageUrl = await generateFalImage(model, finalPrompt, falImageSize, refImageUrl, template_reference_image, finalStrength, remixNegativePrompt);
+        const falMainImage = falImages.length > 0 ? falImages : (refImageUrl || null);
+        const imageUrl = await generateFalImage(model, finalPrompt, falImageSize, falMainImage, template_reference_image, finalStrength, remixNegativePrompt);
 
         // 5. Save & Deduct
         const { data: inserted } = await admin.from("prompt_generations").insert({

@@ -184,7 +184,7 @@ async function generateFalImage(
     modelId: string, // "fal-ai/flux-pro/v1.1" or "fal-ai/flux-pro/v1.1-ultra"
     prompt: string,
     imageSize: any = "landscape_4_3", // or {width, height}
-    mainImageUrl?: string | null,
+    mainImageUrl?: string | string[] | null,
     template_reference_image?: string | null,
     keepOutfit: boolean = true,
     negativePrompt?: string,
@@ -256,23 +256,28 @@ async function generateFalImage(
     if (isNanoBanana) {
         // Determine if we are Editing (Remix) or Generating (T2I)
         let imagesToSend: string[] = [];
+        const mainImages = Array.isArray(mainImageUrl) ? mainImageUrl : (mainImageUrl ? [mainImageUrl] : []);
 
         if (template_reference_image) {
             // REMIX MODE
-            if (subjectFirst && mainImageUrl && mainImageUrl !== template_reference_image) {
-                // SUBJECT-FIRST: Subject is Image 1 (face preserved), Template is Image 2 (scene reference)
-                imagesToSend.push(mainImageUrl);
-                imagesToSend.push(template_reference_image);
+            if (subjectFirst && mainImages.length > 0) {
+                // SUBJECT-FIRST: Subjects are first, Template is last
+                imagesToSend.push(...mainImages);
+                if (!mainImages.includes(template_reference_image)) {
+                    imagesToSend.push(template_reference_image);
+                }
             } else {
-                // DEFAULT: Template is Image 1, Subject is Image 2
+                // DEFAULT: Template is Image 1, Subjects are subsequent
                 imagesToSend.push(template_reference_image);
-                if (mainImageUrl && mainImageUrl !== template_reference_image) {
-                    imagesToSend.push(mainImageUrl);
+                for (const img of mainImages) {
+                    if (img !== template_reference_image) {
+                        imagesToSend.push(img);
+                    }
                 }
             }
-        } else if (mainImageUrl) {
+        } else if (mainImages.length > 0) {
             // DIRECT EDIT MODE
-            imagesToSend.push(mainImageUrl);
+            imagesToSend.push(...mainImages);
         }
 
         // If we have images, use /edit and attach image_urls
@@ -288,8 +293,9 @@ async function generateFalImage(
         }
     } else {
         // Standard Models (Flux)
-        if (mainImageUrl) {
-            payload.image_url = mainImageUrl;
+        const mainImages = Array.isArray(mainImageUrl) ? mainImageUrl : (mainImageUrl ? [mainImageUrl] : []);
+        if (mainImages.length > 0) {
+            payload.image_url = mainImages[0]; // Flux only takes 1
         }
     }
 
@@ -654,67 +660,61 @@ export async function POST(req: Request) {
                 console.warn("Global pause check failed (ignoring):", e);
             }
 
-            // Prepare image URL if reference image provided
-            // PRIORITY: canvasFile/canvasUrl (Edit Mode) > imageFiles > imageUrls > template_reference_image
-            let refImageUrl: string | null = null;
+            let falImages: string[] = [];
 
             // 1. Check for Canvas Image (Edit Mode) - HIGHEST PRIORITY
             if (canvasFile) {
-                // Upload canvasFile to get a public URL for Fal
                 const ab = await canvasFile.arrayBuffer();
-                const buffer = Buffer.from(ab);
                 const filePath = `fal-uploads/${userId}/canvas-${Date.now()}.jpg`;
-
-                const { error: uploadErr } = await admin.storage
-                    .from("generations")
-                    .upload(filePath, buffer, { contentType: canvasFile.type || "image/jpeg", upsert: false });
-
+                const { error: uploadErr } = await admin.storage.from("generations").upload(filePath, Buffer.from(ab), { contentType: canvasFile.type || "image/jpeg", upsert: false });
                 if (!uploadErr) {
                     const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
-                    refImageUrl = pubUrl.publicUrl;
-                    // console.log("FAL: Using uploaded canvasFile as base image:", refImageUrl);
+                    falImages.push(pubUrl.publicUrl);
                 } else {
                     console.warn("Failed to upload canvas image for Fal:", uploadErr);
                 }
             } else if (canvasUrl) {
-                // Canvas URL already provided (Studio flow)
-                refImageUrl = canvasUrl;
-                // console.log("FAL: Using canvasUrl as base image:", refImageUrl);
-            } else if (imageFiles.length > 0) {
-                // Upload first image to Supabase to get a public URL for Fal
-                const firstFile = imageFiles[0];
-                const ab = await firstFile.arrayBuffer();
-                const buffer = Buffer.from(ab);
-                const filePath = `fal-uploads/${userId}/${Date.now()}.jpg`;
+                falImages.push(canvasUrl);
+            }
 
-                const { error: uploadErr } = await admin.storage
-                    .from("generations")
-                    .upload(filePath, buffer, { contentType: firstFile.type || "image/jpeg", upsert: false });
-
+            // 2. Upload all user provided image files
+            for (const file of imageFiles) {
+                const ab = await file.arrayBuffer();
+                const filePath = `fal-uploads/${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                const { error: uploadErr } = await admin.storage.from("generations").upload(filePath, Buffer.from(ab), { contentType: file.type || "image/jpeg", upsert: false });
                 if (!uploadErr) {
                     const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
-                    refImageUrl = pubUrl.publicUrl;
+                    falImages.push(pubUrl.publicUrl);
                 } else {
                     console.warn("Failed to upload reference image for Fal:", uploadErr);
                 }
-            } else if (imageUrls.length > 0) {
-                refImageUrl = imageUrls[0];
-            } else if (template_reference_image) {
-                // Fallback: Use string passed from Remix/Edit flows
-                refImageUrl = template_reference_image;
             }
 
-            // 🔍 IMAGE ROUTING DEBUG
-            // console.log("=== IMAGE ROUTING DEBUG ===");
-            // console.log("imageFiles.length:", imageFiles.length);
-            // console.log("imageUrls.length:", imageUrls.length);
-            // console.log("imageUrls:", imageUrls);
-            // console.log("canvasUrl:", canvasUrl?.slice(0, 60));
-            // console.log("canvasFile:", !!canvasFile);
-            // console.log("refImageUrl:", refImageUrl?.slice(0, 60));
-            // console.log("template_reference_image:", template_reference_image?.slice(0, 60));
-            // console.log("refImageUrl === template_reference_image:", refImageUrl === template_reference_image);
-            // console.log("=== END IMAGE ROUTING DEBUG ===");
+            // 3. Append existing imageUrls
+            for (const url of imageUrls) {
+                if (!falImages.includes(url)) falImages.push(url);
+            }
+
+            // 4. Handle Logo
+            let falLogoUrl: string | null = null;
+            if (logoFile) {
+                const ab = await logoFile.arrayBuffer();
+                const filePath = `fal-uploads/${userId}/logo_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+                const { error: uploadErr } = await admin.storage.from("generations").upload(filePath, Buffer.from(ab), { contentType: logoFile.type || "image/png", upsert: false });
+                if (!uploadErr) {
+                    const { data: pubUrl } = admin.storage.from("generations").getPublicUrl(filePath);
+                    falLogoUrl = pubUrl.publicUrl;
+                }
+            } else if (logoUrl) {
+                falLogoUrl = logoUrl;
+            }
+
+            if (falLogoUrl) {
+                falImages.push(falLogoUrl);
+            }
+
+            // Fallback for DB logging backward compatibility 
+            let refImageUrl = falImages.length > 0 ? falImages[0] : (template_reference_image || null);
 
 
             // Fal supports aspect ratio as string like "16:9" or object {width, height}
@@ -895,7 +895,9 @@ export async function POST(req: Request) {
                 finalFalPrompt += textPrompt;
 
                 // LOGO LOGIC (Moved to START of Prompt for Visibility)
-                if (!logoFile && !logoUrl && businessName) {
+                if (falLogoUrl) {
+                    finalFalPrompt = " [LOGO MANDATE] You MUST place the final reference image (the Logo) onto the design. Maintain its aspect ratio and place it prominently. " + finalFalPrompt;
+                } else if (!logoFile && !logoUrl && businessName) {
                     // FIRE LOGO PROMPT - Prepend to ensure model prioritizes the overlay
                     const logoPrompt = ` COMPOSITION PRIORITY: Start by placing a clean, vector-style logo for '${businessName}' in the top-right corner. It must be a distinct, white or black graphic overlay. `;
                     finalFalPrompt = logoPrompt + finalFalPrompt;
@@ -930,11 +932,11 @@ export async function POST(req: Request) {
                 }
 
                 // RESOLVE MAIN IMAGE (Prioritize Canvas for Edit Mode)
-                const falMainImage = canvasUrl || refImageUrl;
-                console.log("FAL GENERATION INPUTS:", { model, falMainImage, template_reference_image, falStrength, finalKeepOutfit });
+                const falMainImage = falImages.length > 0 ? falImages : (refImageUrl || null);
+                // console.log("FAL GENERATION INPUTS:", { model, imageCount: falImages.length, template_reference_image, falStrength, finalKeepOutfit });
 
                 const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, falMainImage, template_reference_image, finalKeepOutfit, remixNegativePrompt, falStrength, useSubjectFirst);
-                console.log("Fal Image Generated:", falImageUrl);
+                // console.log("Fal Image Generated:", falImageUrl);
 
                 // Save to DB
                 const { data: inserted, error: dbErr } = await admin.from("prompt_generations").insert({
