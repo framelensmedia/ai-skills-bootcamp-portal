@@ -412,11 +412,11 @@ export async function POST(req: Request) {
                 // MULTI-SUBJECT MODE: 2+ uploaded images, no separate template
                 const subjectCount = falImages.filter(u => u !== falLogoUrl).length;
                 if (subjectCount >= 2) {
-                    subjectInstruction += ` [MULTI-PERSON MANDATE]: You have been given ${subjectCount} reference images of different people. `;
-                    subjectInstruction += ` You MUST include ALL ${subjectCount} people in the final image. `;
-                    subjectInstruction += ` Each person corresponds to one reference image (Image 1 = Person 1, Image 2 = Person 2, etc.). `;
-                    subjectInstruction += ` Maintain each individual's EXACT facial identity. Do NOT blend or composite their faces. `;
-                    subjectInstruction += ` Arrange them naturally together in the scene described by the prompt. `;
+                    subjectInstruction += ` [MULTI-SUBJECT MANDATE]: You have been given ${subjectCount} reference images. `;
+                    subjectInstruction += ` You MUST include ALL ${subjectCount} subjects in the final image — do NOT drop or omit any. `;
+                    subjectInstruction += ` Each subject corresponds to one reference image (Image 1 = Subject 1, Image 2 = Subject 2, etc.). `;
+                    subjectInstruction += ` If a reference is a person, maintain their EXACT facial identity. If it is a product or object, reproduce it accurately. `;
+                    subjectInstruction += ` Arrange all subjects naturally together in the scene described by the prompt. `;
                     subjectInstruction += ` FACE LOCK: Each person's face must be 100% faithful to their reference image. `;
                 } else {
                     // STANDARD / GENERIC LOGIC (single subject, no template)
