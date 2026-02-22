@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useAuth } from "@/context/AuthProvider";
+import DiscordVipWidget from "@/components/dashboard/DiscordVipWidget";
 import {
   CreditCard,
   DollarSign,
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   const [plan, setPlan] = useState<string>("free");
   const [role, setRole] = useState<string>("user");
   const [staffPro, setStaffPro] = useState<boolean>(false);
+  const [discordUserId, setDiscordUserId] = useState<string | null>(null);
 
   // Local user state for display (merged with profile)
   const [displayUser, setDisplayUser] = useState<any>(null);
@@ -118,15 +120,16 @@ export default function DashboardPage() {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("plan, role, staff_pro, staff_approved, is_approved, username, full_name, profile_image")
+        .select("plan, role, staff_pro, staff_approved, is_approved, username, full_name, profile_image, discord_user_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (!cancelled && !error && profile) {
-        const p = profile as ProfileRow & { username?: string; full_name?: string; profile_image?: string };
+        const p = profile as ProfileRow & { username?: string; full_name?: string; profile_image?: string; discord_user_id?: string };
         setPlan(String(p.plan || "free"));
         setRole(String(p.role || "user"));
         setStaffPro(Boolean(p.staff_pro));
+        setDiscordUserId(p.discord_user_id || null);
 
         // Prioritize full_name > username > email
         const nameToUse = p.full_name || p.username;
@@ -363,6 +366,11 @@ export default function DashboardPage() {
               </button>
             </div>
           )}
+
+          <DiscordVipWidget
+            hasProAccess={hasProAccess}
+            discordUserId={discordUserId}
+          />
 
           <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-5">
             <h3 className="mb-4 text-xs font-mono uppercase tracking-widest text-white/40">System Status</h3>
