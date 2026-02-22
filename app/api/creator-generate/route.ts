@@ -12,6 +12,23 @@ function mustEnv(name: string) {
     return v;
 }
 
+// Helper to convert URL to base64
+async function urlToBase64(url: string) {
+    try {
+        const res = await fetch(url);
+        if (res.ok) {
+            const ab = await res.arrayBuffer();
+            return {
+                data: Buffer.from(ab).toString("base64"),
+                mimeType: res.headers.get("content-type") || "image/png"
+            };
+        }
+    } catch (e) {
+        console.warn(`Fetch failed for ${url}`);
+    }
+    return null;
+}
+
 async function generateFalImage(
     modelId: string,
     prompt: string,
@@ -65,7 +82,26 @@ async function generateFalImage(
         }
 
         if (imagesToSend.length > 0) {
-            payload.image_urls = imagesToSend;
+            // Convert to Base64 to avoid Fal file download errors with special chars
+            const base64ImagesToSend: string[] = [];
+            for (const imgUrl of imagesToSend) {
+                if (imgUrl.trim().startsWith("http")) {
+                    try {
+                        const b64 = await urlToBase64(imgUrl);
+                        if (b64 && b64.data) {
+                            base64ImagesToSend.push(`data:${b64.mimeType};base64,${b64.data}`);
+                        } else {
+                            base64ImagesToSend.push(imgUrl); // Fallback
+                        }
+                    } catch (e) {
+                        base64ImagesToSend.push(imgUrl); // Fallback
+                    }
+                } else if (imgUrl.trim().startsWith("data:")) {
+                    base64ImagesToSend.push(imgUrl);
+                }
+            }
+
+            payload.image_urls = base64ImagesToSend;
         } else {
             delete payload.image_urls;
             delete payload.image_url;

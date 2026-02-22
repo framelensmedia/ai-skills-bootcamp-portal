@@ -283,7 +283,27 @@ async function generateFalImage(
         // If we have images, use /edit and attach image_urls
         if (imagesToSend.length > 0) {
             actualEndpoint = `https://queue.fal.run/${modelId}/edit`;
-            payload.image_urls = imagesToSend;
+
+            // Convert to Base64 to avoid Fal file download errors with special chars
+            const base64ImagesToSend: string[] = [];
+            for (const imgUrl of imagesToSend) {
+                if (imgUrl.trim().startsWith("http")) {
+                    try {
+                        const b64 = await urlToBase64(imgUrl);
+                        if (b64 && b64.data) {
+                            base64ImagesToSend.push(`data:${b64.mimeType};base64,${b64.data}`);
+                        } else {
+                            base64ImagesToSend.push(imgUrl); // Fallback
+                        }
+                    } catch (e) {
+                        base64ImagesToSend.push(imgUrl); // Fallback
+                    }
+                } else if (imgUrl.trim().startsWith("data:")) {
+                    base64ImagesToSend.push(imgUrl);
+                }
+            }
+
+            payload.image_urls = base64ImagesToSend;
             // console.log(`NANO BANANA EDIT: Sending ${imagesToSend.length} images. subjectFirst=${subjectFirst}. Image 1: ${imagesToSend[0]?.slice(0, 60)}, Image 2: ${imagesToSend[1]?.slice(0, 60) || 'NONE'}`);
         } else {
             // T2I MODE (Base Endpoint)
