@@ -155,6 +155,7 @@ async function generateFalImage(
     }
 
     const request_id = initialJson.request_id;
+    const response_url = initialJson.response_url;
     if (!request_id) {
         throw new Error(`Fal.ai returned no request_id and no images: ${JSON.stringify(initialJson)}`);
     }
@@ -189,8 +190,18 @@ async function generateFalImage(
         }
 
         if (statusJson.status === "COMPLETED") {
+            // /status only returns status, not images. Fetch the response_url for actual image data.
+            if (response_url) {
+                const resultRes = await fetch(response_url, {
+                    headers: { "Authorization": `Key ${falKey}` }
+                });
+                const resultJson = await resultRes.json();
+                const imageUrl = resultJson.images?.[0]?.url || resultJson.image?.url;
+                if (!imageUrl) throw new Error(`Fal.ai completed but returned no image URL: ${JSON.stringify(resultJson)}`);
+                return imageUrl;
+            }
             const imageUrl = statusJson.images?.[0]?.url;
-            if (!imageUrl) throw new Error("Fal.ai completed but returned no image URL");
+            if (!imageUrl) throw new Error("Fal.ai completed but returned no image URL in status");
             return imageUrl;
         }
 
