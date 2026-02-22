@@ -361,7 +361,7 @@ async function generateFalImage(
 
         // Use the actual endpoint path for polling (includes /edit if we submitted to /edit)
         const basePath = actualEndpoint.replace('https://queue.fal.run/', '').replace('/edit', '');
-        const statusRes = await fetch(`https://queue.fal.run/${basePath}/requests/${request_id}`, {
+        const statusRes = await fetch(`https://queue.fal.run/${basePath}/requests/${request_id}/status`, {
             headers: {
                 "Authorization": `Key ${falKey}`,
             },
@@ -658,7 +658,12 @@ export async function POST(req: Request) {
 
         // --- BRANCH: FAL.AI MODELS ---
         if (model.startsWith("fal-ai/")) {
-            // console.log(`Using Fal Model: ${model}`);
+            console.log("[FAL DEBUG] Received images:", {
+                imageFiles: imageFiles.length,
+                imageUrls,
+                template: template_reference_image?.slice(0, 60),
+                logoUrl
+            });
 
             // Check Global Pause first
             try {
@@ -732,6 +737,8 @@ export async function POST(req: Request) {
             if (falLogoUrl) {
                 falImages.push(falLogoUrl);
             }
+
+            console.log("[FAL DEBUG] Final falImages array:", falImages.map(u => u.slice(0, 80)));
 
             // Fallback for DB logging backward compatibility 
             let refImageUrl = falImages.length > 0 ? falImages[0] : (template_reference_image || null);

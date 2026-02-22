@@ -127,7 +127,7 @@ async function generateFalImage(
     console.log(`CREATOR GEN (${modelId}):`, {
         prompt: prompt.slice(0, 50),
         endpoint: actualEndpoint,
-        payload: JSON.stringify(payload)
+        imageUrlsCount: payload.image_urls?.length || 0,
     });
 
     // 1. Submit Request
@@ -168,7 +168,7 @@ async function generateFalImage(
         attempts++;
         await new Promise(r => setTimeout(r, 2000));
 
-        const statusUrl = `https://queue.fal.run/${modelId}/requests/${request_id}`;
+        const statusUrl = `https://queue.fal.run/${modelId}/requests/${request_id}/status`;
         const statusRes = await fetch(statusUrl, {
             headers: {
                 "Authorization": `Key ${falKey}`,
@@ -355,6 +355,8 @@ export async function POST(req: Request) {
             falImages.push(falLogoUrl);
             // Append instruction to finalPrompt later
         }
+
+        console.log("[CREATOR DEBUG] falImages count:", falImages.length, "imageUrls received:", imageUrls.length, "imageFiles received:", imageFiles.length, "template:", template_reference_image?.slice(0, 60));
 
         let refImageUrl = falImages.length > 0 ? falImages[0] : null;
 
