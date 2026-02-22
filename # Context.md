@@ -2669,3 +2669,22 @@ Every photoshoot request follows the "Maintain & Modify" architecture:
 - **Input:** Raw uploads stored in `supabase_storage/raw_photoshoot`.
 - **Output:** Saved to `assets` table with `metadata->'photoshoot_mode'` (product/headshot).
 - **Genie Link:** Finalized assets trigger a "Genie Suggestion" for immediate ad-copy generation in the Media Studio.
+
+# MODULE: Discord VIP Integration
+
+## 1. Feature Objective
+To provide VIP members with direct access to a private Discord community via the AI Skills Studio dashboard, featuring automated role management.
+
+## 2. Authentication & Bot Permissions
+- **Scopes:** `identify`, `guilds.join` (allows the bot to add the user to the server automatically).
+- **Bot Permissions:** Must have `MANAGE_ROLES` permission and its role must be higher in the hierarchy than the "VIP" role it is assigning.
+
+## 3. Workflow Logic
+- **Step 1:** User clicks 'Join Discord' -> OAuth2 redirect to Discord.
+- **Step 2:** Supabase Edge Function receives the `access_token` and `discord_user_id`.
+- **Step 3:** Bot uses the `PUT /guilds/{guild.id}/members/{user.id}` endpoint to add the user to the server with the pre-defined VIP Role ID.
+- **Step 4:** Logic check: Only allow this workflow if `profiles.subscription_tier == 'pro'`.
+
+## 4. Dashboard Widget
+- **State A (Unlinked):** Show "Connect Discord to access VIP Channels."
+- **State B (Linked):** Show "You are in! [Open Discord App]" with a direct deep-link to the VIP channel.
