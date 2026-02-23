@@ -97,11 +97,16 @@ export async function GET(req: Request) {
         // 3. Verify user is PRO in Supabase
         const { data: profile } = await supabase
             .from("profiles")
-            .select("subscription_tier")
+            .select("plan, role, staff_pro")
             .eq("id", user.id)
             .single();
 
-        if (profile?.subscription_tier !== "pro") {
+        const plan = String(profile?.plan || "free").toLowerCase();
+        const role = String(profile?.role || "user").toLowerCase();
+        const isStaffPlus = ["staff", "instructor", "editor", "admin", "super_admin"].includes(role);
+        const hasProAccess = plan === "premium" || profile?.staff_pro === true || isStaffPlus;
+
+        if (!hasProAccess) {
             console.error("User is not a PRO subscriber");
             return NextResponse.redirect(`${dashboardUrl}?error=not_pro_subscriber`);
         }
