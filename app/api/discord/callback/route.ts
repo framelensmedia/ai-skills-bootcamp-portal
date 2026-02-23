@@ -114,7 +114,13 @@ export async function GET(req: NextRequest) {
         // 4. Save discord_user_id to profiles first, so we don't loop if role assignment fails
         // We MUST use the service_role key to bypass RLS since users cannot update this field directly
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+        const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (!supabaseServiceRole) {
+            console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+            return NextResponse.redirect(`${dashboardUrl}?error=missing_service_key`);
+        }
+
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
 
         const { error: updateError } = await supabaseAdmin
@@ -124,7 +130,7 @@ export async function GET(req: NextRequest) {
 
         if (updateError) {
             console.error("Failed to update profile with discord ID", updateError);
-            return NextResponse.redirect(`${dashboardUrl}?error=profile_update_failed`);
+            return NextResponse.redirect(`${dashboardUrl}?error=profile_update_failed_${encodeURIComponent(updateError.message)}`);
         }
 
         // 5. Add User to Guild & Assign Role (Using Bot Token)
@@ -145,9 +151,12 @@ export async function GET(req: NextRequest) {
 
         // 201 Created (Added), 204 No Content (Already in server)
         let roleError = false;
+        let roleErrorMsg = "";
+
         if (!addMemberResponse.ok && addMemberResponse.status !== 204 && addMemberResponse.status !== 201) {
             const err = await addMemberResponse.text();
             console.error("Failed to add member to guild or assign role", addMemberResponse.status, err);
+            roleErrorMsg = `add_member_failed_${addMemberResponse.status}`;
             roleError = true;
         }
 
@@ -161,7 +170,9 @@ export async function GET(req: NextRequest) {
                 }
             });
             if (!roleRes.ok) {
-                console.error("Failed to patch role for existing member", await roleRes.text());
+                const errText = await roleRes.text();
+                console.error("Failed to patch role for existing member", errText);
+                roleErrorMsg = `patch_role_failed_${roleRes.status}_${encodeURIComponent(errText.substring(0, 50))}`;
                 roleError = true;
             }
         }
@@ -169,7 +180,7 @@ export async function GET(req: NextRequest) {
         if (roleError) {
             // We still linked them, so don't throw a fatal error. 
             // Just warn them on the dashboard so they can check bot permissions.
-            return NextResponse.redirect(`${dashboardUrl}?error=discord_role_assignment_failed_but_linked`);
+            return NextResponse.redirect(`${dashboardUrl}?error=discord_role_assignment_failed_but_linked_${roleErrorMsg}`);
         }
 
         return NextResponse.redirect(`${dashboardUrl}?success=discord_linked`);
