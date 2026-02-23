@@ -102,9 +102,9 @@ export async function GET(req: Request) {
             .single();
 
         const plan = String(profile?.plan || "free").toLowerCase();
-        const role = String(profile?.role || "user").toLowerCase();
+        const role = String(profile?.role || "user").toLowerCase().replace(" ", "_");
         const isStaffPlus = ["staff", "instructor", "editor", "admin", "super_admin"].includes(role);
-        const hasProAccess = plan === "premium" || profile?.staff_pro === true || isStaffPlus;
+        const hasProAccess = plan === "premium" || plan === "pro" || profile?.staff_pro === true || isStaffPlus;
 
         if (!hasProAccess) {
             console.error("User is not a PRO subscriber");

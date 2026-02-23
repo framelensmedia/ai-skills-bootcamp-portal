@@ -51,13 +51,22 @@ export default function DashboardPage() {
   const [managingBilling, setManagingBilling] = useState(false);
 
   // Role Checks
-  const isStaffPlus = useMemo(() => ["staff", "instructor", "editor", "admin", "super_admin"].includes(role), [role]);
-  const isEditorPlus = useMemo(() => ["editor", "admin", "super_admin"].includes(role), [role]);
-  const isAdminPlus = useMemo(() => ["admin", "super_admin"].includes(role), [role]);
+  const isStaffPlus = useMemo(() => {
+    const r = role.toLowerCase().replace(" ", "_");
+    return ["staff", "instructor", "editor", "admin", "super_admin"].includes(r);
+  }, [role]);
+  const isEditorPlus = useMemo(() => {
+    const r = role.toLowerCase().replace(" ", "_");
+    return ["editor", "admin", "super_admin"].includes(r);
+  }, [role]);
+  const isAdminPlus = useMemo(() => {
+    const r = role.toLowerCase().replace(" ", "_");
+    return ["admin", "super_admin"].includes(r);
+  }, [role]);
 
   const hasProAccess = useMemo(() => {
     const p = String(plan || "free").toLowerCase();
-    return p === "premium" || staffPro || isStaffPlus;
+    return p === "premium" || p === "pro" || staffPro || isStaffPlus;
   }, [plan, staffPro, isStaffPlus]);
 
   // Greeting Logic
