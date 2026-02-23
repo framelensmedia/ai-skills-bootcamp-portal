@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     siteName: "AI Skills Studio",
     images: [
       {
-        url: "/default-meta-image.png",
+        url: "/images/studio-screenshot.png",
         width: 1200,
         height: 630,
         alt: "AI Skills Studio",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Launch your business with AI",
     description: "Learn high-value AI skills and build real projects.",
-    images: ["/default-meta-image.png"],
+    images: ["/images/studio-screenshot.png"],
   },
   appleWebApp: {
     capable: true,
