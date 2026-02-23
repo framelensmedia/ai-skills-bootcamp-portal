@@ -23,7 +23,7 @@ const reviews = [
 
 export default function SuccessStories() {
     return (
-        <section className="mx-auto max-w-6xl px-4 py-20 pb-10 md:py-32 md:pb-14">
+        <section className="mx-auto max-w-6xl px-4 pt-16 pb-20 md:pt-20 md:pb-24">
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold md:text-4xl text-white mb-4">
                     Success Stories

@@ -168,7 +168,7 @@ export default async function PromptsPage({
             <Wand2 size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Latest Templates</h2>
+            <h2 className="text-2xl font-bold text-white mb-3">Latest Templates</h2>
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
               <span className="text-purple-400 flex-shrink-0">●</span>
               <span className="text-xs font-medium text-white">Newest additions to our library</span>
@@ -176,7 +176,7 @@ export default async function PromptsPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(trendingPrompts ?? []).map((p) => {
             const image = p.featured_image_url || p.image_url || p.media_url || null;
             return (
@@ -205,7 +205,7 @@ export default async function PromptsPage({
             <Layers size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Prompt Packs</h2>
+            <h2 className="text-2xl font-bold text-white mb-3">Prompt Packs</h2>
             <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
               <span className="text-[#B7FF00] flex-shrink-0">●</span>
               <span className="text-xs font-medium text-white">Curated collections for specific workflows</span>
@@ -223,7 +223,7 @@ export default async function PromptsPage({
               <Palette size={24} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white mb-1">All Templates</h2>
+              <h2 className="text-2xl font-bold text-white mb-3">All Templates</h2>
               <div className="inline-flex items-center gap-2 rounded-2xl rounded-br-none border border-white/10 bg-[#1A1A1A] px-3 py-1.5 shadow-sm cursor-default">
                 <span className="text-blue-400 flex-shrink-0">●</span>
                 <span className="text-xs font-medium text-white">Search and filter our entire library</span>
@@ -240,7 +240,7 @@ export default async function PromptsPage({
         />
 
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(prompts ?? []).map((p) => {
             const image =
               p.featured_image_url || p.image_url || p.media_url || null;

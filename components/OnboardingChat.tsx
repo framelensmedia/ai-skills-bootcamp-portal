@@ -220,7 +220,7 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
                         <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                             style={{ animation: "fadeSlideIn 0.3s ease-out" }}>
                             {msg.role === "bot" ? (
-                                <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0">
+                                <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(183,255,0,0.15)]">
                                     <img src="/logo-symbol.png" alt="AI" className="w-5 h-5 object-contain" />
                                 </div>
                             ) : (
@@ -251,7 +251,7 @@ export default function OnboardingChat({ onInputFocus }: OnboardingChatProps) {
 
                     {isTyping && (
                         <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0 animate-pulse">
+                            <div className="w-8 h-8 rounded-full border border-[#B7FF00]/20 bg-[#B7FF00]/10 text-[#B7FF00] flex items-center justify-center shrink-0 animate-pulse shadow-[0_0_10px_rgba(183,255,0,0.15)]">
                                 <img src="/logo-symbol.png" alt="AI" className="w-5 h-5 object-contain" />
                             </div>
                             <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-none px-4 py-2.5 flex items-center gap-1.5">

@@ -82,11 +82,27 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
 
     const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Auto-hide tab logic (disabled in onboarding mode)
+    // Auto-hide tab logic (mobile responsive)
     useEffect(() => {
         if (isSetupMode) return;
-        const timer = setTimeout(() => setIsIdle(true), 3000);
-        return () => clearTimeout(timer);
+
+        const handleInteraction = () => {
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+            setIsIdle(false);
+            idleTimerRef.current = setTimeout(() => setIsIdle(true), 2500);
+        };
+
+        // Listen for scroll and touch on mobile to trigger the auto-hide wake up
+        window.addEventListener("scroll", handleInteraction, { passive: true });
+        window.addEventListener("touchstart", handleInteraction, { passive: true });
+
+        handleInteraction(); // Start initial timer
+
+        return () => {
+            window.removeEventListener("scroll", handleInteraction);
+            window.removeEventListener("touchstart", handleInteraction);
+            if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        };
     }, [isSetupMode]);
 
     const handleMouseEnter = () => {
@@ -123,8 +139,8 @@ function AIAssistantContent({ onboardingMode, onboardingContent }: AIAssistantPr
             <div
                 className={`fixed z-[100] flex flex-col transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${isOpen ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
                     } ${isExpanded
-                        ? "inset-0 bg-black flex overflow-hidden" // Full Screen (App Mode)
-                        : "inset-0 sm:inset-[5%] md:inset-[10%] rounded-none sm:rounded-[10px] bg-black sm:bg-black/95 backdrop-blur-2xl border-0 sm:border border-[#B7FF00]/40 shadow-[0_0_50px_rgba(183,255,0,0.25)] flex overflow-hidden" // Modal Mode (Glow) - Fullscreen on mobile
+                        ? "inset-0 bg-black flex overflow-hidden rounded-none" // Full Screen (App Mode)
+                        : "inset-[2%] sm:inset-[5%] md:inset-[10%] rounded-[16px] sm:rounded-[10px] bg-black/95 backdrop-blur-2xl border border-[#B7FF00]/40 shadow-[0_0_50px_rgba(183,255,0,0.25)] flex overflow-hidden" // Modal Mode (Glow)
                     }`}
             >
                 {/* Header / Layout Container */}

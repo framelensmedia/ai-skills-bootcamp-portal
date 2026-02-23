@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PromptCard from "@/components/PromptCard";
 import RemixCard, { RemixItem } from "@/components/RemixCard";
+import RemixCarousel from "@/components/RemixCarousel";
+import AutoplayVideo from "@/components/AutoplayVideo";
 import { Wand2, ArrowRight, Flame, RefreshCw, Search, Star, Users } from "lucide-react";
 import Image from "next/image";
 import SuccessStories from "@/components/home/SuccessStories";
@@ -340,7 +342,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
     }
 
     return (
-        <>
+        <div className="overflow-hidden">
 
             {/* 1) HERO */}
             <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
@@ -434,87 +436,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
             {/* 4) WHAT YOU'LL LEARN */}
             <WhatYouWillLearnSection />
 
-            {/* 4.5) MASTERMIND COMMUNITY BANNER */}
-            <section className="mx-auto max-w-6xl px-4 py-6 md:py-8">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-[#B7FF00]/20 bg-zinc-950/80 p-6 shadow-[0_0_30px_rgba(183,255,0,0.03)]">
-                    <div className="flex items-center gap-4 text-center sm:text-left w-full justify-center sm:justify-start">
-                        <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00]/10 text-[#B7FF00]">
-                            <Users size={24} />
-                        </div>
-                        <div>
-                            <p className="text-lg font-bold text-white mb-1">Elite Mastermind Community</p>
-                            <p className="text-muted-foreground text-sm">
-                                Join an elite mastermind community and network with other entrepreneurs just like you.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 5) PROMPT TEMPLATES */}
-            <section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-border pb-8">
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
-                                <Wand2 size={12} />
-                            </span>
-                            <span className="text-xs font-bold uppercase tracking-wider text-[#B7FF00]">
-                                Prompt Templates
-                            </span>
-                        </div>
-                        <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight mb-3">
-                            Free Templates
-                        </h2>
-                        <p className="text-lg text-muted-foreground max-w-2xl">
-                            Pick a template, customize it for your business, and post it today.
-                        </p>
-                    </div>
-
-                    <Link
-                        href="/prompts"
-                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
-                        className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0"
-                    >
-                        <span>Use Free Templates</span>
-                        <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
-                    </Link>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {trendingPrompts.length ? (
-                        trendingPrompts.map((p) => (
-                            <PromptCard
-                                key={p.id}
-                                id={p.id}
-                                title={p.title}
-                                summary={p.summary || ""}
-                                slug={p.slug}
-                                category={p.category || undefined}
-                                accessLevel={p.access_level}
-                                imageUrl={p.image_url || p.featured_image_url || p.media_url}
-                                initialFavorited={favSet.has(p.id)}
-                            />
-                        ))
-                    ) : (
-                        <div className="text-sm text-muted-foreground col-span-4 py-8 text-center">No prompts found.</div>
-                    )}
-                </div>
-
-                <div className="mt-6 flex justify-center md:hidden">
-                    <Link
-                        href="/prompts"
-                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
-                        className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80"
-                    >
-                        <span>Use Free Templates</span>
-                    </Link>
-                </div>
-            </section>
-
-
             {/* 5.5) PROFESSIONAL TOOLS */}
-            <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16 mt-12 md:mt-20">
+            <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16">
                 <div className="rounded-3xl border border-white/10 bg-zinc-900/50 overflow-hidden backdrop-blur-sm relative group/section">
                     {/* Background glow */}
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-purple-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
@@ -577,10 +500,73 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                 </div>
             </section>
 
+
+            {/* 5) PROMPT TEMPLATES */}
+            <section className="mx-auto max-w-6xl px-4 py-12 md:py-16 mt-12 md:mt-16">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-border pb-8">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B7FF00]/10 text-[#B7FF00]">
+                                <Wand2 size={12} />
+                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-[#B7FF00]">
+                                Prompt Templates
+                            </span>
+                        </div>
+                        <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight mb-3">
+                            Free Templates
+                        </h2>
+                        <p className="text-lg text-muted-foreground max-w-2xl">
+                            Pick a template, customize it for your business, and post it today.
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/prompts"
+                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
+                        className="group flex items-center gap-2 rounded-xl bg-card border border-border px-5 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-[#B7FF00]/30 hover:text-[#B7FF00] shrink-0"
+                    >
+                        <span>Use Free Templates</span>
+                        <ArrowRight size={16} className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[#B7FF00]" />
+                    </Link>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {trendingPrompts.length ? (
+                        trendingPrompts.map((p) => (
+                            <PromptCard
+                                key={p.id}
+                                id={p.id}
+                                title={p.title}
+                                summary={p.summary || ""}
+                                slug={p.slug}
+                                category={p.category || undefined}
+                                accessLevel={p.access_level}
+                                imageUrl={p.image_url || p.featured_image_url || p.media_url}
+                                initialFavorited={favSet.has(p.id)}
+                            />
+                        ))
+                    ) : (
+                        <div className="text-sm text-muted-foreground col-span-4 py-8 text-center">No prompts found.</div>
+                    )}
+                </div>
+
+                <div className="mt-6 flex justify-center md:hidden">
+                    <Link
+                        href="/prompts"
+                        onClick={() => trackEvent("cta_click_use_free_templates", { section: "templates", label: "Use Free Templates" })}
+                        className="group flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-border/80"
+                    >
+                        <span>Use Free Templates</span>
+                    </Link>
+                </div>
+            </section>
+
+
             {/* 5) COMMUNITY CREATIONS */}
             {recentRemixes && recentRemixes.length > 0 && (
-                <section className="mx-auto max-w-6xl px-4 pb-12 md:pb-16">
-                    <div className="mt-24 pt-8 border-t border-white/10">
+                <section className="mx-auto max-w-6xl px-4 pt-12 pb-12 md:pt-16 md:pb-16 border-t border-white/10">
+                    <div>
                         {/* Mobile Layout */}
                         <div className="mb-6 md:hidden">
                             <div className="flex items-center gap-4 mb-3">
@@ -611,10 +597,8 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             </div>
                         </div>
 
-                        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {recentRemixes.map((remix) => (
-                                <RemixCard key={remix.id} item={remix} />
-                            ))}
+                        <div className="mt-8 -mx-4 sm:mx-0">
+                            <RemixCarousel remixes={recentRemixes} user={user} />
                         </div>
 
                         <div className="mt-8 flex justify-center">
@@ -630,6 +614,23 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     </div>
                 </section>
             )}
+
+            {/* 4.5) MASTERMIND COMMUNITY BANNER */}
+            <section className="mx-auto max-w-6xl px-4 pt-12 pb-6 md:pt-16 md:pb-8">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-[#B7FF00]/20 bg-zinc-950/80 p-6 shadow-[0_0_30px_rgba(183,255,0,0.03)]">
+                    <div className="flex items-center gap-4 text-center sm:text-left w-full justify-center sm:justify-start">
+                        <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00]/10 text-[#B7FF00]">
+                            <Users size={24} />
+                        </div>
+                        <div>
+                            <p className="text-lg font-bold text-white mb-1">Elite Mastermind Community</p>
+                            <p className="text-muted-foreground text-sm">
+                                Join an elite mastermind community and network with other entrepreneurs just like you.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* 6) SUCCESS STORIES */}
             <SuccessStories />
@@ -659,7 +660,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                     <p className="text-xs text-white/30">Free tier available. Upgrade anytime.</p>
                 </div>
             </section>
-        </>
+        </div>
     );
 }
 

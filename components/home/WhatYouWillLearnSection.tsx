@@ -28,7 +28,7 @@ export default function WhatYouWillLearnSection() {
     ];
 
     return (
-        <section className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+        <section className="mx-auto max-w-6xl px-4 pt-16 md:pt-24 pb-12">
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold md:text-5xl text-foreground mb-6">
                     What You’ll Learn

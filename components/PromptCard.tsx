@@ -175,39 +175,15 @@ export default function PromptCard({
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/10" />
           ) : null}
 
-          {/* Top Categories & Labels */}
-          <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85">
-              {(category ?? "general").toUpperCase()}
-            </span>
-
-            {isPro ? (
-              <span className="rounded-full border border-lime-400/30 bg-lime-400/15 px-3 py-1 text-[11px] text-lime-200">
-                PRO
-              </span>
-            ) : null}
-
-            {packName && packSlug && (
-              <div
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  router.push(`/prompts/packs/${packSlug}`);
-                }}
-                className="cursor-pointer rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/85 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1"
-              >
-                <span className="opacity-50">PACK:</span> {packName}
-              </div>
-            )}
-          </div>
+          {/* Top Categories & Labels Removed As Per Request */}
         </div>
 
         <div className="flex flex-1 flex-col p-4 sm:p-5 w-full">
-          <div className="text-lg font-semibold leading-tight pr-6">{title}</div>
-
-          <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-            {summary && summary.trim().length > 0 ? summary : "Open to view and use this prompt."}
+          <div className="text-base font-bold leading-tight pr-6 line-clamp-2 min-h-[2.5rem]" title={title}>
+            {title}
           </div>
+
+          {/* Summary Removed As Per Request */}
 
           <div className="mt-auto pt-4 flex items-center justify-between w-full">
             <div className="text-xs text-muted-foreground/70">{isAuthed ? "Remix Prompt" : "Log in to Remix"}</div>

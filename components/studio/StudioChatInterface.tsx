@@ -127,12 +127,15 @@ export default function StudioChatInterface({
             <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-gray-800">
                 <div className="max-w-3xl mx-auto space-y-6">
                     {messages.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-[50vh] text-center opacity-50">
-                            <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mb-4">
-                                <MessageSquare size={32} className="text-[#B7FF00]" />
+                        <div className="flex flex-col items-center justify-center h-[50vh] text-center mt-4">
+                            <div className="relative w-24 h-24 rounded-[2rem] bg-gradient-to-b from-white/5 to-white/[0.02] border border-white/10 flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(183,255,0,0.15)] group transition-all duration-500 hover:shadow-[0_0_60px_rgba(183,255,0,0.25)] hover:border-[#B7FF00]/30">
+                                <div className="absolute inset-0 bg-[#B7FF00] opacity-5 group-hover:opacity-10 blur-2xl transition-opacity duration-500 rounded-[2rem]"></div>
+                                <MessageSquare size={44} className="text-[#B7FF00] drop-shadow-[0_0_15px_rgba(183,255,0,0.4)] relative z-10" />
                             </div>
-                            <h2 className="text-2xl font-bold mb-2">AI Strategist</h2>
-                            <p className="text-sm max-w-md text-gray-400 mb-8">I can help you write an image prompt, draft a script, or plan a marketing campaign! What do you need help with?</p>
+                            <h2 className="text-3xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-500 tracking-tight">AI Strategist</h2>
+                            <p className="text-base max-w-md text-gray-400 mb-10 leading-relaxed font-medium">
+                                I can help you write an image prompt, draft a script, or plan a marketing campaign! What do you need help with?
+                            </p>
 
                             <div className="flex flex-col gap-4 items-center w-full max-w-md">
                                 <button

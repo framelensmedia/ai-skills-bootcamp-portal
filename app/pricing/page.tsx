@@ -13,6 +13,7 @@ function PricingContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
+  const [isPro, setIsPro] = useState(false);
 
   const canceled = searchParams.get("canceled");
 
@@ -58,8 +59,12 @@ function PricingContent() {
   };
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
+    supabase.auth.getUser().then(async ({ data }: { data: { user: any } }) => {
       setUserId(data.user?.id ?? null);
+      if (data.user?.id) {
+        const { data: profile } = await supabase.from('profiles').select('plan, role, staff_pro').eq('user_id', data.user.id).single();
+        setIsPro(profile?.plan === 'premium' || profile?.plan === 'staff_pro' || profile?.staff_pro || profile?.role === 'admin' || profile?.role === 'super_admin');
+      }
     });
   }, [supabase]);
 
@@ -238,7 +243,7 @@ function PricingContent() {
             <li>Premium prompts and templates</li>
             <li>Members-only vault pages</li>
             <li>Self-paced course access</li>
-            <li>Custom GPT resources</li>
+            <li>Private Generations</li>
           </ul>
 
           <button
@@ -264,7 +269,7 @@ function PricingContent() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 md:grid-cols-3 ${!isPro ? "opacity-50 grayscale pointer-events-none" : ""}`}>
           {/* 50 Credits */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors">
             <div className="flex items-center justify-between mb-4">
@@ -277,10 +282,10 @@ function PricingContent() {
             <p className="text-sm text-white/60 mb-6">Perfect for trying things out</p>
             <button
               onClick={() => buyCredits("credits_50")}
-              disabled={buyingPack !== null}
+              disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
             >
-              {buyingPack === "credits_50" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Premium" : buyingPack === "credits_50" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
 
@@ -299,10 +304,10 @@ function PricingContent() {
             <p className="text-sm text-white/60 mb-6">Most popular choice</p>
             <button
               onClick={() => buyCredits("credits_120")}
-              disabled={buyingPack !== null}
+              disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg bg-[#B7FF00] px-4 py-3 text-sm font-bold text-black hover:bg-[#a8e600] disabled:opacity-60 transition-colors"
             >
-              {buyingPack === "credits_120" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Premium" : buyingPack === "credits_120" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
 
@@ -318,10 +323,10 @@ function PricingContent() {
             <p className="text-sm text-white/60 mb-6">For power creators</p>
             <button
               onClick={() => buyCredits("credits_300")}
-              disabled={buyingPack !== null}
+              disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
             >
-              {buyingPack === "credits_300" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Premium" : buyingPack === "credits_300" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
         </div>
@@ -337,18 +342,18 @@ function PricingContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🔄</span>
-                  <h3 className="font-semibold text-white">Auto-Recharge</h3>
+                  <h3 className="font-semibold text-white">Auto-Recharge {hasPaymentMethod && !isPro && <span className="text-red-400 text-xs ml-2">(Pro feature)</span>}</h3>
                 </div>
                 <p className="text-sm text-white/60 mt-1">
                   Automatically top up when credits drop below 10
                 </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className={`relative inline-flex items-center ${isPro ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
                 <input
                   type="checkbox"
-                  checked={autoRechargeEnabled}
+                  checked={autoRechargeEnabled && isPro}
                   onChange={(e) => toggleAutoRecharge(e.target.checked)}
-                  disabled={autoRechargeLoading || !hasPaymentMethod}
+                  disabled={autoRechargeLoading || !hasPaymentMethod || !isPro}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#B7FF00] disabled:opacity-50"></div>

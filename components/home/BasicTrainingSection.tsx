@@ -137,7 +137,7 @@ export default function BasicTrainingSection({ className = "" }: Props) {
         : 0;
 
     return (
-        <section className={`mx-auto max-w-6xl px-4 py-12 ${className}`}>
+        <section className={`mx-auto max-w-6xl px-4 ${className}`}>
 
             {/* 2-Column Split Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-zinc-900/40 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-sm hover:border-[#B7FF00]/20 transition-all duration-500 group">
