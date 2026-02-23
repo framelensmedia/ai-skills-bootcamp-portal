@@ -110,7 +110,18 @@ export async function GET(req: NextRequest) {
             return NextResponse.redirect(`${dashboardUrl}?error=not_pro_subscriber`);
         }
 
-        // 4. Add User to Guild & Assign Role (Using Bot Token)
+        // 4. Save discord_user_id to profiles first, so we don't loop if role assignment fails
+        const { error: updateError } = await supabase
+            .from("profiles")
+            .update({ discord_user_id: discordUserId })
+            .eq("id", user.id);
+
+        if (updateError) {
+            console.error("Failed to update profile with discord ID", updateError);
+            return NextResponse.redirect(`${dashboardUrl}?error=profile_update_failed`);
+        }
+
+        // 5. Add User to Guild & Assign Role (Using Bot Token)
         const addMemberUrl = `https://discord.com/api/guilds/${guildId}/members/${discordUserId}`;
         const addMemberPayload = {
             access_token: userAccessToken, // Require to add user (guilds.join scope)
@@ -127,11 +138,11 @@ export async function GET(req: NextRequest) {
         });
 
         // 201 Created (Added), 204 No Content (Already in server)
+        let roleError = false;
         if (!addMemberResponse.ok && addMemberResponse.status !== 204 && addMemberResponse.status !== 201) {
             const err = await addMemberResponse.text();
             console.error("Failed to add member to guild or assign role", addMemberResponse.status, err);
-            // Non-fatal, we still linked them, but worth logging
-            return NextResponse.redirect(`${dashboardUrl}?error=discord_role_assignment_failed`);
+            roleError = true;
         }
 
         // Optional: If 204, they were already in the server, so we need to PATCH to add the role
@@ -145,18 +156,14 @@ export async function GET(req: NextRequest) {
             });
             if (!roleRes.ok) {
                 console.error("Failed to patch role for existing member", await roleRes.text());
+                roleError = true;
             }
         }
 
-        // 5. Save discord_user_id to profiles
-        const { error: updateError } = await supabase
-            .from("profiles")
-            .update({ discord_user_id: discordUserId })
-            .eq("id", user.id);
-
-        if (updateError) {
-            console.error("Failed to update profile", updateError);
-            return NextResponse.redirect(`${dashboardUrl}?error=profile_update_failed`);
+        if (roleError) {
+            // We still linked them, so don't throw a fatal error. 
+            // Just warn them on the dashboard so they can check bot permissions.
+            return NextResponse.redirect(`${dashboardUrl}?error=discord_role_assignment_failed_but_linked`);
         }
 
         return NextResponse.redirect(`${dashboardUrl}?success=discord_linked`);

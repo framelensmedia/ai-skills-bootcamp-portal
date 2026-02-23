@@ -109,11 +109,22 @@ export default function DashboardPage() {
 
       if (paid === '1') {
         console.log("Payment successful, refreshing profile...");
-        // Provide user feedback that upgrade worked
         alert("Success! Your account has been upgraded.");
       } else if (creditsAdded) {
         console.log(`Successfully added ${creditsAdded} credits, refreshing...`);
         alert(`Success! Added ${creditsAdded} credits to your account.`);
+      }
+
+      // Check for Discord Callback status
+      const err = params.get('error');
+      const success = params.get('success');
+
+      if (success === 'discord_linked') {
+        // Force refresh to get new discord user id
+        setLoadingProfile(true);
+        alert("Success! Your Discord account is now linked to your VIP status.");
+      } else if (err && err.startsWith('discord_')) {
+        alert(`Discord Link Error: ${err}. Please check your bot permissions and settings.`);
       }
     }
   }, [initialized, user, router]);
