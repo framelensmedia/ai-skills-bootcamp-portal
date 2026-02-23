@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 import { sendGHLWebhook } from "@/lib/ghl";
 import { NextResponse } from "next/server";
 
@@ -29,11 +30,20 @@ export async function GET(request: Request) {
                 if (ambassador) {
                     const { data: { user } } = await supabase.auth.getUser(); // refresh user
                     if (user) {
-                        await supabase.from("referrals").upsert({
-                            ambassador_id: ambassador.id,
-                            referred_user_id: user.id,
-                            status: "trial"
-                        }, { onConflict: "referred_user_id" });
+                        try {
+                            const supabaseAdmin = createClient(
+                                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                                process.env.SUPABASE_SERVICE_ROLE_KEY!
+                            );
+
+                            await supabaseAdmin.from("referrals").upsert({
+                                ambassador_id: ambassador.id,
+                                referred_user_id: user.id,
+                                status: "trial"
+                            }, { onConflict: "referred_user_id" });
+                        } catch (err) {
+                            console.error("Failed to insert referral", err);
+                        }
                     }
                 }
             }
