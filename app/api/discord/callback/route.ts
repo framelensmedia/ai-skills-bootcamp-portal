@@ -14,8 +14,9 @@ export async function GET(req: NextRequest) {
     const error = searchParams.get("error");
     const stateStr = searchParams.get("state");
 
-    const redirectUri = `${req.nextUrl.origin}/api/discord/callback`;
-    const dashboardUrl = `${req.nextUrl.origin}/dashboard`;
+    const origin = process.env.NODE_ENV === "production" ? "https://aiskills.studio" : "http://localhost:3000";
+    const redirectUri = `${origin}/api/discord/callback`;
+    const dashboardUrl = `${origin}/dashboard`;
 
     if (error || !code) {
         console.error("Discord Auth Error:", error);

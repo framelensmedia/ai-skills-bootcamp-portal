@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
     const state = JSON.stringify({ userId: user.id });
     const encodedState = Buffer.from(state).toString("base64");
 
-    const redirectUri = `${req.nextUrl.origin}/api/discord/callback`;
+    const origin = process.env.NODE_ENV === "production" ? "https://aiskills.studio" : "http://localhost:3000";
+    const redirectUri = `${origin}/api/discord/callback`;
 
     // Scopes required:
     // identify: To get the discord user ID
