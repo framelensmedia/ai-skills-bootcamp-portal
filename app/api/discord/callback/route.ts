@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
         const { data: profile } = await supabase
             .from("profiles")
             .select("plan, role, staff_pro")
-            .eq("id", user.id)
+            .eq("user_id", user.id)
             .single();
 
         const plan = String(profile?.plan || "free").toLowerCase();
@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
         const { error: updateError } = await supabaseAdmin
             .from("profiles")
             .update({ discord_user_id: discordUserId })
-            .eq("id", user.id);
+            .eq("user_id", user.id);
 
         if (updateError) {
             console.error("Failed to update profile with discord ID", updateError);
