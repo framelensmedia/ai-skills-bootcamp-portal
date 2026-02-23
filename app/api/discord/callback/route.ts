@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req: NextRequest) {
     const supabase = await createSupabaseServerClient();
@@ -180,9 +181,11 @@ export async function GET(req: NextRequest) {
         if (roleError) {
             // We still linked them, so don't throw a fatal error. 
             // Just warn them on the dashboard so they can check bot permissions.
+            revalidatePath("/dashboard");
             return NextResponse.redirect(`${dashboardUrl}?error=discord_role_assignment_failed_but_linked_${roleErrorMsg}`);
         }
 
+        revalidatePath("/dashboard");
         return NextResponse.redirect(`${dashboardUrl}?success=discord_linked`);
 
     } catch (error) {
