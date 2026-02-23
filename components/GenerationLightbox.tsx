@@ -373,6 +373,7 @@ export default function GenerationLightbox({
                 </button>
               )}
 
+              {/* HIDDEN PER USER REQUEST
               <button
                 type="button"
                 onClick={(e) => {
@@ -386,6 +387,7 @@ export default function GenerationLightbox({
                 <span className="hidden md:block">Publish</span>
                 <Send className="w-4 h-4" />
               </button>
+              */}
 
 
 

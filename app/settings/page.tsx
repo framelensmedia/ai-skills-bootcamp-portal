@@ -356,7 +356,8 @@ function SettingsContent() {
                     </div>
                 </div>
 
-                {/* Connected Accounts Section */}
+                {/* Connected Accounts Section (HIDDEN PER USER REQUEST) */}
+                {/* 
                 <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-6">
                     <div className="mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
                         <Share2 size={18} className="text-[#B7FF00]" />
@@ -368,7 +369,6 @@ function SettingsContent() {
                     </p>
 
                     <div className="space-y-4">
-                        {/* Meta / Instagram / Facebook */}
                         <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black p-4">
                             <div>
                                 <h3 className="font-bold text-white text-sm">Meta (Instagram & Facebook)</h3>
@@ -388,7 +388,6 @@ function SettingsContent() {
                             </button>
                         </div>
 
-                        {/* TikTok */}
                         <div className="flex items-center justify-between rounded-lg border border-white/5 bg-black p-4">
                             <div>
                                 <h3 className="font-bold text-white text-sm">TikTok</h3>
@@ -409,6 +408,7 @@ function SettingsContent() {
                         </div>
                     </div>
                 </div>
+                */}
 
                 {/* Zone Info / Billing */}
                 <div className="rounded-xl border border-white/10 bg-zinc-900/30 p-6 opacity-60 hover:opacity-100 transition">

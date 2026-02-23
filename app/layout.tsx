@@ -12,6 +12,7 @@ import { ToastContextProvider } from "@/context/ToastContext";
 import { AuthProvider } from "@/context/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import PullToRefresh from "@/components/PullToRefresh";
+import PWABackButton from "@/components/PWABackButton";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aiskills.studio"),
@@ -90,6 +91,7 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableSystem={false}>
             <ToastContextProvider>
               <PullToRefresh />
+              <PWABackButton />
               {/* Header */}
               <Header />
 
