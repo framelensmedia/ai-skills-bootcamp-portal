@@ -9,9 +9,8 @@ export async function GET(req: Request) {
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
 
-    const protocol = req.url.startsWith("https") || process.env.NODE_ENV === "production" ? "https" : "http";
-    const host = req.headers.get("host") || "localhost:3000";
-    const redirectUri = `${protocol}://${host}/api/social/callback/meta`;
+    const origin = process.env.NODE_ENV === "production" ? "https://aiskills.studio" : "http://localhost:3000";
+    const redirectUri = `${origin}/api/social/callback/meta`;
 
     if (error) {
         console.error("Meta Auth Error:", error, errorDescription);

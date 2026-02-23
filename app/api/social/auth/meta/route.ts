@@ -22,10 +22,8 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Meta App ID not configured" }, { status: 500 });
     }
 
-    // Determine the redirect URI dynamically based on the current host
-    const protocol = req.url.startsWith("https") || process.env.NODE_ENV === "production" ? "https" : "http";
-    const host = req.headers.get("host") || "localhost:3000";
-    const redirectUri = `${protocol}://${host}/api/social/callback/meta`;
+    const origin = process.env.NODE_ENV === "production" ? "https://aiskills.studio" : "http://localhost:3000";
+    const redirectUri = `${origin}/api/social/callback/meta`;
 
     const scopes = [
         "instagram_basic",

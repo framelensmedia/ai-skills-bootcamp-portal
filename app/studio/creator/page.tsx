@@ -490,8 +490,8 @@ function CreatorContent() {
         } catch (err: any) {
             console.error("Generate Error:", err);
             // Detect timeout/abort
-            if (err.name === 'AbortError') {
-                setError("Request timed out. Please try again with a smaller image or better connection.");
+            if (err?.name === 'AbortError' || err?.message?.includes("Failed to fetch") || err?.message?.includes("network")) {
+                setError("Processing took longer than expected. Please check your Library in a minute, your image may still be generating!");
             } else {
                 setError(err.message || "Failed to generate");
             }

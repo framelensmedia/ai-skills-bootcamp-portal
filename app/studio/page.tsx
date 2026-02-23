@@ -522,7 +522,9 @@ function StudioContent() {
     } catch (e: any) {
       console.error("Generation error:", e);
       const msg = e?.message || "";
-      if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
+      if (e?.name === 'AbortError' || msg.includes("Failed to fetch") || msg.includes("network")) {
+        setGenError("Processing took longer than expected. Please check your Library in a minute, your image may still be generating!");
+      } else if (msg.includes("did not match the expected pattern") || msg.includes("InvalidCharacterError")) {
         setGenError("BROWSER_SECURITY"); // Special flag for UI
       } else {
         setGenError(msg || "Failed to generate.");
@@ -675,7 +677,11 @@ function StudioContent() {
 
     } catch (e: any) {
       console.error("Edit Generation Error:", e);
-      setGenError(e.message || "Failed to appply edits.");
+      if (e?.name === 'AbortError' || e?.message?.includes("Failed to fetch") || e?.message?.includes("network")) {
+        setGenError("Processing took longer than expected. Please check your Library in a minute, your image may still be generating!");
+      } else {
+        setGenError(e?.message || "Failed to appply edits.");
+      }
     } finally {
       setGenerating(false);
     }

@@ -186,7 +186,7 @@ export default function GenerationLightbox({
   async function handleCopyCombined(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    await copyToClipboard(c || o);
+    await copyToClipboard(cleanPrompt(c || o));
     setCopiedCombined(true);
     setTimeout(() => setCopiedCombined(false), 1200);
   }
@@ -194,7 +194,7 @@ export default function GenerationLightbox({
   async function handleCopyOriginal(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    await copyToClipboard(o);
+    await copyToClipboard(cleanPrompt(o));
     setCopiedOriginal(true);
     setTimeout(() => setCopiedOriginal(false), 1200);
   }

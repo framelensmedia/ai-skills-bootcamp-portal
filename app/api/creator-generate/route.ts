@@ -222,6 +222,7 @@ export async function POST(req: Request) {
         const contentType = req.headers.get("content-type") || "";
 
         let prompt = "";
+        let cleanPrompt = "";
         let userId = "";
         let aspectRatio = "9:16";
         let subjectOutfit = "";
@@ -252,6 +253,7 @@ export async function POST(req: Request) {
             const formData = await req.formData();
 
             prompt = formData.get("prompt") as string;
+            cleanPrompt = (formData.get("combined_prompt_text") as string) || prompt;
             userId = formData.get("userId") as string;
             aspectRatio = formData.get("aspectRatio") as string || "9:16";
             subjectOutfit = formData.get("subjectOutfit") as string;
@@ -279,6 +281,7 @@ export async function POST(req: Request) {
             const body = await req.json();
 
             prompt = body.prompt;
+            cleanPrompt = body.combined_prompt_text || prompt;
             userId = body.userId;
             aspectRatio = body.aspectRatio || "9:16";
             subjectOutfit = body.subjectOutfit;
@@ -501,12 +504,13 @@ export async function POST(req: Request) {
         const { data: inserted } = await admin.from("prompt_generations").insert({
             user_id: userId,
             image_url: imageUrl,
-            combined_prompt_text: prompt,
+            combined_prompt_text: cleanPrompt,
             settings: {
                 model,
                 provider: "fal-creator-basic",
                 logo_url: logoUrl, // Track it even if not used in generation
-                template_reference_image: template_reference_image
+                template_reference_image: template_reference_image,
+                full_prompt: finalPrompt
             }
         }).select().single();
 

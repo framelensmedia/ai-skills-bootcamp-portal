@@ -993,11 +993,12 @@ export async function POST(req: Request) {
                     prompt_id: promptId,
                     prompt_slug: promptSlug,
                     image_url: falImageUrl,
-                    combined_prompt_text: finalFalPrompt,
+                    combined_prompt_text: combined_prompt_text || finalFalPrompt,
                     settings: {
                         model,
                         provider: "fal",
                         input_images: refImageUrl ? 1 : 0,
+                        full_prompt: finalFalPrompt,
                     },
                 }).select().single();
 

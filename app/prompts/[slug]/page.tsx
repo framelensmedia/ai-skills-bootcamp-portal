@@ -26,6 +26,7 @@ import LazyMedia from "@/components/LazyMedia";
 import GenerationOverlay from "@/components/GenerationOverlay";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import { compressImage } from "@/lib/compressImage";
+import { cleanPrompt } from "@/lib/stringUtils";
 
 function Typewriter({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
@@ -584,8 +585,8 @@ function PromptContent() {
   const fullPromptText = useMemo(() => {
     if (isLocked) return "";
     const p = (bodyRow?.prompt ?? "").toString().trim();
-    if (p.length > 0) return p;
-    return (bodyRow?.prompt_text ?? "").toString().trim();
+    if (p.length > 0) return cleanPrompt(p);
+    return cleanPrompt((bodyRow?.prompt_text ?? "").toString().trim());
   }, [bodyRow, isLocked]);
 
   const fallbackOrb = "/orb-neon.gif";
@@ -978,7 +979,11 @@ function PromptContent() {
         setGenerateError("No image returned.");
       }
     } catch (e: any) {
-      setGenerateError(e?.message || "Failed.");
+      if (e?.name === 'AbortError' || e?.message?.includes("Failed to fetch") || e?.message?.includes("network")) {
+        setGenerateError("Processing took longer than expected. Please check your Studio or Library in a minute, your image may still be generating!");
+      } else {
+        setGenerateError(e?.message || "Failed.");
+      }
     } finally {
       if (mediaType !== "video") setGenerating(false); // Video handles its own setGenerating(false)
     }
