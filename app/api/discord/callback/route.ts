@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -14,10 +14,8 @@ export async function GET(req: Request) {
     const error = searchParams.get("error");
     const stateStr = searchParams.get("state");
 
-    const protocol = req.url.startsWith("https") || process.env.NODE_ENV === "production" ? "https" : "http";
-    const host = req.headers.get("host") || "localhost:3000";
-    const redirectUri = `${protocol}://${host}/api/discord/callback`;
-    const dashboardUrl = `${protocol}://${host}/dashboard`;
+    const redirectUri = `${req.nextUrl.origin}/api/discord/callback`;
+    const dashboardUrl = `${req.nextUrl.origin}/dashboard`;
 
     if (error || !code) {
         console.error("Discord Auth Error:", error);

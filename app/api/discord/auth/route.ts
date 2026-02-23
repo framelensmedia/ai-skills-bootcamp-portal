@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -18,9 +18,7 @@ export async function GET(req: Request) {
     const state = JSON.stringify({ userId: user.id });
     const encodedState = Buffer.from(state).toString("base64");
 
-    const protocol = req.url.startsWith("https") || process.env.NODE_ENV === "production" ? "https" : "http";
-    const host = req.headers.get("host") || "localhost:3000";
-    const redirectUri = `${protocol}://${host}/api/discord/callback`;
+    const redirectUri = `${req.nextUrl.origin}/api/discord/callback`;
 
     // Scopes required:
     // identify: To get the discord user ID
