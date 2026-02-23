@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET(req: NextRequest) {
     const supabase = await createSupabaseServerClient();
@@ -111,7 +112,12 @@ export async function GET(req: NextRequest) {
         }
 
         // 4. Save discord_user_id to profiles first, so we don't loop if role assignment fails
-        const { error: updateError } = await supabase
+        // We MUST use the service_role key to bypass RLS since users cannot update this field directly
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+
+        const { error: updateError } = await supabaseAdmin
             .from("profiles")
             .update({ discord_user_id: discordUserId })
             .eq("id", user.id);
