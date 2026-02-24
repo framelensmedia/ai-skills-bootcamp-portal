@@ -16,10 +16,10 @@ import PWABackButton from "@/components/PWABackButton";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://aiskills.studio"),
-  title: "Launch your business with AI | AI Skills Studio",
+  title: "Grow your business with AI | AI Skills Studio",
   description: "Learn high-value AI skills and build real projects.",
   openGraph: {
-    title: "Launch your business with AI",
+    title: "Grow your business with AI",
     description: "Learn high-value AI skills and build real projects.",
     url: "https://aiskills.studio",
     siteName: "AI Skills Studio",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Launch your business with AI",
+    title: "Grow your business with AI",
     description: "Learn high-value AI skills and build real projects.",
     images: ["/images/studio-screenshot.png"],
   },
