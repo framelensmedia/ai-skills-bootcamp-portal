@@ -361,7 +361,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                         </h1>
 
                         <h2 className="mt-6 text-[22px] sm:text-[28px] md:text-4xl font-black tracking-tight text-foreground leading-tight">
-                            Get More Customers with AI
+                            Get More Customers with&nbsp;AI
                         </h2>
 
                         <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-muted-foreground md:text-xl">
