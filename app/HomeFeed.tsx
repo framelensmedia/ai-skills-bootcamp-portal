@@ -356,11 +356,11 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B7FF00]">NO TECHNICAL SKILLS REQUIRED</span>
                         </div>
 
-                        <h1 className="mt-6 text-5xl font-bold tracking-tight text-foreground md:text-7xl">
+                        <h1 className="mt-6 text-4xl sm:text-5xl font-bold tracking-tight text-foreground md:text-7xl">
                             <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
                         </h1>
 
-                        <h2 className="mt-6 text-[26px] sm:text-3xl md:text-4xl font-black tracking-tight text-foreground whitespace-nowrap sm:whitespace-normal">
+                        <h2 className="mt-6 text-[22px] sm:text-[28px] md:text-4xl font-black tracking-tight text-foreground leading-tight">
                             Get More Customers with AI
                         </h2>
 
