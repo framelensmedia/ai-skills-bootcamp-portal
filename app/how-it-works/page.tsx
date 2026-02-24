@@ -16,7 +16,7 @@ export default function HowItWorksPage() {
         {
             icon: <Wand2 className="h-8 w-8 text-[#B7FF00]" />,
             title: "2. Customize with AI",
-            description: "Just tell our AI what your business is and what you want to say. The AI will instantly rewrite the copy, adjust the layout, and swap the images to match your brand and offer. No design skills required."
+            description: "Just tell the AI what your business is and what you want to say. The AI will instantly rewrite the copy, adjust the layout, and swap the images to match your brand and offer. No design skills required."
         },
         {
             icon: <Send className="h-8 w-8 text-[#B7FF00]" />,
@@ -82,8 +82,8 @@ export default function HowItWorksPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center text-center mt-8 p-12 rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black w-full max-w-4xl">
-                <h2 className="text-3xl md:text-4xl font-black text-white mb-6 tracking-tight max-w-[200px] md:max-w-none mx-auto leading-tight">
+            <div className="flex flex-col items-center justify-center text-center mt-8 py-10 px-6 md:p-12 rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black w-full max-w-4xl">
+                <h2 className="text-3xl md:text-4xl font-black text-white mb-6 tracking-tight max-w-[360px] md:max-w-none mx-auto leading-tight">
                     Ready to Make Your First Post?
                 </h2>
                 <div className="flex flex-col items-center gap-3">
