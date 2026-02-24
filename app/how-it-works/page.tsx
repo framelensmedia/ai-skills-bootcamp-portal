@@ -34,7 +34,7 @@ export default function HowItWorksPage() {
                 <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight leading-tight mb-6">
                     From Idea to Published in <span className="text-[#B7FF00]">3&nbsp;Clicks</span>
                 </h1>
-                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
+                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl md:px-8 mx-auto">
                     Stop paying expensive agencies or spending hours struggling with complicated design tools. Here is how easy it is to grow your business with&nbsp;AI.
                 </p>
             </div>
