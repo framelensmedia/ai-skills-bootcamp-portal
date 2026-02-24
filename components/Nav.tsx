@@ -145,6 +145,7 @@ export default function Nav() {
   };
 
   const links = [
+    { href: "/how-it-works", label: "How It Works" },
     { href: "/learn", label: "Learn" },
     { href: "/studio/creator", label: "Studio" },
     { href: "/prompts", label: "Prompts" },
