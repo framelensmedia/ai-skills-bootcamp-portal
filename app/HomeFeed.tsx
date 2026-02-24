@@ -397,7 +397,7 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             </Link>
 
                             <Link
-                                href="/studio/creator"
+                                href="/how-it-works"
                                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-colors"
                             >
                                 See How It Works <ArrowRight size={16} />
