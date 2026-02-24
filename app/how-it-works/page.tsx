@@ -35,7 +35,7 @@ export default function HowItWorksPage() {
                     From Idea to Published in <span className="text-[#B7FF00]">3&nbsp;Clicks</span>
                 </h1>
                 <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-                    Stop paying expensive agencies or spending hours struggling with complicated design tools. Here is how easy it is to grow your business with AI.
+                    Stop paying expensive agencies or spending hours struggling with complicated design tools. Here is how easy it is to grow your business with&nbsp;AI.
                 </p>
             </div>
 
