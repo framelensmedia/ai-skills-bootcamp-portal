@@ -19,7 +19,7 @@ export default function Footer() {
                             height={32}
                             className="h-8 w-8"
                         />
-                        <span className="font-bold text-foreground text-lg">Skills Studio</span>
+                        <span className="font-bold text-foreground text-lg"><span className="text-[#B7FF00]">AI Skills</span> Studio</span>
                     </Link>
                     <p className="mb-6 max-w-xs md:max-w-none mx-auto md:mx-0">
                         Empowering the next generation of creators and entrepreneurs with AI.
