@@ -360,12 +360,12 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                             <Typewriter text="AI Made Easy" gradientWords={["AI"]} />
                         </h1>
 
-                        <h2 className="mt-6 text-3xl md:text-4xl font-black tracking-tight text-foreground">
-                            Learn. Create. Grow.
+                        <h2 className="mt-6 text-[26px] sm:text-3xl md:text-4xl font-black tracking-tight text-foreground whitespace-nowrap sm:whitespace-normal">
+                            Get More Customers with AI
                         </h2>
 
                         <p className="mt-6 max-w-xl text-lg font-semibold leading-relaxed text-muted-foreground md:text-xl">
-                            We show you how to use AI to get more customers, make better content, and save time in your business.
+                            Stop wasting hours struggling with marketing. We give small business owners the exact templates and tools to create professional ads, flyers, and social posts in 3&nbsp;clicks.
                         </p>
 
                         {/* Search Bar */}
@@ -393,14 +393,14 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 href="/prompts"
                                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-[#B7FF00] px-8 py-3.5 text-sm font-bold text-black hover:opacity-90 transition-opacity"
                             >
-                                Browse Prompts <ArrowRight size={16} />
+                                Start Growing for Free <ArrowRight size={16} />
                             </Link>
 
                             <Link
                                 href="/studio/creator"
                                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/10 transition-colors"
                             >
-                                Open Creator Studio <ArrowRight size={16} />
+                                See How It Works <ArrowRight size={16} />
                             </Link>
                         </div>
 
@@ -448,24 +448,23 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
                                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#B7FF00]">Pro Creator Studio</span>
                             </div>
                             <h2 className="text-3xl md:text-5xl font-black text-foreground tracking-tight mb-6 leading-tight">
-                                Your Very Own <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400">Design Studio</span>
+                                Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#B7FF00] to-green-400">AI Marketing Machine</span>
                             </h2>
                             <p className="text-lg font-medium text-muted-foreground mb-8 leading-relaxed">
-                                Create stunning ads, flyers, and social posts to get more customers. You don't need to be a tech expert to make your business look amazing online. Everything you need is right here!
+                                You shouldn't need a degree in graphic design to look professional online. Our platform is built specifically for small business operators who need high-quality marketing fast.
                             </p>
 
                             <ul className="space-y-4 mb-10">
                                 {[
-                                    "Make beautiful, high-quality images for your business",
-                                    "Remove tricky backgrounds with just one click",
-                                    "Turn simple photos into eye-catching short videos",
-                                    "Add big bold words and stylish layouts easily"
+                                    { title: "Ready-to-Post Templates:", desc: "Pick a design, swap the text, and post it today." },
+                                    { title: "Instant Professional Look:", desc: "Turn a quick snapshot from your phone into a polished, high-end ad." },
+                                    { title: "Bold, Small Business Advertising:", desc: "Stand out in your city with marketing that demands attention." }
                                 ].map((item, i) => (
                                     <li key={i} className="flex items-start gap-4">
                                         <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#B7FF00]/20 text-[#B7FF00]">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                         </div>
-                                        <span className="text-foreground/90 font-medium">{item}</span>
+                                        <span className="text-foreground/90 font-medium"><strong className="text-white">{item.title}</strong> {item.desc}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -618,14 +617,14 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
             {/* 4.5) MASTERMIND COMMUNITY BANNER */}
             <section className="mx-auto max-w-6xl px-4 pt-12 pb-6 md:pt-16 md:pb-8">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-[#B7FF00]/20 bg-zinc-950/80 p-6 shadow-[0_0_30px_rgba(183,255,0,0.03)]">
-                    <div className="flex items-center gap-4 text-center sm:text-left w-full justify-center sm:justify-start">
-                        <div className="hidden sm:flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#B7FF00]/10 text-[#B7FF00]">
-                            <Users size={24} />
+                    <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left w-full justify-center sm:justify-start">
+                        <div className="flex shrink-0 items-center justify-center rounded-2xl bg-[#B7FF00]/10 border border-[#B7FF00]/20 h-16 w-16 mb-2 sm:mb-0">
+                            <Users className="h-8 w-8 text-[#B7FF00]" />
                         </div>
                         <div>
-                            <p className="text-lg font-bold text-white mb-1">Elite Mastermind Community</p>
+                            <p className="text-lg font-bold text-white mb-1">Join The Small Business AI&nbsp;Mastermind.</p>
                             <p className="text-muted-foreground text-sm">
-                                Join an elite mastermind community and network with other entrepreneurs just like you.
+                                You aren't doing this alone. Join a private community of small business owners, operators, and entrepreneurs who are using AI to dominate their markets. Share what works, copy successful campaigns, and grow together.
                             </p>
                         </div>
                     </div>
@@ -637,27 +636,16 @@ export default function HomeFeed({ prompts, instructorBootcamps = [], favoriteId
 
             {/* 7) FINAL CTA */}
             <section className="mx-auto max-w-6xl px-4 pb-24">
-                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 p-12 text-center backdrop-blur-sm">
+                <div className="rounded-3xl border border-white/10 bg-zinc-900/50 p-8 md:p-12 text-center backdrop-blur-sm">
                     <h2 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">
-                        READY TO <span className="text-[#B7FF00]">CREATE</span>?
+                        Ready to <span className="text-[#B7FF00]">Grow Your Business</span>?
                     </h2>
-                    <p className="mx-auto max-w-2xl text-lg text-white/60 mb-10">
-                        Start with free prompts. Upgrade for Pro prompts and the fastest workflow for content production.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                        <Link href="/prompts" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors">
-                            Browse Prompts
+                    <div className="flex flex-col items-center justify-center gap-2 mb-4">
+                        <Link href={user ? "/prompts" : "/signup"} className="w-full sm:w-auto px-4 md:px-8 py-3.5 md:py-4 rounded-xl bg-[#B7FF00] text-black font-bold hover:opacity-90 transition-opacity">
+                            <span className="text-[17px] md:text-xl whitespace-nowrap">Create Your First Ad Now</span>
                         </Link>
-                        <Link href="/studio/creator" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors">
-                            Open Creator Studio
-                        </Link>
-                        {!user && (
-                            <Link href="/signup" className="w-full sm:w-auto px-6 py-3 rounded-lg bg-[#B7FF00] text-black font-bold hover:opacity-90 transition-opacity">
-                                Sign Up
-                            </Link>
-                        )}
+                        <span className="text-sm text-[#B7FF00] opacity-80 font-medium">It's Free</span>
                     </div>
-                    <p className="text-xs text-white/30">Free tier available. Upgrade anytime.</p>
                 </div>
             </section>
         </div>

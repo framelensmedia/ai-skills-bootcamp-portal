@@ -12,26 +12,26 @@ export default function WhatYouWillLearnSection() {
     const cards = [
         {
             icon: <Users className="h-8 w-8 text-[#B7FF00]" />,
-            title: "Get More Customers",
-            description: "Create posts, offers, and messages that bring people in."
+            title: "Fill Your Schedule",
+            description: "Create daily social posts and offers that make your phone ring."
         },
         {
             icon: <LayoutTemplate className="h-8 w-8 text-[#B7FF00]" />,
-            title: "Create Content Faster",
-            description: "Make flyers, captions, emails, and videos in less time."
+            title: "No Design Experience Needed",
+            description: "Stop paying expensive agencies. Just type your business name, pick a template, and hit go."
         },
         {
             icon: <Zap className="h-8 w-8 text-[#B7FF00]" />,
-            title: "Run Your Business Smarter",
-            description: "Save hours with easy AI workflows for everyday tasks."
+            title: "Save 10 Hours a Week",
+            description: "Let our AI handle the heavy lifting while you focus on running your business."
         }
     ];
 
     return (
         <section className="mx-auto max-w-6xl px-4 pt-16 md:pt-24 pb-12">
             <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold md:text-5xl text-foreground mb-6">
-                    What You’ll Learn
+                <h2 className="text-3xl font-bold md:text-3xl lg:text-4xl text-foreground mb-6 tracking-tight">
+                    Marketing That Actually Brings People Through The Door.
                 </h2>
                 <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
                     Simple AI skills you can use right away to grow your business.
@@ -44,7 +44,7 @@ export default function WhatYouWillLearnSection() {
                         <div className="mb-6 p-4 bg-[#B7FF00]/10 rounded-2xl w-fit">
                             {card.icon}
                         </div>
-                        <h3 className="text-xl font-bold text-foreground mb-3">
+                        <h3 className="text-lg lg:text-[19px] xl:text-xl font-bold text-foreground mb-3 tracking-tight">
                             {card.title}
                         </h3>
                         <p className="text-muted-foreground leading-relaxed">

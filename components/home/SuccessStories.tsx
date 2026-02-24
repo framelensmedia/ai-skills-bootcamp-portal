@@ -2,21 +2,21 @@ import { Star } from "lucide-react";
 
 const reviews = [
     {
-        name: "Sarah Jenkins",
-        role: "Agency Founder",
-        content: "I launched my creative agency in just 2 weeks using these workflows. The AI skills taught here are practical and immediately applicable. Best investment I've made.",
+        name: "Marcus T.",
+        role: "Retail Store Owner",
+        content: "I'm 52 and barely know how to use Instagram. In my first week using these templates, I ran a weekend promo flyer that brought in 15 new customers to my boutique. It took me three minutes to make.",
         image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150&h=150"
     },
     {
-        name: "Michael Chen",
-        role: "Content Creator",
-        content: "Scaled my content production 10x without hiring a team. The remix workflows are a game changer for keeping up with social media demands.",
+        name: "David R.",
+        role: "Small Business Service Operator",
+        content: "I used to spend my Sunday nights stressing over what to post for my landscaping business. Now I use the AI templates, schedule my week in 15 minutes, and get back to my family.",
         image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150&h=150"
     },
     {
-        name: "Jessica Rivera",
-        role: "Marketing Director",
-        content: "Finally a place that teaches how to actually APPLY AI, not just theory. We've integrated these tools into our daily operations and seen a 40% boost in efficiency.",
+        name: "Sarah M.",
+        role: "Restaurant Manager",
+        content: "We couldn't afford a marketing agency for the restaurant. This platform gave us the exact tools to create daily specials that look like we paid a professional thousands of dollars.",
         image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150&h=150"
     }
 ];
@@ -35,7 +35,7 @@ export default function SuccessStories() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {reviews.map((review, i) => (
-                    <div key={i} className="rounded-2xl border border-border bg-card p-6 md:p-8 hover:border-[#B7FF00]/30 transition-colors">
+                    <div key={i} className="rounded-2xl border border-border bg-card p-6 md:p-8 hover:border-[#B7FF00]/30 transition-colors flex flex-col h-full">
                         <div className="flex gap-1 mb-4 text-[#B7FF00]">
                             {[...Array(5)].map((_, i) => (
                                 <Star key={i} size={16} fill="currentColor" />
@@ -46,8 +46,8 @@ export default function SuccessStories() {
                             "{review.content}"
                         </p>
 
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-muted overflow-hidden relative">
+                        <div className="flex items-center gap-3 mt-auto">
+                            <div className="h-10 w-10 rounded-full bg-muted overflow-hidden relative shrink-0">
                                 {/* Using standard img tag for simplicity in static component, or could use Next Image if needed but external domains need config */}
                                 <img src={review.image} alt={review.name} className="h-full w-full object-cover" />
                             </div>
