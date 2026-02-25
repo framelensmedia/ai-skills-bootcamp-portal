@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { waitForGeneration } from "@/lib/waitForGeneration";
 import { transformAutoModeToPrompt, type AutoModeData } from "@/lib/autoModeTransformer";
 import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
@@ -455,6 +456,20 @@ function CreatorContent() {
             if (!res.ok) {
                 const msg = json?.message || json?.error || (text.length < 200 ? text : `Server Error (${res.status})`);
                 throw new Error(msg || "Generation failed");
+            }
+
+            // Handle async pending (Fal queue backed up — returns 202)
+            if (res.status === 202 && json?.status === "pending" && json?.generationId) {
+                setError("Still generating — Fal is busy. Checking every 5s...");
+                const finalUrl = await waitForGeneration(json.generationId);
+                setError(null);
+                if (finalUrl) {
+                    setPreviewImage(finalUrl);
+                    setResultData({ imageUrl: finalUrl, generationId: json.generationId });
+                    setLightboxOpen(true);
+                    if (json.remainingCredits !== undefined) setUserCredits(json.remainingCredits);
+                }
+                return;
             }
 
             // Update Credits
