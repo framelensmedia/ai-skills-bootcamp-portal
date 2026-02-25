@@ -3,12 +3,12 @@
 import { useAuth } from "@/context/AuthProvider";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Flame, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function GamificationStatus() {
     const { user } = useAuth();
     const [stats, setStats] = useState<{ xp: number; streak: number } | null>(null);
-    const supabase = createSupabaseBrowserClient();
+    const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     useEffect(() => {
         if (!user) return;
@@ -53,7 +53,7 @@ export default function GamificationStatus() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user]);
+    }, [user, supabase]);
 
     if (!stats) return null;
 
