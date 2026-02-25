@@ -89,21 +89,22 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Clawdbot] Processing Pack: ${pack.name} with ${templates.length} templates (Max Duration: ${maxDuration}s).`);
 
-        // 2. Prep Pack Record (Use External URL initially)
+        // 2. Prep Pack Record
         const packThumbnailUrl = pack.thumbnail_url || pack.thumbnailUrl || pack.image_url || pack.imageUrl || pack.url || null;
         const slug = pack.slug || `${sanitize(pack.name)}-${Date.now()}`;
 
-        // SCHEMA FIX: Use 'title' instead of 'pack_name'.
-        // Also Populate legacy 'pack_name' and 'pack_id' if they exist to satisfy constraints.
         const packPayload: any = {
-            title: pack.name, // Correct Column
-            pack_name: pack.name, // Legacy Column (just in case)
+            title: pack.name,
+            pack_name: pack.name,
             slug: slug,
-            pack_id: slug, // Legacy Column (sometimes used as slug or ID, try slug)
+            pack_id: slug,
             access_level: pack.access_level || "free",
             is_published: pack.is_published !== undefined ? pack.is_published : false,
             category: pack.category || "General",
-            thumbnail_url: packThumbnailUrl, // Use the external URL initially
+            thumbnail_url: packThumbnailUrl,
+            ...(pack.difficulty && { difficulty: pack.difficulty }),
+            ...(pack.seo_title && { seo_title: pack.seo_title }),
+            ...(pack.seo_description && { seo_description: pack.seo_description }),
         };
 
         // 3. Insert Pack Immediately
@@ -116,6 +117,18 @@ export async function POST(req: NextRequest) {
         if (packError) throw new Error(`Pack creation failed: ${packError.message}`);
 
         console.log(`[Clawdbot] Created Pack ID: ${packRecord.id} (Starting parallel processing)`);
+
+        // 3b. Handle Tags (upsert + map) if provided
+        if (Array.isArray(pack.tags) && pack.tags.length > 0) {
+            try {
+                await upsertAndMapTags(packRecord.id, pack.tags);
+                console.log(`[Clawdbot] Applied ${pack.tags.length} tags to pack ${packRecord.id}`);
+            } catch (tagErr: any) {
+                console.error("[Clawdbot] Tag mapping failed (non-fatal):", tagErr.message);
+            }
+        }
+
+
 
         // 4. Parallel Process: Templates AND Thumbnail Upload
         // This prevents the Image Upload from blocking the Template Processing, reducing total latency.
@@ -212,6 +225,29 @@ export async function POST(req: NextRequest) {
 }
 
 // --- Helpers ---
+
+async function upsertAndMapTags(packId: string, tagNames: string[]) {
+    const upsertedIds: string[] = [];
+    for (const name of tagNames) {
+        const normalized = name.trim();
+        if (!normalized) continue;
+        const slug = normalized.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+        // Find or create tag
+        let { data: tag } = await supabase.from("pack_tags").select("id").eq("name", normalized).maybeSingle();
+        if (!tag) {
+            const { data: created } = await supabase.from("pack_tags").insert({ name: normalized, slug }).select("id").single();
+            tag = created;
+        }
+        if (tag?.id) upsertedIds.push(tag.id);
+    }
+
+    // Clear old mappings and insert new ones
+    await supabase.from("pack_tag_map").delete().eq("pack_id", packId);
+    if (upsertedIds.length > 0) {
+        await supabase.from("pack_tag_map").insert(upsertedIds.map(tag_id => ({ pack_id: packId, tag_id })));
+    }
+}
 
 function sanitize(str: string) {
     return str.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '');
