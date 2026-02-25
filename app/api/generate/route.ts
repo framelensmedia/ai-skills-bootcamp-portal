@@ -181,15 +181,16 @@ async function urlToBase64(url: string) {
 // --- FAL.AI INTEGRATION ---
 
 async function generateFalImage(
-    modelId: string, // "fal-ai/flux-pro/v1.1" or "fal-ai/flux-pro/v1.1-ultra"
+    modelId: string,
     prompt: string,
-    imageSize: any = "landscape_4_3", // or {width, height}
+    imageSize: any = "landscape_4_3",
     mainImageUrl?: string | string[] | null,
     template_reference_image?: string | null,
     keepOutfit: boolean = true,
     negativePrompt?: string,
     strengthOverride?: number,
-    subjectFirst: boolean = false // When true, subject is Image 1 (preserved) and template is Image 2 (reference)
+    subjectFirst: boolean = false,
+    onSubmit?: (requestId: string, responseUrl: string) => Promise<void>
 ) {
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error("Missing FAL_KEY env var");
@@ -349,38 +350,76 @@ async function generateFalImage(
 
     const request_id = initialJson.request_id;
     const response_url = initialJson.response_url;
+    console.log(`[FAL SUBMIT] request_id=${request_id}, response_url=${response_url}`);
     if (!request_id) {
         throw new Error(`Fal.ai returned no request_id and no images: ${JSON.stringify(initialJson)}`);
     }
+
+    // Notify the route so it can update the pending DB record with tracking info
+    if (onSubmit && request_id) {
+        await onSubmit(request_id, response_url || "").catch(() => { });
+    }
+
 
     // 2. Poll for Status (Time-based to respect Vercel 300s limit)
     const startTime = Date.now();
     const TIMEOUT_MS = 290000; // 290s (Leave 10s buffer)
 
+    // Also try fetching the result directly from response_url on each poll
+    // This is how Fal SDK works internally - avoids relying purely on status transitions
     while (Date.now() - startTime < TIMEOUT_MS) {
-        await new Promise(r => setTimeout(r, 1000)); // 1s wait
+        await new Promise(r => setTimeout(r, 3000)); // 3s wait
 
-        // Use the actual endpoint path for polling (includes /edit if we submitted to /edit)
+        // Try fetching result directly from response_url first (fastest path)
+        if (response_url) {
+            try {
+                const ac = new AbortController();
+                const t = setTimeout(() => ac.abort(), 5000); // 5s timeout
+                const directRes = await fetch(response_url, {
+                    headers: { "Authorization": `Key ${falKey}` },
+                    signal: ac.signal,
+                });
+                clearTimeout(t);
+                if (directRes.ok) {
+                    const directJson = await directRes.json();
+                    const directImage = directJson.images?.[0]?.url || directJson.image?.url;
+                    if (directImage) {
+                        console.log(`[FAL POLL] Got image directly from response_url`);
+                        return directImage;
+                    }
+                }
+            } catch (e) {
+                // Timed out or failed — ignore, fall through to status check
+            }
+        }
+
+        // Fal status endpoint uses the BASE model path - strip /edit if present
         const basePath = actualEndpoint.replace('https://queue.fal.run/', '').replace('/edit', '');
-        const statusRes = await fetch(`https://queue.fal.run/${basePath}/requests/${request_id}/status`, {
-            headers: {
-                "Authorization": `Key ${falKey}`,
-            },
+        const statusUrl = `https://queue.fal.run/${basePath}/requests/${request_id}/status`;
+        console.log(`[FAL POLL] Checking status: ${statusUrl}`);
+
+        const statusRes = await fetch(statusUrl, {
+            headers: { "Authorization": `Key ${falKey}` },
         });
 
+        console.log(`[FAL POLL] HTTP ${statusRes.status}`);
 
-        if (!statusRes.ok) continue; // retry polling
+        if (!statusRes.ok) {
+            console.log(`[FAL POLL] Non-OK, retrying...`);
+            continue;
+        }
 
         const statusJson = await statusRes.json();
+        console.log(`[FAL POLL] Status: ${statusJson.status}`);
 
-        // Check for direct completion (some Fal models return images directly)
+        // Check for images directly in status response
         if (statusJson.images?.[0]?.url) {
             return statusJson.images[0].url;
         }
 
         if (statusJson.status === "COMPLETED") {
-            // /status only returns status, not images. Fetch the response_url for actual image data.
             if (response_url) {
+                console.log(`[FAL POLL] COMPLETED – fetching: ${response_url}`);
                 const resultRes = await fetch(response_url, {
                     headers: { "Authorization": `Key ${falKey}` }
                 });
@@ -394,12 +433,11 @@ async function generateFalImage(
             return imageUrl;
         }
 
-        if (statusJson.status === "IN_QUEUE" || statusJson.status === "IN_PROGRESS") {
-            continue;
+        if (statusJson.status === "FAILED" || statusJson.status === "ERROR") {
+            throw new Error(`Fal.ai Generation Failed: ${JSON.stringify(statusJson)}`);
         }
 
-        // Only throw error if no images and not in progress
-        throw new Error(`Fal.ai Generation Failed: ${JSON.stringify(statusJson)}`);
+        // IN_QUEUE or IN_PROGRESS - continue polling
     }
 
     throw new Error("Fal.ai Generation Timed Out");
@@ -963,18 +1001,12 @@ export async function POST(req: Request) {
 
 
             try {
-                // Strength Logic: If Industry Intent (Background Change) is active, lower strength to allow Hallucination
-                // falStrength already declared above
+                // Strength Logic: If Industry Intent (Background Change) is active
                 let finalKeepOutfit = keepOutfit;
 
                 if (industryIntent) {
                     falStrength = 0.85;
-                    // CRITICAL: If changing industry (e.g. to Chef), we MUST allow outfit changes.
-                    // If we strictly keep outfit, they will wear a t-shirt in a kitchen.
-                    // So we disable strict outfit lock, and trust the prompt "ADAPT OUTFIT" which we added above.
                     finalKeepOutfit = false;
-
-                    // Add explicit instruction if not already there
                     if (!finalFalPrompt.includes("ADAPT OUTFIT") && !finalFalPrompt.includes("AUTO-OUTFIT")) {
                         finalFalPrompt += ` [OUTFIT ADAPTATION]: The subject's clothing should remain similar in style but ADAPT to fit the '${industryIntent}' profession/vibe. If the new industry implies a uniform (e.g. Chef, Doctor, Firefighter), you MUST change the outfit to match.`;
                     }
@@ -982,41 +1014,18 @@ export async function POST(req: Request) {
 
                 // RESOLVE MAIN IMAGE (Prioritize Canvas for Edit Mode)
                 const falMainImage = falImages.length > 0 ? falImages : (refImageUrl || null);
-                // console.log("FAL GENERATION INPUTS:", { model, imageCount: falImages.length, template_reference_image, falStrength, finalKeepOutfit });
 
-                const falImageUrl = await generateFalImage(model, finalFalPrompt, falImageSize, falMainImage, template_reference_image, finalKeepOutfit, remixNegativePrompt, falStrength, useSubjectFirst);
-                // console.log("Fal Image Generated:", falImageUrl);
+                // ── STEP 1: Save a PENDING record immediately after Fal submit ────────────
+                // This ensures the record exists in the DB even if Vercel times out.
 
-                // Save to DB
-                const { data: inserted, error: dbErr } = await admin.from("prompt_generations").insert({
-                    user_id: userId,
-                    prompt_id: promptId,
-                    prompt_slug: promptSlug,
-                    image_url: falImageUrl,
-                    combined_prompt_text: combined_prompt_text || finalFalPrompt,
-                    settings: {
-                        model,
-                        provider: "fal",
-                        input_images: refImageUrl ? 1 : 0,
-                        full_prompt: finalFalPrompt,
-                    },
-                }).select().single();
-
-                if (dbErr) {
-                    console.error("DB Insert Error:", dbErr);
-                    return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
-                }
-
-                // DEDUCT CREDITS (Exempt Admins)
+                // DEDUCT CREDITS immediately (generation is committed at submit time)
+                let pendingGenerationId: string | null = null;
                 if (!isAdmin) {
                     const newBalance = userCredits - IMAGE_COST;
                     const { error: rpcErr } = await admin.rpc("decrement_credits", { x: IMAGE_COST, user_id_param: userId });
                     if (rpcErr) {
-                        // Fallback if RPC missing
                         await admin.from("profiles").update({ credits: newBalance }).eq("user_id", userId);
                     }
-
-                    // Trigger auto-recharge if enabled and below threshold
                     triggerAutoRechargeIfNeeded({
                         userId,
                         newBalance,
@@ -1024,6 +1033,89 @@ export async function POST(req: Request) {
                         autoRechargePackId: userProfile.auto_recharge_pack_id ?? null,
                         autoRechargeThreshold: userProfile.auto_recharge_threshold ?? 10,
                     }).catch(err => console.error("[Auto-Recharge] Error:", err));
+                }
+
+                // Insert PENDING record now so it survives a Vercel timeout
+                const { data: pendingRecord, error: pendingErr } = await admin.from("prompt_generations").insert({
+                    user_id: userId,
+                    prompt_id: promptId,
+                    prompt_slug: promptSlug,
+                    image_url: null, // Will be updated when generation completes
+                    combined_prompt_text: combined_prompt_text || finalFalPrompt,
+                    settings: {
+                        model,
+                        provider: "fal",
+                        status: "pending",
+                        input_images: refImageUrl ? 1 : 0,
+                        full_prompt: finalFalPrompt,
+                        fal_response_url: null, // Will be filled in by generateFalImage callback
+                        fal_request_id: null,
+                    },
+                }).select().single();
+
+                if (!pendingErr && pendingRecord?.id) {
+                    pendingGenerationId = String(pendingRecord.id);
+                }
+
+                // ── STEP 2: Run generation (polls Fal for up to 290s) ───────────────────
+                let falImageUrl: string;
+                try {
+                    falImageUrl = await generateFalImage(
+                        model, finalFalPrompt, falImageSize, falMainImage,
+                        template_reference_image, finalKeepOutfit, remixNegativePrompt,
+                        falStrength, useSubjectFirst,
+                        // Pass callback to update pending record with fal_request_id + fal_response_url once submitted
+                        async (requestId: string, responseUrl: string) => {
+                            if (pendingGenerationId) {
+                                await admin.from("prompt_generations")
+                                    .update({ settings: { model, provider: "fal", status: "pending", input_images: refImageUrl ? 1 : 0, full_prompt: finalFalPrompt, fal_request_id: requestId, fal_response_url: responseUrl } })
+                                    .eq("id", pendingGenerationId);
+                            }
+                        }
+                    );
+                } catch (falErr: any) {
+                    // If Fal timed out but we have a pending record, return 202 so client can poll
+                    if (falErr.message?.includes("Timed Out") && pendingGenerationId) {
+                        console.log(`[GENERATE] Fal timed out — returning 202 pending for ${pendingGenerationId}`);
+                        return NextResponse.json(
+                            { status: "pending", generationId: pendingGenerationId, remainingCredits: userCredits - IMAGE_COST },
+                            { status: 202 }
+                        );
+                    }
+                    throw falErr;
+                }
+
+                // ── STEP 3: Update the pending record with the real image URL ────────────
+                if (pendingGenerationId) {
+                    const { error: updateErr } = await admin.from("prompt_generations")
+                        .update({
+                            image_url: falImageUrl,
+                            settings: {
+                                model, provider: "fal", status: "completed",
+                                input_images: refImageUrl ? 1 : 0,
+                                full_prompt: finalFalPrompt,
+                            },
+                        })
+                        .eq("id", pendingGenerationId);
+
+                    if (updateErr) {
+                        console.error("DB Update Error:", updateErr);
+                    }
+                    console.log("Fal Image Updated in DB:", pendingGenerationId);
+                    return NextResponse.json({ images: [{ url: falImageUrl }], generationId: pendingGenerationId, imageUrl: falImageUrl, remainingCredits: userCredits - IMAGE_COST });
+                }
+
+                // Fallback: insert fresh record if pending insert failed
+                const { data: inserted, error: dbErr } = await admin.from("prompt_generations").insert({
+                    user_id: userId, prompt_id: promptId, prompt_slug: promptSlug,
+                    image_url: falImageUrl,
+                    combined_prompt_text: combined_prompt_text || finalFalPrompt,
+                    settings: { model, provider: "fal", status: "completed", input_images: refImageUrl ? 1 : 0, full_prompt: finalFalPrompt },
+                }).select().single();
+
+                if (dbErr) {
+                    console.error("DB Insert Error:", dbErr);
+                    return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
                 }
 
                 console.log("Fal Image Saved to DB:", inserted?.id);

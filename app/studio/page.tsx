@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { waitForGeneration } from "@/lib/waitForGeneration";
 import { compressImage } from "@/lib/compressImage";
 import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
 import EditModeModal, { QueueItem } from "@/components/EditModeModal";
@@ -501,7 +502,15 @@ function StudioContent() {
         return;
       }
 
-      const imageUrl = normalize(json?.imageUrl);
+      let imageUrl = normalize(json?.imageUrl);
+
+      // Handle async pending (Fal queue backed up)
+      if (res.status === 202 && json?.status === "pending" && json?.generationId) {
+        setGenError("Still generating — Fal is busy. Checking every 5s...");
+        imageUrl = (await waitForGeneration(json.generationId)) || "";
+        setGenError(null);
+      }
+
       const fullQualityUrl = normalize(json?.fullQualityUrl);
 
       if (!imageUrl) {
@@ -514,7 +523,7 @@ function StudioContent() {
       setLastFullQualityUrl(fullQualityUrl);
       setLightboxOpen(true);
 
-      // Auto-Switch for Video Intent -> Open Modal
+      // Auto-Switch for Video Intent
       if (preIntent === "video") {
         setMediaType("video");
         setVideoModalOpen(true);
@@ -661,7 +670,15 @@ function StudioContent() {
       }
 
       const data = await res.json();
-      const imageUrl = data.imageUrl;
+      let imageUrl = data.imageUrl;
+
+      // Handle async pending (Fal queue backed up)
+      if (res.status === 202 && data?.status === "pending" && data?.generationId) {
+        setGenError("Still generating — Fal is busy. Checking every 5s...");
+        imageUrl = (await waitForGeneration(data.generationId)) || "";
+        setGenError(null);
+      }
+
       const fullQualityUrl = data.full_quality_url || imageUrl;
 
       setLastImageUrl(imageUrl);

@@ -17,6 +17,7 @@ import VideoGeneratorModal from "@/components/VideoGeneratorModal";
 import LazyMedia from "@/components/LazyMedia";
 import { compressImage } from "@/lib/compressImage";
 import { DEFAULT_MODEL_ID } from "@/lib/model-config";
+import { waitForGeneration } from "@/lib/waitForGeneration";
 
 type SortMode = "newest" | "oldest";
 
@@ -309,11 +310,16 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
             }
 
             const data = await apiRes.json();
+            let generatedImageUrl = data.imageUrl;
 
+            // Handle async pending (Fal queue backed up)
+            if (apiRes.status === 202 && data?.status === "pending" && data?.generationId) {
+                generatedImageUrl = (await waitForGeneration(data.generationId)) || "";
+            }
             // Create new item with edit applied
             const newItem: LibraryItem = {
                 id: data.id || `gen-${Date.now()}`,
-                imageUrl: data.imageUrl,
+                imageUrl: generatedImageUrl,
                 mediaType: "image",
                 createdAt: new Date().toISOString(),
                 createdAtMs: Date.now(),

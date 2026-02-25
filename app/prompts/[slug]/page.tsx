@@ -6,6 +6,7 @@ import Loading from "@/components/Loading";
 import { useEffect, useMemo, useState, useRef, Suspense, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { waitForGeneration } from "@/lib/waitForGeneration";
 import RemixChatWizard, { RemixAnswers, TemplateConfig, DEFAULT_CONFIG } from "@/components/RemixChatWizard";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
@@ -724,9 +725,15 @@ function PromptContent() {
       }
 
       const data = await res.json();
-      if (data.imageUrl) {
-        setGeneratedImageUrl(data.imageUrl);
-        // setHasGeneratedForActions(true); // Assuming this variable might not exist?
+      let finalImageUrl = data.imageUrl;
+
+      // Handle async pending response (Fal queue backed up)
+      if (res.status === 202 && data.status === "pending" && data.generationId) {
+        finalImageUrl = await waitForGeneration(data.generationId);
+      }
+
+      if (finalImageUrl) {
+        setGeneratedImageUrl(finalImageUrl);
       }
     } catch (e: any) {
       console.error(e);
@@ -970,10 +977,19 @@ function PromptContent() {
         return;
       }
 
-      const url = (json?.imageUrl || "").trim();
+      let url = (json?.imageUrl || "").trim();
+
+      // Handle async pending (Fal queue backed up — polls until image is ready)
+      if (res.status === 202 && json?.status === "pending" && json?.generationId) {
+        url = (await waitForGeneration(json.generationId, (attempt) => {
+          if (attempt === 1) setGenerateError("Still generating — Fal is busy. Checking every 5s...");
+        })) || "";
+        setGenerateError(null);
+      }
+
       if (url) {
         setGeneratedImageUrl(url);
-        setOverridePreviewUrl(url); // Show result in main preview
+        setOverridePreviewUrl(url);
         refreshRemixes();
       } else {
         setGenerateError("No image returned.");
