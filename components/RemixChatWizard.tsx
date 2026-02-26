@@ -103,6 +103,7 @@ export default function RemixChatWizard({
     const [answers, setAnswers] = useState<RemixAnswers>(initialValues || {});
     const [inputVal, setInputVal] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const [messages, setMessages] = useState<Message[]>([]);
 
     // Toggle for Subject Lock
@@ -239,6 +240,16 @@ export default function RemixChatWizard({
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
+
+    // PWA/iOS keyboard fix: autoFocus is ignored inside modals on iOS.
+    // We use a ref + setTimeout to focus programmatically after the modal settles.
+    useEffect(() => {
+        if (!isOpen) return;
+        const timer = setTimeout(() => {
+            inputRef.current?.focus();
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [isOpen, stepIndex]);
 
     const navigatingRef = useRef(false);
 
@@ -490,7 +501,7 @@ export default function RemixChatWizard({
                                 {/* Industry Input + Next Button */}
                                 <div className="flex gap-2">
                                     <input
-                                        autoFocus={!isGuest}
+                                        ref={inputRef}
                                         className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-4 text-base text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
                                         placeholder="Industry (e.g. Coffee Shop)..."
                                         value={inputVal}
@@ -515,7 +526,7 @@ export default function RemixChatWizard({
                             <div className="flex flex-col gap-4">
                                 <div className="flex gap-2">
                                     <input
-                                        autoFocus={!isGuest}
+                                        ref={inputRef}
                                         className="flex-1 rounded-xl border border-white/20 bg-neutral-800 px-4 py-4 text-base text-white placeholder:text-white/40 focus:border-lime-400/50 focus:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-lime-400/20"
                                         placeholder="Business Name..."
                                         value={inputVal}
@@ -599,7 +610,7 @@ export default function RemixChatWizard({
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">
                                     <input
-                                        autoFocus={!isGuest}
+                                        ref={inputRef}
                                         onClick={() => {
                                             if (isGuest && onGuestInteraction) onGuestInteraction();
                                         }}

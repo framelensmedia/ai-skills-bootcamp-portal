@@ -1241,7 +1241,7 @@ function PromptContent() {
                   )}
                   {/* Generating Overlay */}
                   {generating && (
-                    <GenerationOverlay />
+                    <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
                   )}
 
                   {/* Expand Icon Overlay - Subtle */}
