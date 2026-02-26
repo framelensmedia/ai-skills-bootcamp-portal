@@ -1,31 +1,33 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { useToast } from "@/context/ToastContext";
+import { useInView } from "@/hooks/useInView";
 
 type PromptCardProps = {
   title: string;
   summary: string;
   slug: string;
-  id: string; // Added for Favorites
+  id: string;
 
-  // Allow passing any of these from queries
   featuredImageUrl?: string | null;
   imageUrl?: string | null;
   mediaUrl?: string | null;
 
   category?: string;
-  accessLevel?: string; // free | premium (DB value)
+  accessLevel?: string;
 
   packName?: string;
   packSlug?: string;
 
   initialFavorited?: boolean;
   onToggleFavorite?: (newVal: boolean) => void;
+  /** Pass true for above-the-fold cards to skip lazy loading */
+  priority?: boolean;
 };
 
 export default function PromptCard({
@@ -42,7 +44,9 @@ export default function PromptCard({
   packSlug,
   initialFavorited = false,
   onToggleFavorite,
+  priority = false,
 }: PromptCardProps) {
+  const { ref: inViewRef, isInView } = useInView({ threshold: 0, rootMargin: "300px 0px" });
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -151,12 +155,13 @@ export default function PromptCard({
         onClick={handleClick}
         className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition hover:border-border/80 hover:bg-accent"
       >
-        <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-black/40">
-          {resolvedImageUrl && resolvedImageUrl.length > 5 ? (
+        <div ref={inViewRef} className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-black/40">
+          {(priority || isInView) && resolvedImageUrl && resolvedImageUrl.length > 5 ? (
             <Image
               src={resolvedImageUrl}
               alt={title}
               fill
+              priority={priority}
               className={[
                 "object-cover transition duration-300 group-hover:scale-[1.02]",
                 isFallbackOrb ? "brightness-[0.55]" : "opacity-90",
@@ -166,7 +171,6 @@ export default function PromptCard({
               onLoad={() => setImgFailed(false)}
             />
           ) : (
-            /* Skeleton / Placeholder if no URL */
             <div className="h-full w-full bg-white/5 animate-pulse" />
           )}
 

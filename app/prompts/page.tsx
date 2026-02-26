@@ -177,7 +177,7 @@ export default async function PromptsPage({
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(trendingPrompts ?? []).map((p) => {
+          {(trendingPrompts ?? []).map((p, i) => {
             const image = p.featured_image_url || p.image_url || p.media_url || null;
             return (
               <PromptCard
@@ -192,6 +192,7 @@ export default async function PromptsPage({
                 packName={p.pack_name || undefined}
                 packSlug={p.pack_slug || undefined}
                 initialFavorited={favoriteIds.has(p.id)}
+                priority={i < 6}
               />
             );
           })}
