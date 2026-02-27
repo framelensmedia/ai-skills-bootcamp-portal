@@ -1111,7 +1111,7 @@ function StudioContent() {
             <div className="rounded-2xl border border-orange-500/30 bg-orange-950/30 p-4 text-sm text-orange-200 shadow-lg border-l-4 border-l-orange-500">
               <strong>Usage Prevention:</strong> This image triggered Google's Safety Filters (likely due to a detected face or public figure).
               <br /><br />
-              Veo (the video model) is stricter than the image model. Try using a different subject or a non-human image.
+              The video model is stricter than the image model. Try using a different subject or a non-human image.
             </div>
           ) : genError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200 shadow-lg">

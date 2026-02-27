@@ -194,7 +194,6 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 <Film className="text-lime-400" size={20} />
                                 {sourceVideo ? "Edit Video" : "Video Remix"}
                             </h2>
-                            <p className="text-xs text-white/40">Powered by {VIDEO_MODELS.find(m => m.id === selectedModel)?.label || "Veo"}</p>
                         </div>
                         <button
                             onClick={onClose}

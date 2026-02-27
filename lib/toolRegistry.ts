@@ -42,11 +42,11 @@ export const TOOL_REGISTRY: Record<string, AIModelConfig> = {
     },
 
     // Video
-    'veo-3': {
-        id: 'veo-3',
-        name: 'Veo 3.1',
+    'pro-video': {
+        id: 'pro-video',
+        name: 'Pro Video Generation',
         provider: 'google',
-        modelId: 'veo-3.1-fast-generate-001', // Example
+        modelId: 'pro-video-001', // Example
         capabilities: ['video'],
         contextWindow: 0,
         costPerInputToken: 0, // Per second billing usually

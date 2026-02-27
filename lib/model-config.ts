@@ -10,8 +10,8 @@ export const GENERATION_MODELS = [
 export const VIDEO_MODELS = [
     {
         id: "veo-3.1",
-        label: "Google Veo",
-        description: "Native Vertex AI",
+        label: "Pro Video",
+        description: "High Quality Generation",
         default: true,
     },
     // Grok temporarily disabled - timeout issues
