@@ -175,7 +175,7 @@ function PricingContent() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">Membership</h1>
         <p className="text-white/70">
-          Free prompts and tips, or go Premium for the full vault, resources, and tools.
+          Free prompts and tips, or go Pro for the full vault, resources, and tools.
         </p>
       </div>
 
@@ -193,7 +193,7 @@ function PricingContent() {
 
       <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors">
+        <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-white/20 transition-colors flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="text-4xl">🌱</div>
             <div className="text-right">
@@ -206,21 +206,27 @@ function PricingContent() {
           <p className="text-sm text-white/60 mb-6">Get started with the basics.</p>
 
           <ul className="space-y-3 text-sm text-white/80 mb-8">
-            <li>Free prompt drops (green prompts)</li>
+            <li>40 Credits (one time)</li>
+            <li>Free prompt drops</li>
             <li>Quick tips and mini tutorials</li>
-            <li>Basic resources</li>
+            <li>Free resources</li>
           </ul>
 
-          <button
-            onClick={() => router.push(userId ? "/dashboard" : "/login")}
-            className="w-full rounded-lg border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold hover:bg-black/60 transition-colors"
-          >
-            {userId ? "Go to Dashboard" : "Log in to Start"}
-          </button>
+          <div className="mt-auto">
+            <button
+              onClick={() => router.push(userId ? "/dashboard" : "/login")}
+              className="w-full rounded-lg border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold hover:bg-black/60 transition-colors"
+            >
+              {userId ? "Go to Dashboard" : "Log in to Start"}
+            </button>
+            <p className="mt-3 text-center text-xs invisible pointer-events-none" aria-hidden="true">
+              Placeholder
+            </p>
+          </div>
         </div>
 
         {/* Premium */}
-        <div className="rounded-2xl border-2 border-[#B7FF00]/30 bg-[#B7FF00]/5 p-6 relative hover:border-[#B7FF00]/50 transition-colors">
+        <div className="h-full rounded-2xl border-2 border-[#B7FF00]/30 bg-[#B7FF00]/5 p-6 relative hover:border-[#B7FF00]/50 transition-colors flex flex-col">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#B7FF00] text-black text-xs font-bold px-3 py-1 rounded-full">
             MOST POPULAR
           </div>
@@ -233,30 +239,34 @@ function PricingContent() {
             </div>
           </div>
 
-          <div className="text-xl font-semibold mb-1">Premium</div>
+          <div className="text-xl font-semibold mb-1">Pro</div>
           <p className="text-sm text-white/60 mb-2">
             Full access to the vault, tools, and member perks.
           </p>
           <div className="text-xs text-[#B7FF00] font-bold mb-6">7-day trial for $1</div>
 
           <ul className="space-y-3 text-sm text-white/80 mb-8">
-            <li>Premium prompts and templates</li>
+            <li>Everything in free plus</li>
+            <li>200 Credits Monthly</li>
             <li>Members-only vault pages</li>
             <li>Self-paced course access</li>
             <li>Private Generations</li>
+            <li>Access to AI Small Business Mastermind</li>
           </ul>
 
-          <button
-            onClick={startCheckout}
-            disabled={loading}
-            className="w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 transition-colors"
-          >
-            {loading ? "Redirecting..." : "Start Trial for $1"}
-          </button>
+          <div className="mt-auto">
+            <button
+              onClick={startCheckout}
+              disabled={loading}
+              className="w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-black hover:bg-white/90 disabled:opacity-60 transition-colors"
+            >
+              {loading ? "Redirecting..." : "Start Trial for $1"}
+            </button>
 
-          <p className="mt-3 text-center text-xs text-white/40">
-            Secure checkout powered by Stripe.
-          </p>
+            <p className="mt-3 text-center text-xs text-white/40">
+              Secure checkout powered by Stripe.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -285,7 +295,7 @@ function PricingContent() {
               disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
             >
-              {!isPro ? "Requires Premium" : buyingPack === "credits_50" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Pro" : buyingPack === "credits_50" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
 
@@ -307,7 +317,7 @@ function PricingContent() {
               disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg bg-[#B7FF00] px-4 py-3 text-sm font-bold text-black hover:bg-[#a8e600] disabled:opacity-60 transition-colors"
             >
-              {!isPro ? "Requires Premium" : buyingPack === "credits_120" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Pro" : buyingPack === "credits_120" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
 
@@ -326,7 +336,7 @@ function PricingContent() {
               disabled={buyingPack !== null || !isPro}
               className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
             >
-              {!isPro ? "Requires Premium" : buyingPack === "credits_300" ? "Redirecting..." : "Buy Now"}
+              {!isPro ? "Requires Pro" : buyingPack === "credits_300" ? "Redirecting..." : "Buy Now"}
             </button>
           </div>
         </div>

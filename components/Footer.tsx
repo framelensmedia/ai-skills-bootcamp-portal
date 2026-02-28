@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Twitter, Instagram, Linkedin, Github } from "lucide-react";
+import { Instagram, Facebook, Github } from "lucide-react";
 
 import Image from "next/image";
 
@@ -25,9 +25,8 @@ export default function Footer() {
                         Empowering the next generation of creators and entrepreneurs with AI.
                     </p>
                     <div className="flex gap-4 justify-center md:justify-start">
-                        <Link href="#" className="hover:text-foreground transition-colors"><Twitter size={20} /></Link>
-                        <Link href="#" className="hover:text-foreground transition-colors"><Instagram size={20} /></Link>
-                        <Link href="#" className="hover:text-foreground transition-colors"><Linkedin size={20} /></Link>
+                        <Link href="https://www.instagram.com/aiskills.studio/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors"><Instagram size={20} /></Link>
+                        <Link href="https://www.facebook.com/aiskillsstudio/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors"><Facebook size={20} /></Link>
                     </div>
                 </div>
 
