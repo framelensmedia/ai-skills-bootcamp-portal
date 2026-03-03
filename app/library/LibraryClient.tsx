@@ -455,23 +455,29 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 const imageIds = ids.filter(id => remixItems.find(i => i.id === id)?.mediaType !== "video");
                 const videoIds = ids.filter(id => remixItems.find(i => i.id === id)?.mediaType === "video");
 
-                const promises = [];
+                const requests: Promise<Response>[] = [];
                 if (imageIds.length > 0) {
-                    promises.push(fetch("/api/library/delete", {
+                    requests.push(fetch("/api/library/delete", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ ids: imageIds, table: "prompt_generations" })
                     }));
                 }
                 if (videoIds.length > 0) {
-                    promises.push(fetch("/api/library/delete", {
+                    requests.push(fetch("/api/library/delete", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ ids: videoIds, table: "video_generations" })
                     }));
                 }
 
-                await Promise.all(promises);
+                const responses = await Promise.all(requests);
+                for (const res of responses) {
+                    if (!res.ok) {
+                        const json = await res.json().catch(() => ({ error: "Delete failed" }));
+                        throw new Error(json.error || "Delete failed");
+                    }
+                }
             } else {
                 // Favorites
                 const res = await fetch("/api/library/delete", {

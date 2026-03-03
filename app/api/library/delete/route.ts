@@ -19,15 +19,27 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
         }
 
-        // 1. Verify Authentication
+        // 1. Verify Authentication — try getUser() first, fall back to getSession()
         const supabase = await createSupabaseServerClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
+        let userId: string | null = null;
 
-        if (!user) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            userId = user.id;
+        } else {
+            // Fallback to session (handles some edge-cases with cookie forwarding)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+                userId = session.user.id;
+            }
+        }
+
+        if (!userId) {
+            console.error("Delete route: No authenticated user found");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        console.log(`Delete route: user=${userId} table=${table} ids=${JSON.stringify(ids)}`);
 
         // 2. Perform Delete with Admin Client (bypassing potential RLS issues)
         // CRITICAL: We MUST enforce user_id check manually since we are admin
@@ -38,38 +50,46 @@ export async function POST(req: Request) {
                 .from("prompt_favorites")
                 .delete()
                 .in("id", ids)
-                .eq("user_id", user.id);
+                .eq("user_id", userId);
+
+            if (err1) console.error("prompt_favorites delete error:", err1);
 
             // Try deleting from video_favorites
             const { error: err2 } = await supabaseAdmin
                 .from("video_favorites")
                 .delete()
                 .in("id", ids)
-                .eq("user_id", user.id);
+                .eq("user_id", userId);
+
+            if (err2) console.error("video_favorites delete error:", err2);
 
             if (err1 && err2) {
-                return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+                return NextResponse.json(
+                    { error: `Failed to delete favorites: ${err1.message}` },
+                    { status: 500 }
+                );
             }
         } else {
-            const targetTable = table === "video_generations" ? "video_generations" : (table === "prompt_generations" ? "prompt_generations" : "prompt_generations");
+            const validTables = ["prompt_generations", "video_generations"];
+            const targetTable = validTables.includes(table) ? table : "prompt_generations";
 
-            const { error } = await supabaseAdmin
+            const { error, count } = await supabaseAdmin
                 .from(targetTable)
-                .delete()
+                .delete({ count: "exact" })
                 .in("id", ids)
-                .eq("user_id", user.id); // Enforce ownership
+                .eq("user_id", userId); // Enforce ownership
 
             if (error) {
-                console.error("Delete Error:", error);
+                console.error(`Delete Error (${targetTable}):`, error);
                 return NextResponse.json({ error: error.message }, { status: 500 });
             }
+
+            console.log(`Deleted ${count ?? 0} records from ${targetTable}`);
         }
-
-
 
         return NextResponse.json({ success: true, count: ids.length });
     } catch (err: any) {
-        console.error("API Error:", err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        console.error("API Error in /api/library/delete:", err);
+        return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
     }
 }

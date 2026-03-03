@@ -12,7 +12,7 @@ type LazyMediaProps = {
 };
 
 export default function LazyMedia({ src, poster, alt = "", type, className, unoptimized = false }: LazyMediaProps) {
-    const { ref, isInView } = useInView({ threshold: 0.1, rootMargin: "200px 0px" });
+    const { ref, isInView } = useInView({ threshold: 0.1, rootMargin: "200px 0px" }, true);
     const [isLoaded, setIsLoaded] = useState(false);
 
     return (

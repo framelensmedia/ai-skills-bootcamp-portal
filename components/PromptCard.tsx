@@ -46,7 +46,7 @@ export default function PromptCard({
   onToggleFavorite,
   priority = false,
 }: PromptCardProps) {
-  const { ref: inViewRef, isInView } = useInView({ threshold: 0, rootMargin: "300px 0px" });
+  const { ref: inViewRef, isInView } = useInView({ threshold: 0, rootMargin: "300px 0px" }, true);
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isAuthed, setIsAuthed] = useState(false);
