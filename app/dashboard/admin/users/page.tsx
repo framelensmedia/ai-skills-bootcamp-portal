@@ -11,9 +11,10 @@ type ProfileRow = {
   staff_approved: boolean;
   is_approved: boolean;
   created_at: string;
+  credits: number;
 };
 
-const ROLE_OPTIONS = ["user","staff","instructor","editor","admin","super_admin"];
+const ROLE_OPTIONS = ["user", "staff", "instructor", "editor", "admin", "super_admin"];
 
 export default function AdminUsersPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -41,7 +42,7 @@ export default function AdminUsersPage() {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("user_id,email,role,staff_pro,staff_approved,is_approved,created_at")
+      .select("user_id,email,role,staff_pro,staff_approved,is_approved,created_at,credits")
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -63,7 +64,7 @@ export default function AdminUsersPage() {
     setErr(null);
 
     // staff+ should always have pro
-    const staffPlus = ["staff","instructor","editor","admin","super_admin"].includes(nextRole);
+    const staffPlus = ["staff", "instructor", "editor", "admin", "super_admin"].includes(nextRole);
 
     const res = await fetch("/api/admin/users/update-role", {
       method: "POST",
@@ -84,6 +85,48 @@ export default function AdminUsersPage() {
     }
 
     await load();
+  }
+
+  async function grantCredits(row: ProfileRow) {
+    if (!["admin", "super_admin"].includes(meRole)) {
+      alert("Only admins can grant credits directly.");
+      return;
+    }
+
+    const val = prompt(`How many credits to add to ${row.email || row.user_id}?\n\nCurrent Balance: ${row.credits ?? 0}`);
+    if (!val) return;
+
+    const amount = parseInt(val.trim(), 10);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid positive number.");
+      return;
+    }
+
+    const conf = confirm(`Add ${amount} credits to ${row.email || row.user_id}?`);
+    if (!conf) return;
+
+    setErr(null);
+    try {
+      const res = await fetch("/api/admin/users/add-credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: row.user_id,
+          amount
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        setErr(json?.error || "Failed to add credits");
+        return;
+      }
+
+      alert(`Successfully added ${amount} credits.`);
+      await load();
+    } catch (e: any) {
+      setErr(e.message || "Failed to add credits");
+    }
   }
 
   return (
@@ -129,6 +172,9 @@ export default function AdminUsersPage() {
                         PRO: {r.staff_pro ? "YES" : "NO"}
                       </span>
                       <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1">
+                        CREDITS: {r.credits ?? 0}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1">
                         STAFF APPROVED: {r.staff_approved ? "YES" : "NO"}
                       </span>
                     </div>
@@ -146,6 +192,15 @@ export default function AdminUsersPage() {
                         </option>
                       ))}
                     </select>
+
+                    {["admin", "super_admin"].includes(meRole) && (
+                      <button
+                        onClick={() => grantCredits(r)}
+                        className="rounded-lg border border-[#B7FF00]/50 bg-[#B7FF00]/10 px-3 py-2 text-xs font-semibold text-[#B7FF00] hover:bg-[#B7FF00]/20"
+                      >
+                        + Add Credits
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
