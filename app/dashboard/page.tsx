@@ -63,6 +63,10 @@ export default function DashboardPage() {
     const r = role.toLowerCase().replace(" ", "_");
     return ["admin", "super_admin"].includes(r);
   }, [role]);
+  const isSuperAdmin = useMemo(() => {
+    const r = role.toLowerCase().replace(" ", "_");
+    return ["super_admin"].includes(r);
+  }, [role]);
 
   const hasProAccess = useMemo(() => {
     const p = String(plan || "free").toLowerCase();
@@ -352,17 +356,32 @@ export default function DashboardPage() {
                   </Link>
                 )}
                 {isAdminPlus && (
-                  <Link href="/dashboard/admin/users" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
-                    <Users size={18} className="text-orange-400" />
-                    <span className="text-sm font-medium text-white">User Admin</span>
-                  </Link>
-                )}
-                {isAdminPlus && (
                   <Link href="/dashboard/admin/analytics" className="flex items-center gap-3 rounded-lg border border-white/5 bg-black/40 px-4 py-3 hover:bg-white/5 transition">
                     <LayoutGrid size={18} className="text-green-400" />
                     <span className="text-sm font-medium text-white">Site Analytics</span>
                   </Link>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Super Admin Mission Control Section */}
+          {isSuperAdmin && (
+            <div className="mt-8 rounded-xl border border-red-500/20 bg-red-950/10 p-6 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-red-500/50"></div>
+              <div className="mb-4 flex items-center gap-2">
+                <Terminal size={16} className="text-red-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wide text-white">Super Admin Mission Control</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Link href="/dashboard/super_admin/users" className="flex items-center gap-3 rounded-lg border border-red-500/10 bg-black/40 px-4 py-3 hover:bg-red-900/20 transition">
+                  <Users size={18} className="text-red-400" />
+                  <span className="text-sm font-medium text-white">User Intelligence</span>
+                </Link>
+                <Link href="/dashboard/super_admin/analytics" className="flex items-center gap-3 rounded-lg border border-red-500/10 bg-black/40 px-4 py-3 hover:bg-red-900/20 transition">
+                  <LayoutGrid size={18} className="text-red-400" />
+                  <span className="text-sm font-medium text-white">System Analytics</span>
+                </Link>
               </div>
             </div>
           )}
