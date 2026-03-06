@@ -37,6 +37,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const isGeneratingRef = useRef(false);
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [timer, setTimer] = useState(0);
@@ -113,6 +114,8 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
 
     const handleGenerate = async () => {
         if (!canGenerate) return;
+        if (isGenerating || isGeneratingRef.current) return;
+        isGeneratingRef.current = true;
 
         setIsGenerating(true);
         setError(null);
@@ -162,6 +165,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
             setError(e.message || "Something went wrong.");
         } finally {
             setIsGenerating(false);
+            isGeneratingRef.current = false;
         }
     };
 
@@ -351,7 +355,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                 disabled={!canGenerate}
                                 className={`w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2 transition-all shadow-lg ${!canGenerate
                                     ? "bg-white/10 text-white/20 cursor-not-allowed"
-                                    : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] shadow-lime-400/20"
+                                    : "bg-lime-400 hover:bg-lime-300 hover:scale-[1.02] active:scale-[0.98] shadow-lime-400/20"
                                     }`}
                             >
                                 {isGenerating ? (

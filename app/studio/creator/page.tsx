@@ -141,6 +141,7 @@ function CreatorContent() {
 
     // Video State
     const [animating, setAnimating] = useState(false);
+    const isAnimatingRef = useRef(false);
     const [videoResult, setVideoResult] = useState<string | null>(null);
     const [videoModalOpen, setVideoModalOpen] = useState(false);
     const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
@@ -517,7 +518,8 @@ function CreatorContent() {
 
     const handleAnimate = async () => {
         if (!handleAuthGate()) return;
-        if (animating) return;
+        if (animating || isAnimatingRef.current) return;
+        isAnimatingRef.current = true;
 
         const promptText = manualPrompt.trim();
         if (!promptText) {
@@ -612,6 +614,7 @@ function CreatorContent() {
             console.error("Video Generation Error:", err);
         } finally {
             setAnimating(false);
+            isAnimatingRef.current = false;
         }
     };
 
@@ -1011,7 +1014,7 @@ function CreatorContent() {
                     {mediaType === "video" ? (
                         <button
                             className={[
-                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-[0_0_20px_-5px_#B7FF00]",
                                 animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                             ].join(" ")}
                             onClick={handleAnimate}
