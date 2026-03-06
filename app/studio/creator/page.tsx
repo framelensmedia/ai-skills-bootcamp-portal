@@ -610,6 +610,7 @@ function CreatorContent() {
             }
         } catch (err: any) {
             console.error("Video Generation Error:", err);
+        } finally {
             setAnimating(false);
         }
     };
@@ -1062,7 +1063,7 @@ function CreatorContent() {
                     <div className="sticky top-8 w-full flex flex-col space-y-4">
                         <div className={`order-2 lg:order-1 relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
                             {/* Generating Overlay */}
-                            {generating && (
+                            {(generating || animating) && (
                                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
                                     <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
                                 </div>

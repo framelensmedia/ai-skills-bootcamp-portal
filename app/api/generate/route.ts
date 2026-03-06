@@ -1145,6 +1145,9 @@ export async function POST(req: Request) {
         let credentials;
         try {
             credentials = JSON.parse(credsJson);
+            if (credentials.private_key && typeof credentials.private_key === "string") {
+                credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+            }
         } catch {
             throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON");
         }
@@ -1552,9 +1555,12 @@ Execute the user's instruction precisely.
 
         // 9. Insert History
         try {
-            await admin.from("prompt_generations").insert({
+            // Ensure promptId is a valid UUID, otherwise Postgres will crash silently
+            const isValidUuid = promptId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(promptId);
+
+            const { error: insertErr } = await admin.from("prompt_generations").insert({
                 user_id: userId,
-                prompt_id: promptId,
+                prompt_id: isValidUuid ? promptId : null,
                 prompt_slug: promptSlug,
                 image_url: imageUrl,
 
@@ -1576,8 +1582,11 @@ Execute the user's instruction precisely.
                     full_quality_url: originalUrl, // Save Full Quality URL
                 },
             });
+            if (insertErr) {
+                console.error("prompt_generations insert failed:", insertErr.message);
+            }
         } catch (e) {
-            console.error("prompt_generations insert failed:", e);
+            console.error("prompt_generations insert crashed:", e);
             // don't fail the request, just log it
         }
 

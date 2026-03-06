@@ -365,6 +365,9 @@ export async function POST(req: Request) {
         let credentials;
         try {
             credentials = JSON.parse(credsJson);
+            if (credentials.private_key && typeof credentials.private_key === "string") {
+                credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+            }
         } catch (e) {
             console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON parse error:", e);
             throw new Error(`Invalid GOOGLE_APPLICATION_CREDENTIALS_JSON: ${e}`);
@@ -664,7 +667,7 @@ export async function POST(req: Request) {
                 const gcsErr = await gcsRes.text();
                 throw new Error(`Failed to fetch video from GCS: ${gcsRes.status}`);
             }
-            uploadBody = await gcsRes.blob();
+            uploadBody = Buffer.from(await gcsRes.arrayBuffer());
         } else {
             throw new Error("No video bytes or GCS URI in response");
         }
