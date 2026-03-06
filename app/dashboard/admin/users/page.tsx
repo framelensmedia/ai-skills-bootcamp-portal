@@ -23,6 +23,7 @@ export default function AdminUsersPage() {
   const [rows, setRows] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   async function load() {
     setLoading(true);
@@ -40,11 +41,18 @@ export default function AdminUsersPage() {
       setMeRole(String(me?.role || "user"));
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("profiles")
       .select("user_id,email,role,staff_pro,staff_approved,is_approved,created_at,credits")
       .order("created_at", { ascending: false })
       .limit(200);
+
+    if (searchTerm.trim() !== "") {
+      const term = `%${searchTerm.trim()}%`;
+      query = query.or(`email.ilike.${term},user_id.eq.${searchTerm.trim()}`);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       setErr(error.message);
@@ -56,9 +64,14 @@ export default function AdminUsersPage() {
     setLoading(false);
   }
 
+  // Normal load on mount or search
   useEffect(() => {
-    load();
-  }, []);
+    // Basic debounce
+    const t = setTimeout(() => {
+      load();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   async function updateRole(row: ProfileRow, nextRole: string) {
     setErr(null);
@@ -139,6 +152,24 @@ export default function AdminUsersPage() {
         <p className="mt-2 text-xs text-white/45">
           Your role: {meRole}
         </p>
+      </div>
+
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full max-w-md">
+          <input
+            type="text"
+            placeholder="Search by Email or User ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white placeholder-white/40 outline-none focus:border-white/30"
+          />
+        </div>
+        <button
+          onClick={load}
+          className="rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          Refresh List
+        </button>
       </div>
 
       {err ? (
