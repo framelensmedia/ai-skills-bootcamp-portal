@@ -66,9 +66,9 @@ export default function AdminUsersPage() {
 
     if (planFilter !== "all") {
       if (planFilter === "free") {
-        query = query.or("plan.is.null,plan.eq.free");
-      } else {
-        query = query.eq("plan", planFilter);
+        query = query.or("plan.is.null,plan.eq.free").eq("staff_pro", false);
+      } else if (planFilter === "premium") {
+        query = query.or("plan.eq.premium,plan.ilike.pro,staff_pro.eq.true");
       }
     }
 
