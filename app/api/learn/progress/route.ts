@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         const { data: profile } = await supabase
             .from("profiles")
             .select("xp, streak_days, last_activity_date")
-            .eq("id", user.id)
+            .eq("user_id", user.id)
             .single();
 
         if (profile) {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                 xp: (profile.xp || 0) + xpGained,
                 streak_days: newStreak,
                 last_activity_date: new Date().toISOString()
-            }).eq("id", user.id);
+            }).eq("user_id", user.id);
         }
 
         return NextResponse.json({
