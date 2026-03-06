@@ -12,6 +12,7 @@ type ProfileRow = {
   is_approved: boolean;
   created_at: string;
   credits: number;
+  plan: string | null;
 };
 
 const ROLE_OPTIONS = ["user", "staff", "instructor", "editor", "admin", "super_admin"];
@@ -43,7 +44,7 @@ export default function AdminUsersPage() {
 
     let query = supabase
       .from("profiles")
-      .select("user_id,email,role,staff_pro,staff_approved,is_approved,created_at,credits")
+      .select("user_id,email,role,staff_pro,staff_approved,is_approved,created_at,credits,plan")
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -205,8 +206,13 @@ export default function AdminUsersPage() {
                         ROLE: {String(r.role).toUpperCase()}
                       </span>
                       <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1">
-                        PRO: {r.staff_pro ? "YES" : "NO"}
+                        PRO: {r.staff_pro || r.plan === 'premium' ? "YES" : "NO"}
                       </span>
+                      {r.plan && r.plan !== 'free' && (
+                        <span className="rounded-full border border-[#B7FF00]/30 bg-[#B7FF00]/10 px-3 py-1 text-[#B7FF00]">
+                          PLAN: {String(r.plan).toUpperCase()}
+                        </span>
+                      )}
                       <span className="rounded-full border border-white/10 bg-black/40 px-3 py-1">
                         CREDITS: {r.credits ?? 0}
                       </span>
