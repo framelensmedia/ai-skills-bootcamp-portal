@@ -48,8 +48,13 @@ export default function AdminUsersPage() {
       .limit(200);
 
     if (searchTerm.trim() !== "") {
-      const term = `%${searchTerm.trim()}%`;
-      query = query.or(`email.ilike.${term},user_id.eq.${searchTerm.trim()}`);
+      const term = searchTerm.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+      if (isUuid) {
+        query = query.or(`email.ilike.%${term}%,user_id.eq.${term}`);
+      } else {
+        query = query.ilike('email', `%${term}%`);
+      }
     }
 
     const { data, error } = await query;
