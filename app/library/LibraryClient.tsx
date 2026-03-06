@@ -1051,14 +1051,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                 onShare={handleShare}
                 onRemix={handleRemix}
                 onEdit={isOwnedByCurrentUser ? () => {
-                    if (lbMediaType === "video") {
-                        // Video-to-video editing via modal
-                        setVideoSourceImage(lightboxUrl || null); // Thumbnail as preview
-                        setVideoSourceVideo(lbVideoUrl || null); // Source video for editing
-                        setVideoSourceId(lightboxItemId || undefined);
-                        setLightboxOpen(false);
-                        setIsVideoModalOpen(true);
-                    } else {
+                    if (lbMediaType !== "video") {
                         setLightboxOpen(false);
                         setEditModalOpen(true);
                     }
@@ -1077,7 +1070,6 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     setLightboxOpen(false);
                     setIsVideoModalOpen(true);
                 } : undefined}
-
             />
 
             {/* Edit Mode Modal */}
@@ -1101,6 +1093,32 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     sourceImageId={videoSourceId}
                     sourceVideo={videoSourceVideo || undefined} // For video-to-video editing
                     userId={undefined} // Route handles authentication
+                    onVideoGenerated={(data) => {
+                        const newVideo: LibraryItem = {
+                            id: `temp-${Date.now()}`,
+                            imageUrl: "",
+                            videoUrl: data.videoUrl,
+                            thumbnailUrl: null,
+                            mediaType: "video",
+                            createdAt: new Date().toISOString(),
+                            createdAtMs: Date.now(),
+                            promptId: null,
+                            promptSlug: null,
+                            aspectRatio: "16:9",
+                            promptTitle: data.prompt?.slice(0, 50) || "Animated Scene",
+                            promptCategory: null,
+                            originalPromptText: data.prompt || "",
+                            remixPromptText: "",
+                            combinedPromptText: data.prompt || "",
+                            folder: null,
+                            folder_id: null,
+                            is_public: true
+                        };
+                        setRemixItems(prev => [newVideo, ...prev]);
+                        setIsVideoModalOpen(false);
+                        setVideoSourceVideo(null);
+                        showToast("Video added to Library");
+                    }}
                 />
             )}
 

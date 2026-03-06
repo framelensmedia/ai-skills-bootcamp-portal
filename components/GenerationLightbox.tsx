@@ -341,7 +341,7 @@ export default function GenerationLightbox({
                 <Sparkles className="w-4 h-4" />
               </button>
 
-              {onEdit && (
+              {onEdit && mediaType !== "video" && (
                 <button
                   type="button"
                   onClick={(e) => {

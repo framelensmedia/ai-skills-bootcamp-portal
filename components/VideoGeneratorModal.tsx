@@ -21,9 +21,10 @@ type Props = {
     userId?: string;
     initialPrompt?: string;
     initialModelId?: string;
+    onVideoGenerated?: (data: { videoUrl: string, prompt: string, modelId: string }) => void;
 };
 
-export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt, initialModelId }: Props) {
+export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sourceImageId, sourceVideo, userId, initialPrompt, initialModelId, onVideoGenerated }: Props) {
     const router = useRouter();
     const [prompt, setPrompt] = useState(initialPrompt || "");
     const [dialogue, setDialogue] = useState("");
@@ -148,6 +149,14 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
             }
 
             setResultUrl(data.videoUrl);
+
+            if (onVideoGenerated) {
+                onVideoGenerated({
+                    videoUrl: data.videoUrl,
+                    prompt: prompt,
+                    modelId: selectedModel
+                });
+            }
         } catch (e: any) {
             console.error("Video Error:", e);
             setError(e.message || "Something went wrong.");

@@ -313,18 +313,23 @@ export async function POST(req: Request) {
                 // If base64 image, we might want to upload it too? 
                 // Existing logic handles base64 thumbnail upload.
 
-                await admin.from("video_generations").insert({
+                const { error: dbFail } = await admin.from("video_generations").insert({
                     user_id: userId,
-                    source_image_id: sourceImageId || null,
+                    source_image_id: inputVideo ? null : (sourceImageId || null),
                     prompt_id: promptId || null,
                     video_url: videoUrl,
                     thumbnail_url: thumbnailUrl,
                     prompt,
                     dialogue,
                     status: "completed",
-                    is_public: true,
-                    model: falModelId
+                    is_public: true
                 });
+
+                if (dbFail) {
+                    console.error("Fal Video DB Insert Error:", dbFail);
+                    import("fs").then(fs => fs.writeFileSync("/tmp/db_error.txt", JSON.stringify(dbFail, null, 2)));
+                    throw new Error("Video generated but failed to save to database");
+                }
 
                 // DEDUCT CREDITS (Fal) - Exempt Admins
                 if (!isAdmin) {
@@ -445,6 +450,11 @@ export async function POST(req: Request) {
             finalPrompt += `\n\n[BUSINESS BLUEPRINT CONTEXT]\n(Apply these brand guidelines to the visual style):\n${businessContext}\n`;
         }
 
+        // Video Extension Prompt Tuning
+        if (inputVideo) {
+            finalPrompt += `\n\n[CRITICAL EXTENSION INSTRUCTIONS]\nYou are extending an existing video. You MUST preserve the exact same voice, tone, accent, and audio characteristics of the original speaker. Do not change the sound of the voice. STRICTLY NO GIBBERISH OR BABBLING.`;
+        }
+
         let instancePayload: any = {};
 
         // SEMANTIC REMIX LOGIC:
@@ -560,7 +570,7 @@ export async function POST(req: Request) {
         const parameters: any = {
             sampleCount: 1,
             durationSeconds,
-            negativePrompt: "distortion, low quality, shaky, blurry, text, gibberish, watermark, writing",
+            negativePrompt: "distortion, low quality, shaky, blurry, text, gibberish, watermark, writing, nonsense audio, babbling, robotic voice, voice changing, muffled audio, unintelligible speaking",
             personGeneration: "allow_all",
             safetySettings: [
                 { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -714,9 +724,9 @@ export async function POST(req: Request) {
             }
         }
 
-        await admin.from("video_generations").insert({
+        const { error: dbFail } = await admin.from("video_generations").insert({
             user_id: userId,
-            source_image_id: sourceImageId || null,
+            source_image_id: inputVideo ? null : (sourceImageId || null),
             prompt_id: promptId || null, // NEW: Save linkage
             video_url: videoUrl,
             thumbnail_url: thumbnailUrl,
@@ -725,6 +735,12 @@ export async function POST(req: Request) {
             status: "completed",
             is_public: true
         });
+
+        if (dbFail) {
+            console.error("Veo Video DB Insert Error:", dbFail);
+            import("fs").then(fs => fs.writeFileSync("/tmp/db_error.txt", JSON.stringify(dbFail, null, 2)));
+            throw new Error("Video generated but failed to save to database");
+        }
 
         // DEDUCT CREDITS (Veo) - Exempt Admins
         if (!isAdmin) {

@@ -1053,6 +1053,11 @@ export async function POST(req: Request) {
                     },
                 }).select().single();
 
+                if (pendingErr) {
+                    console.error("DB Pending Insert Error:", pendingErr);
+                    import("fs").then(fs => fs.writeFileSync("/tmp/db_image_insert_error.txt", JSON.stringify(pendingErr, null, 2)));
+                }
+
                 if (!pendingErr && pendingRecord?.id) {
                     pendingGenerationId = String(pendingRecord.id);
                 }
@@ -1100,6 +1105,9 @@ export async function POST(req: Request) {
 
                     if (updateErr) {
                         console.error("DB Update Error:", updateErr);
+                        import("fs").then(fs => fs.writeFileSync("/tmp/db_image_update_error.txt", JSON.stringify(updateErr, null, 2)));
+                        // We should probably fail loud if we can't save it, or at least log heavily
+                        throw new Error(`Failed to save edited image to database: ${updateErr.message}`);
                     }
                     console.log("Fal Image Updated in DB:", pendingGenerationId);
                     return NextResponse.json({ images: [{ url: falImageUrl }], generationId: pendingGenerationId, imageUrl: falImageUrl, remainingCredits: userCredits - IMAGE_COST });
@@ -1115,7 +1123,8 @@ export async function POST(req: Request) {
 
                 if (dbErr) {
                     console.error("DB Insert Error:", dbErr);
-                    return NextResponse.json({ error: "Failed to save generation" }, { status: 500 });
+                    import("fs").then(fs => fs.writeFileSync("/tmp/db_image_fallback_insert_error.txt", JSON.stringify(dbErr, null, 2)));
+                    return NextResponse.json({ error: "Failed to save generation: " + dbErr.message }, { status: 500 });
                 }
 
                 console.log("Fal Image Saved to DB:", inserted?.id);
