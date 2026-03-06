@@ -19,7 +19,8 @@ import {
   Shield,
   Crown,
   Terminal,
-  ArrowUpRight
+  ArrowUpRight,
+  Power
 } from "lucide-react";
 
 type ProfileRow = {
@@ -381,6 +382,10 @@ export default function DashboardPage() {
                 <Link href="/dashboard/super_admin/analytics" className="flex items-center gap-3 rounded-lg border border-red-500/10 bg-black/40 px-4 py-3 hover:bg-red-900/20 transition">
                   <LayoutGrid size={18} className="text-red-400" />
                   <span className="text-sm font-medium text-white">System Analytics</span>
+                </Link>
+                <Link href="/dashboard/super_admin/controls" className="flex items-center gap-3 rounded-lg border border-red-500/10 bg-black/40 px-4 py-3 hover:bg-red-900/20 transition">
+                  <Power size={18} className="text-red-400" />
+                  <span className="text-sm font-medium text-white">System Controls</span>
                 </Link>
               </div>
             </div>
