@@ -7,15 +7,15 @@ const FAL_KEY = process.env.FAL_KEY;
 // Define our platform preset voices. 
 // These are the predefined voices supported by ChatterboxHD text-to-speech.
 const PRESET_VOICES = [
-    { id: "Aurora", name: "Aurora", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/aurora.mp3" },
-    { id: "Blade", name: "Blade", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/blade.mp3" },
-    { id: "Britney", name: "Britney", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/britney.mp3" },
-    { id: "Carl", name: "Carl", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/carl.mp3" },
-    { id: "Cliff", name: "Cliff", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/cliff.mp3" },
-    { id: "Richard", name: "Richard", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/richard.mp3" },
-    { id: "Rico", name: "Rico", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/rico.mp3" },
-    { id: "Siobhan", name: "Siobhan", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/siobhan.mp3" },
-    { id: "Vicky", name: "Vicky", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/vicky.mp3" }
+    { id: "Aurora", name: "Aurora", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/aurora.wav" },
+    { id: "Blade", name: "Blade", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/blade.wav" },
+    { id: "Britney", name: "Britney", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/britney.wav" },
+    { id: "Carl", name: "Carl", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/carl.wav" },
+    { id: "Cliff", name: "Cliff", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/cliff.wav" },
+    { id: "Richard", name: "Richard", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/richard.wav" },
+    { id: "Rico", name: "Rico", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/rico.wav" },
+    { id: "Siobhan", name: "Siobhan", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/siobhan.wav" },
+    { id: "Vicky", name: "Vicky", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/vicky.wav" }
 ];
 
 export async function generateTTS(text: string, voiceId: string, refAudioUrl: string) {

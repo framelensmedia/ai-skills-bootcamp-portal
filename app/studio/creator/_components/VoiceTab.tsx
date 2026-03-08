@@ -44,7 +44,14 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
 
         if (voicesRes.success && voicesRes.voices) {
             setVoices(voicesRes.voices);
-            if (voicesRes.voices.length > 0 && !selectedVoice) setSelectedVoice(voicesRes.voices[0].id);
+            if (voicesRes.voices.length > 0 && !selectedVoice) {
+                const firstCloned = voicesRes.voices.find(v => v.type === 'cloned');
+                if (firstCloned) {
+                    setSelectedVoice(firstCloned.id);
+                } else {
+                    setSelectedVoice(voicesRes.voices[0].id);
+                }
+            }
         }
 
         if (historyRes.success && historyRes.generations) {
