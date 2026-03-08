@@ -22,9 +22,11 @@ import { GenerationFailureNotification } from "@/components/GenerationFailureNot
 import PromptCard from "@/components/PromptCard";
 import RemixCard from "@/components/RemixCard";
 import Link from "next/link";
-import { ArrowRight, Library, TriangleAlert } from "lucide-react";
+import { ArrowRight, Library, TriangleAlert, Mic } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
+import VoiceTab from "./_components/VoiceTab";
+import { getVoiceGenerations } from "@/app/actions/voiceStudio";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
@@ -114,6 +116,14 @@ function CreatorContent() {
             if (models && models.value) {
                 setModelsConfig(models.value);
             }
+
+            // Fetch Voice Generations for drop down
+            try {
+                const hRes = await getVoiceGenerations();
+                if (hRes.success && hRes.generations) {
+                    setVoiceGenerations(hRes.generations);
+                }
+            } catch (e) { }
         };
         fetchConfig();
     }, []);
@@ -122,14 +132,14 @@ function CreatorContent() {
     const [manualPrompt, setManualPrompt] = useState("");
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
-    const [mediaType, setMediaType] = useState<"image" | "video">("image");
+    const [activeTab, setActiveTab] = useState<"image" | "video" | "voice">("image");
 
     // Credits
     const [userCredits, setUserCredits] = useState<number | null>(null);
     const VIDEO_COST = 30;
     const IMAGE_COST = 3;
-    const isVideo = mediaType === "video";
-    const currentCost = isVideo ? VIDEO_COST : IMAGE_COST;
+    const VOICE_COST = 5; // placeholder cost for voice
+    const currentCost = activeTab === "video" ? VIDEO_COST : activeTab === "voice" ? VOICE_COST : IMAGE_COST;
     const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
     const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${currentCost}, have ${userCredits}.` : null;
 
@@ -147,10 +157,14 @@ function CreatorContent() {
     const [videoSubMode, setVideoSubMode] = useState<"image_to_video" | "text_to_video">("image_to_video");
     const [libraryModalOpen, setLibraryModalOpen] = useState(false);
 
+    // Audio Track State
+    const [audioTrackUrl, setAudioTrackUrl] = useState<string | null>(null);
+    const [voiceGenerations, setVoiceGenerations] = useState<any[]>([]);
+
     // Intent check
     useEffect(() => {
         if (searchParams?.get("intent") === "video") {
-            setMediaType("video");
+            setActiveTab("video");
         }
     }, [searchParams]);
 
@@ -190,9 +204,10 @@ function CreatorContent() {
 
     // Switch Default Model when Media Type Changes
     useEffect(() => {
-        if (mediaType === "video") setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
-        else setSelectedModel(DEFAULT_MODEL_ID);
-    }, [mediaType]);
+        if (activeTab === "video" || activeTab === "voice") {
+            setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
+        } else setSelectedModel(DEFAULT_MODEL_ID);
+    }, [activeTab]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -482,7 +497,7 @@ function CreatorContent() {
             const intent = searchParams?.get("intent");
             if (intent === "video") {
                 // Auto-switch to video tab & Open Modal
-                setMediaType("video");
+                setActiveTab("video");
 
                 const data = json;
                 if (data && data.imageUrl) {
@@ -587,7 +602,8 @@ function CreatorContent() {
                     userId: user?.id,
                     aspectRatio: aspectRatio,
                     sourceImageId: searchParams?.get("promptId") || undefined,
-                    modelId: selectedModel
+                    modelId: selectedModel,
+                    audioUrl: audioTrackUrl
                 })
             });
 
@@ -714,7 +730,26 @@ function CreatorContent() {
                     <Clapperboard className="w-8 h-8 md:w-10 md:h-10 text-primary" />
                     Creator Studio
                 </h1>
-                <p className="mt-2 text-muted-foreground">Generate stunning visuals in minutes</p>
+                <p className="mt-2 text-muted-foreground">The complete AI Media Production engine</p>
+            </div>
+
+            {/* Master Tabs */}
+            <div className="mb-8 flex items-center gap-6 border-b border-border">
+                {(["image", "video", "voice"] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`pb-3 px-1 text-sm font-bold uppercase tracking-wider transition-colors relative outline-none ${activeTab === tab
+                            ? "text-primary"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
+                    >
+                        {tab}
+                        {activeTab === tab && (
+                            <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary rounded-t-sm" />
+                        )}
+                    </button>
+                ))}
             </div>
 
             {/* GLOBAL PAUSE BANNER */}
@@ -738,447 +773,487 @@ function CreatorContent() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* LEFT COLUMN: Controls */}
-                <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
-                    <div className="flex items-center justify-between">
-                        <h2 className="tour-studio-welcome text-lg font-bold text-foreground">Prompt Tool</h2>
-                        <div className="text-xs font-bold text-primary uppercase tracking-wider">AI Studio</div>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground/60 text-center italic">
-                        AI is not perfect; it can make mistakes.
-                    </p>
-
-                    {/* Settings Card */}
-                    <div className="tour-studio-settings rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
-                        <div className="flex items-center justify-between gap-3 mb-4">
-                            <div className="flex items-center gap-2">
-                                <div className="text-sm font-bold text-foreground">Settings</div>
+                {activeTab !== "voice" ? (
+                    <>
+                        {/* LEFT COLUMN: Controls */}
+                        <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
+                            <div className="flex items-center justify-between">
+                                <h2 className="tour-studio-welcome text-lg font-bold text-foreground">Prompt Tool</h2>
+                                <div className="text-xs font-bold text-primary uppercase tracking-wider">AI Studio</div>
                             </div>
-                            <div className="text-xs font-mono text-primary">
-                                {mediaType.toUpperCase()} / {aspectRatio}
-                            </div>
-                        </div>
 
-                        <div className="tour-studio-media-type grid grid-cols-2 gap-3">
-                            <SelectPill
-                                label="Image"
-                                selected={mediaType === "image"}
-                                onClick={() => setMediaType("image")}
-                                disabled={generating || animating}
-                            />
-                            <SelectPill
-                                label="Video"
-                                selected={mediaType === "video"}
-                                onClick={() => setMediaType("video")}
-                                disabled={generating || animating}
-                            />
-                        </div>
+                            <p className="text-xs text-muted-foreground/60 text-center italic">
+                                AI is not perfect; it can make mistakes.
+                            </p>
 
-                        {mediaType === "video" && (
-                            <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <SelectPill
-                                    label="Image to Video"
-                                    description="Start Frame"
-                                    selected={videoSubMode === "image_to_video"}
-                                    onClick={() => setVideoSubMode("image_to_video")}
-                                    disabled={generating || animating}
-                                />
-                                <SelectPill
-                                    label="Text to Video"
-                                    description="Words only"
-                                    selected={videoSubMode === "text_to_video"}
-                                    onClick={() => setVideoSubMode("text_to_video")}
-                                    disabled={generating || animating}
-                                />
-                            </div>
-                        )}
-
-                        <div className="mt-4 pt-4 border-t border-border">
-                            <div className="tour-studio-aspect-ratio grid grid-cols-4 gap-2">
-                                <SelectPill
-                                    label="9:16"
-                                    description="Vertical"
-                                    icon={<Smartphone size={16} />}
-                                    selected={aspectRatio === "9:16"}
-                                    onClick={() => setAspectRatio("9:16")}
-                                    disabled={generating}
-                                />
-                                <SelectPill
-                                    label="16:9"
-                                    description="Wide"
-                                    icon={<Monitor size={16} />}
-                                    selected={aspectRatio === "16:9"}
-                                    onClick={() => setAspectRatio("16:9")}
-                                    disabled={generating}
-                                />
-                                <SelectPill
-                                    label="1:1"
-                                    description="Square"
-                                    icon={<Square size={16} />}
-                                    selected={aspectRatio === "1:1"}
-                                    onClick={() => setAspectRatio("1:1")}
-                                    disabled={generating}
-                                />
-                                <SelectPill
-                                    label="4:5"
-                                    description="Rect"
-                                    icon={<RectangleVertical size={16} />}
-                                    selected={aspectRatio === "4:5"}
-                                    onClick={() => setAspectRatio("4:5")}
-                                    disabled={generating}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Model Selector */}
-                        {mediaType === "image" && GENERATION_MODELS.length > 1 && (
-                            <div className="mt-4 pt-4 border-t border-border">
-                                <div className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Model</div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {GENERATION_MODELS.map((model) => (
-                                        <SelectPill
-                                            key={model.id}
-                                            label={model.label}
-                                            description={model.description}
-                                            selected={selectedModel === model.id}
-                                            onClick={() => setSelectedModel(model.id)}
-                                            disabled={modelsConfig && modelsConfig[model.id] === false}
-                                        />
-                                    ))}
+                            {/* Settings Card */}
+                            <div className="tour-studio-settings rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-bold text-foreground">Settings</div>
+                                    </div>
+                                    <div className="text-xs font-mono text-primary">
+                                        {activeTab.toUpperCase()} / {aspectRatio}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
 
-                        {/* Video Model Selector - Only show if multiple models */}
-                        {mediaType === "video" && VIDEO_MODELS.length > 1 && (
-                            <div className="mt-4 pt-4 border-t border-white/5">
-                                <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {VIDEO_MODELS.map((model) => (
+                                {activeTab === "video" && (
+                                    <div className="mb-4 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <SelectPill
-                                            key={model.id}
-                                            label={model.label}
-                                            description={model.description}
-                                            selected={selectedModel === model.id}
-                                            onClick={() => setSelectedModel(model.id)}
+                                            label="Image to Video"
+                                            description="Start Frame"
+                                            selected={videoSubMode === "image_to_video"}
+                                            onClick={() => setVideoSubMode("image_to_video")}
+                                            disabled={generating || animating}
                                         />
-                                    ))}
+                                        <SelectPill
+                                            label="Text to Video"
+                                            description="Words only"
+                                            selected={videoSubMode === "text_to_video"}
+                                            onClick={() => setVideoSubMode("text_to_video")}
+                                            disabled={generating || animating}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="mt-4 pt-4 border-t border-border">
+                                    <div className="tour-studio-aspect-ratio grid grid-cols-4 gap-2">
+                                        <SelectPill
+                                            label="9:16"
+                                            description="Vertical"
+                                            icon={<Smartphone size={16} />}
+                                            selected={aspectRatio === "9:16"}
+                                            onClick={() => setAspectRatio("9:16")}
+                                            disabled={generating}
+                                        />
+                                        <SelectPill
+                                            label="16:9"
+                                            description="Wide"
+                                            icon={<Monitor size={16} />}
+                                            selected={aspectRatio === "16:9"}
+                                            onClick={() => setAspectRatio("16:9")}
+                                            disabled={generating}
+                                        />
+                                        <SelectPill
+                                            label="1:1"
+                                            description="Square"
+                                            icon={<Square size={16} />}
+                                            selected={aspectRatio === "1:1"}
+                                            onClick={() => setAspectRatio("1:1")}
+                                            disabled={generating}
+                                        />
+                                        <SelectPill
+                                            label="4:5"
+                                            description="Rect"
+                                            icon={<RectangleVertical size={16} />}
+                                            selected={aspectRatio === "4:5"}
+                                            onClick={() => setAspectRatio("4:5")}
+                                            disabled={generating}
+                                        />
+                                    </div>
                                 </div>
+
+                                {/* Image AI Model Selection */}
+                                {activeTab === "image" && GENERATION_MODELS.length > 1 && (
+                                    <div className="mt-4 pt-4 border-t border-border">
+                                        <div className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide">Model</div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                            {GENERATION_MODELS.map((model) => (
+                                                <SelectPill
+                                                    key={model.id}
+                                                    label={model.label}
+                                                    description={model.description}
+                                                    selected={selectedModel === model.id}
+                                                    onClick={() => setSelectedModel(model.id)}
+                                                    disabled={modelsConfig && modelsConfig[model.id] === false}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Video Model Selector - Only show if multiple models */}
+                                {activeTab === "video" && VIDEO_MODELS.length > 1 && (
+                                    <div className="mt-4 pt-4 border-t border-white/5">
+                                        <div className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide">Video Model</div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                            {VIDEO_MODELS.map((model) => (
+                                                <SelectPill
+                                                    key={model.id}
+                                                    label={model.label}
+                                                    description={model.description}
+                                                    selected={selectedModel === model.id}
+                                                    onClick={() => setSelectedModel(model.id)}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "video" && (
+                                    <div className="mt-4 pt-4 border-t border-border">
+                                        <div className="text-xs font-bold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-2">
+                                            <Mic size={14} /> Add Voiceover Track <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Optional</span>
+                                        </div>
+                                        <select
+                                            value={audioTrackUrl || ""}
+                                            onChange={(e) => setAudioTrackUrl(e.target.value === "" ? null : e.target.value)}
+                                            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-inner truncate"
+                                        >
+                                            <option value="">None (Silent Video)</option>
+                                            {voiceGenerations.map((g: any) => (
+                                                <option key={g.id} value={g.audio_url}>
+                                                    {g.voice_name || 'Custom Voice'} - &quot;{g.text_prompt.substring(0, 30)}{g.text_prompt.length > 30 ? '...' : ''}&quot;
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
 
 
 
-                    {/* Style Presets */}
-                    <div className="mt-4 pt-4 border-t border-border space-y-3">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                            Style Preset <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Optional</span>
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {STYLE_PRESETS.map((preset) => (
-                                <button
-                                    key={preset.id}
-                                    onClick={() => setStylePreset(stylePreset === preset.id ? null : preset.id)}
-                                    className={`
+                            {/* Style Presets */}
+                            <div className="mt-4 pt-4 border-t border-border space-y-3">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                                    Style Preset <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">Optional</span>
+                                </label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {STYLE_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.id}
+                                            onClick={() => setStylePreset(stylePreset === preset.id ? null : preset.id)}
+                                            className={`
                                             relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all group overflow-hidden
                                             ${stylePreset === preset.id
-                                            ? "bg-primary border-primary text-primary-foreground shadow-sm"
-                                            : "bg-secondary border-border text-muted-foreground hover:bg-accent hover:text-foreground hover:border-border"
-                                        }
+                                                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                                                    : "bg-secondary border-border text-muted-foreground hover:bg-accent hover:text-foreground hover:border-border"
+                                                }
                                         `}
-                                >
-                                    <div className={`text-2xl transition-transform duration-300 ${stylePreset === preset.id ? "scale-110" : "group-hover:scale-110"}`}>{preset.icon}</div>
-                                    <div className="flex flex-col min-w-0">
-                                        <span className="text-xs font-bold uppercase tracking-wide truncate">{preset.label}</span>
-                                        <span className={`text-[9px] leading-tight truncate opacity-70 ${stylePreset === preset.id ? "text-black" : "text-white"}`}>
-                                            {preset.prompt.split("with")[0].replace("Shot on ", "")}
-                                        </span>
-                                    </div>
+                                        >
+                                            <div className={`text-2xl transition-transform duration-300 ${stylePreset === preset.id ? "scale-110" : "group-hover:scale-110"}`}>{preset.icon}</div>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-xs font-bold uppercase tracking-wide truncate">{preset.label}</span>
+                                                <span className={`text-[9px] leading-tight truncate opacity-70 ${stylePreset === preset.id ? "text-black" : "text-white"}`}>
+                                                    {preset.prompt.split("with")[0].replace("Shot on ", "")}
+                                                </span>
+                                            </div>
 
-                                    {/* Selection Ring */}
-                                    {stylePreset === preset.id && (
-                                        <div className="absolute inset-0 border-2 border-black/10 rounded-xl" />
+                                            {/* Selection Ring */}
+                                            {stylePreset === preset.id && (
+                                                <div className="absolute inset-0 border-2 border-black/10 rounded-xl" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+
+                            {/* Prompt Tool Card */
+                            }
+                            <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
+                                {/* Choice Overlay Removed as requested */}
+
+                                <RemixChatWizard
+                                    isOpen={wizardOpen}
+                                    onClose={() => {
+                                        setWizardOpen(false);
+                                    }}
+                                    onComplete={handleWizardComplete}
+                                    templatePreviewUrl={previewImage}
+                                    initialValues={remixAnswers}
+                                    uploads={uploads}
+                                    onUploadsChange={setUploads}
+                                    logo={logo}
+                                    onLogoChange={setLogo}
+                                    businessName={businessName}
+                                    onBusinessNameChange={setBusinessName}
+                                    templateConfig={templateConfig}
+                                    isGuest={!user}
+                                    onGuestInteraction={() => handleAuthGate()}
+                                />
+
+                                {/* AUTO MODE */}
+                                {mode === "auto" && (
+                                    <div>
+                                        <AutoModeChat
+                                            onComplete={handleAutoModeComplete}
+                                            disabled={generating}
+                                            initialReferenceImage={uploads[0] || null}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* MANUAL MODE */}
+                                <div className={`relative transition-all duration-500`}>
+                                    {(activeTab === "image" || (activeTab === "video" && videoSubMode === "image_to_video")) && (
+                                        <div className="tour-studio-reference mb-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
+                                                {activeTab === "video" ? "Start Frame" : "Reference Images"}
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setLibraryModalOpen(true)}
+                                                className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                                            >
+                                                <Library size={18} className="transition-transform group-hover:scale-110" />
+                                                <span>PICK FROM YOUR LIBRARY</span>
+                                            </button>
+
+                                            <div className="relative">
+                                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                                    <div className="w-full border-t border-white/5"></div>
+                                                </div>
+                                                <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                                                    <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
+                                                </div>
+                                            </div>
+
+                                            <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
+
+                                            {uploads.length > 0 && (
+                                                <SubjectControls
+                                                    subjectMode={subjectMode}
+                                                    setSubjectMode={setSubjectMode}
+                                                    subjectLock={subjectLock}
+                                                    setSubjectLock={setSubjectLock}
+                                                    subjectOutfit={subjectOutfit}
+                                                    setSubjectOutfit={setSubjectOutfit}
+                                                    keepOutfit={keepOutfit}
+                                                    setKeepOutfit={setKeepOutfit}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <textarea
+                                        onChange={(e) => setManualPrompt(e.target.value)}
+                                        className="tour-studio-prompt w-full rounded-2xl border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
+                                        rows={8}
+                                        placeholder="Describe your image..."
+                                        value={manualPrompt}
+                                        onClick={handleAuthGate}
+                                        onFocus={handleAuthGate}
+                                    />
+                                </div>
+                            </div>
+
+
+
+                            {/* Generate Button */}
+                            {error && (
+                                <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+                                    {error}
+                                </div>
+                            )}
+                            {creditError && (
+                                <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+                                    {creditError}
+                                </div>
+                            )}
+
+                            {activeTab === "video" ? (
+                                <button
+                                    className={[
+                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-[0_0_20px_-5px_#B7FF00]",
+                                        animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
+                                    ].join(" ")}
+                                    onClick={handleAnimate}
+                                    disabled={animating || (generationsPaused && !isAdmin) || !hasCredits}
+                                >
+                                    {animating ? (
+                                        <span className="flex items-center gap-2">
+                                            <LoadingHourglass className="w-5 h-5 text-black" />
+                                            <span>Creating Video...</span>
+                                        </span>
+                                    ) : (
+                                        <span className="flex items-center gap-2">
+                                            <Clapperboard size={20} />
+                                            <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"} ({isAdmin ? "∞" : VIDEO_COST} Cr)</span>
+                                        </span>
                                     )}
                                 </button>
-                            ))}
+                            ) : (
+                                <button
+                                    className={[
+                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                        generating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
+                                    ].join(" ")}
+                                    onClick={mode === "auto" ? undefined : handleManualGenerate}
+                                    disabled={generating || (generationsPaused && !isAdmin) || !hasCredits}
+                                >
+                                    {generating ? (
+                                        <span className="flex items-center gap-2">
+                                            <LoadingHourglass className="w-5 h-5 text-black" />
+                                            <span>Generating...</span>
+                                        </span>
+                                    ) : `Generate Artwork (${isAdmin ? "∞" : IMAGE_COST} Cr)`}
+                                </button>
+                            )}
+
+
+
+                            <GenerationFailureNotification
+                                error={error}
+                                onClose={() => setError(null)}
+                                onRetry={() => generateImage(manualPrompt || "", uploads)}
+                            />
+
+                            <StudioCommunityFeed />
                         </div>
-                    </div>
 
-
-                    {/* Prompt Tool Card */
-                    }
-                    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
-                        {/* Choice Overlay Removed as requested */}
-
-                        <RemixChatWizard
-                            isOpen={wizardOpen}
-                            onClose={() => {
-                                setWizardOpen(false);
-                            }}
-                            onComplete={handleWizardComplete}
-                            templatePreviewUrl={previewImage}
-                            initialValues={remixAnswers}
-                            uploads={uploads}
-                            onUploadsChange={setUploads}
-                            logo={logo}
-                            onLogoChange={setLogo}
-                            businessName={businessName}
-                            onBusinessNameChange={setBusinessName}
-                            templateConfig={templateConfig}
-                            isGuest={!user}
-                            onGuestInteraction={() => handleAuthGate()}
-                        />
-
-                        {/* AUTO MODE */}
-                        {mode === "auto" && (
-                            <div>
-                                <AutoModeChat
-                                    onComplete={handleAutoModeComplete}
-                                    disabled={generating}
-                                    initialReferenceImage={uploads[0] || null}
-                                />
-                            </div>
-                        )}
-
-                        {/* MANUAL MODE */}
-                        <div className={`relative transition-all duration-500`}>
-                            {(mediaType === "image" || (mediaType === "video" && videoSubMode === "image_to_video")) && (
-                                <div className="tour-studio-reference mb-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="text-xs font-bold text-white/50 uppercase tracking-wide">
-                                        {mediaType === "video" ? "Start Frame" : "Reference Images"}
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setLibraryModalOpen(true)}
-                                        className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
-                                    >
-                                        <Library size={18} className="transition-transform group-hover:scale-110" />
-                                        <span>PICK FROM YOUR LIBRARY</span>
-                                    </button>
-
-                                    <div className="relative">
-                                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                            <div className="w-full border-t border-white/5"></div>
+                        {/* RIGHT COLUMN: Preview / Results */}
+                        <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
+                            <div className="sticky top-8 w-full flex flex-col space-y-4">
+                                <div className={`order-2 lg:order-1 relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
+                                    {/* Generating Overlay */}
+                                    {(generating || animating) && (
+                                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl">
+                                            <GenerationOverlay label={activeTab === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
                                         </div>
-                                        <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
-                                            <span className="bg-[#121212] px-2 text-white/20">or upload new</span>
-                                        </div>
-                                    </div>
+                                    )}
 
-                                    <ImageUploader files={uploads} onChange={setUploads} onUploadStart={handleAuthGate} />
-
-                                    {uploads.length > 0 && (
-                                        <SubjectControls
-                                            subjectMode={subjectMode}
-                                            setSubjectMode={setSubjectMode}
-                                            subjectLock={subjectLock}
-                                            setSubjectLock={setSubjectLock}
-                                            subjectOutfit={subjectOutfit}
-                                            setSubjectOutfit={setSubjectOutfit}
-                                            keepOutfit={keepOutfit}
-                                            setKeepOutfit={setKeepOutfit}
+                                    {videoResult ? (
+                                        <video
+                                            src={videoResult}
+                                            className="absolute inset-0 w-full h-full object-cover"
+                                            autoPlay
+                                            loop
+                                            controls
+                                            playsInline
+                                        />
+                                    ) : (
+                                        <Image
+                                            src={previewImage}
+                                            alt="Preview"
+                                            fill
+                                            className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
+                                            unoptimized
                                         />
                                     )}
+
+                                    {/* Only show overlay for actual images, not the placeholder */}
+                                    {previewImage !== "/orb-neon.gif" && !videoResult && (
+                                        <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+                                    )}
+
+                                    {/* Download Button for Video */}
+                                    {videoResult && (
+                                        <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30">
+                                            <a
+                                                href={videoResult}
+                                                download="video.mp4"
+                                                className="bg-white text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-zinc-200 transition-colors"
+                                            >
+                                                <Download size={18} /> Download
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
 
-                            <textarea
-                                onChange={(e) => setManualPrompt(e.target.value)}
-                                className="tour-studio-prompt w-full rounded-2xl border-0 bg-[#2A2A2A] p-5 text-sm text-white outline-none transition-all placeholder:text-white/30 leading-relaxed font-medium resize-none shadow-inner focus:ring-2 focus:ring-lime-400/30 ring-1 ring-white/5"
-                                rows={8}
-                                placeholder="Describe your image..."
-                                value={manualPrompt}
-                                onClick={handleAuthGate}
-                                onFocus={handleAuthGate}
-                            />
-                        </div>
-                    </div>
-
-
-
-                    {/* Generate Button */}
-                    {error && (
-                        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
-                            {error}
-                        </div>
-                    )}
-                    {creditError && (
-                        <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
-                            {creditError}
-                        </div>
-                    )}
-
-                    {mediaType === "video" ? (
-                        <button
-                            className={[
-                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-[0_0_20px_-5px_#B7FF00]",
-                                animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
-                            ].join(" ")}
-                            onClick={handleAnimate}
-                            disabled={animating || (generationsPaused && !isAdmin) || !hasCredits}
-                        >
-                            {animating ? (
-                                <span className="flex items-center gap-2">
-                                    <LoadingHourglass className="w-5 h-5 text-black" />
-                                    <span>Creating Video...</span>
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-2">
-                                    <Clapperboard size={20} />
-                                    <span>{videoSubMode === "image_to_video" ? "Animate Image" : "Generate Video"} ({isAdmin ? "∞" : VIDEO_COST} Cr)</span>
-                                </span>
-                            )}
-                        </button>
-                    ) : (
-                        <button
-                            className={[
-                                "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
-                                generating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
-                            ].join(" ")}
-                            onClick={mode === "auto" ? undefined : handleManualGenerate}
-                            disabled={generating || (generationsPaused && !isAdmin) || !hasCredits}
-                        >
-                            {generating ? (
-                                <span className="flex items-center gap-2">
-                                    <LoadingHourglass className="w-5 h-5 text-black" />
-                                    <span>Generating...</span>
-                                </span>
-                            ) : `Generate Artwork (${isAdmin ? "∞" : IMAGE_COST} Cr)`}
-                        </button>
-                    )}
-
-
-
-                    <GenerationFailureNotification
-                        error={error}
-                        onClose={() => setError(null)}
-                        onRetry={() => generateImage(manualPrompt || "", uploads)}
-                    />
-
-                    <StudioCommunityFeed />
-                </div>
-
-                {/* RIGHT COLUMN: Preview / Results */}
-                <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
-                    <div className="sticky top-8 w-full flex flex-col space-y-4">
-                        <div className={`order-2 lg:order-1 relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
-                            {/* Generating Overlay */}
-                            {(generating || animating) && (
-                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
-                                    <GenerationOverlay label={mediaType === "video" ? "GENERATING VIDEO" : "GENERATING IMAGE"} />
-                                </div>
-                            )}
-
-                            {videoResult ? (
-                                <video
-                                    src={videoResult}
-                                    className="absolute inset-0 w-full h-full object-cover"
-                                    autoPlay
-                                    loop
-                                    controls
-                                    playsInline
-                                />
-                            ) : (
-                                <Image
-                                    src={previewImage}
-                                    alt="Preview"
-                                    fill
-                                    className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
-                                    unoptimized
-                                />
-                            )}
-
-                            {/* Only show overlay for actual images, not the placeholder */}
-                            {previewImage !== "/orb-neon.gif" && !videoResult && (
-                                <div className="absolute inset-0 bg-black/35 pointer-events-none" />
-                            )}
-
-                            {/* Download Button for Video */}
-                            {videoResult && (
-                                <div className="absolute bottom-6 left-0 right-0 flex justify-center z-30">
-                                    <a
-                                        href={videoResult}
-                                        download="video.mp4"
-                                        className="bg-white text-black px-6 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 hover:bg-zinc-200 transition-colors"
-                                    >
-                                        <Download size={18} /> Download
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Placeholder Text - Responsive Order (Top on mobile, Bottom upon desktop) */}
-                        {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
-                            <div className="w-full flex justify-center order-1 lg:order-2">
-                                <div className="bg-black/50 backdrop-blur-md rounded-xl p-6 w-full border border-white/5 text-center">
-                                    <h3 className="text-2xl font-bold text-white mb-2">{mediaType === "video" ? "Your Video" : "Your Artwork"}</h3>
-                                    <p className="text-sm text-white/50">
-                                        Generated {mediaType === "video" ? "videos" : "images"} will appear here. You can then edit, download, or share them.
-                                    </p>
-                                </div>
+                                {/* Placeholder Text - Responsive Order (Top on mobile, Bottom upon desktop) */}
+                                {(!previewImage || previewImage === "/orb-neon.gif") && !videoResult && (
+                                    <div className="w-full flex justify-center order-1 lg:order-2">
+                                        <div className="flex flex-col items-center text-center max-w-[280px]">
+                                            <h3 className="text-2xl font-bold text-white mb-2">{activeTab === "video" ? "Your Video" : "Your Artwork"}</h3>
+                                            <p className="text-[13px] text-white/50 leading-relaxed font-medium">
+                                                Generated {activeTab === "video" ? "videos" : "images"} will appear here. You can then edit, download, or share them.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
+                    </>
+                ) : (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <VoiceTab
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
+                        />
                     </div>
-                </div>
+                )}
             </div>
 
-            {/* Video Modal is only used for Remix Cards / Library items now, 
-                Studio handles its own inline generation */}
-            <VideoGeneratorModal
-                isOpen={videoModalOpen}
-                onClose={() => setVideoModalOpen(false)}
-                sourceImage={previewImage}
-                initialPrompt={manualPrompt}
-                initialModelId={selectedModel}
-            />
-            <LibraryImagePickerModal
-                isOpen={libraryModalOpen}
-                onClose={() => setLibraryModalOpen(false)}
-                onSelect={async (url) => {
-                    setPreviewImage(url);
-                    try {
-                        const res = await fetch(url);
-                        const blob = await res.blob();
-                        let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
-                        try {
-                            file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
-                        } catch (e) { console.warn(e); }
-                        setUploads((prev) => [...prev, file]);
-                    } catch (err) {
-                        console.error("Failed to fetch library img:", err);
-                    }
-                }}
-            />
+            {/* Global Modals for Image/Video */}
+            {activeTab !== "voice" && (
+                <>
+                    {/* Video Modal is only used for Remix Cards / Library items now, 
+                        Studio handles its own inline generation */}
+                    <VideoGeneratorModal
+                        isOpen={videoModalOpen}
+                        onClose={() => setVideoModalOpen(false)}
+                        sourceImage={previewImage}
+                        initialPrompt={manualPrompt}
+                        initialModelId={selectedModel}
+                    />
+                    <LibraryImagePickerModal
+                        isOpen={libraryModalOpen}
+                        onClose={() => setLibraryModalOpen(false)}
+                        onSelect={async (url) => {
+                            setPreviewImage(url);
+                            try {
+                                const res = await fetch(url);
+                                const blob = await res.blob();
+                                let file = new File([blob], "library_ref.jpg", { type: "image/jpeg" });
+                                try {
+                                    file = await compressImage(file, { maxWidth: 1280, quality: 0.8 });
+                                } catch (e) { console.warn(e); }
+                                setUploads((prev) => [...prev, file]);
+                            } catch (err) {
+                                console.error("Failed to fetch library img:", err);
+                            }
+                        }}
+                    />
 
-            {/* Lightbox for Inline Preview */}
-            <GenerationLightbox
-                open={lightboxOpen}
-                url={previewImage}
-                videoUrl={null}
-                mediaType="image"
-                onClose={() => setLightboxOpen(false)}
-                title={manualPrompt || "Generated Image"}
-                originalPromptText={manualPrompt}
-                combinedPromptText={manualPrompt}
-                onAnimate={() => {
-                    setLightboxOpen(false);
-                    setMediaType("video");
-                    setVideoSubMode("image_to_video");
-                    // previewImage is already set to the result, so it will be used as source
-                    // Scroll to preview/settings
-                    previewRef.current?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                onShare={handleShare}
-                fullQualityUrl={resultData?.full_quality_url}
-            />
+                    {/* Lightbox for Inline Preview */}
+                    <GenerationLightbox
+                        open={lightboxOpen}
+                        url={previewImage}
+                        videoUrl={null}
+                        mediaType="image"
+                        onClose={() => setLightboxOpen(false)}
+                        title={manualPrompt || "Generated Image"}
+                        originalPromptText={manualPrompt}
+                        combinedPromptText={manualPrompt}
+                        onAnimate={() => {
+                            setLightboxOpen(false);
+                            setActiveTab("video");
+                            setVideoSubMode("image_to_video");
+                            // previewImage is already set to the result, so it will be used as source
+                            // Scroll to preview/settings
+                            previewRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        onShare={handleShare}
+                        fullQualityUrl={resultData?.full_quality_url}
+                    />
+                </>
+            )}
         </main>
     );
 }
 
+// ----------------------------------------------------------------------
+// SKELETON COMPONENTS
+// ----------------------------------------------------------------------
 
+function VoiceTabSkeleton() {
+    return (
+        <div className="w-full min-h-[500px] flex flex-col items-center justify-center border border-white/10 bg-white/5 rounded-3xl backdrop-blur-2xl">
+            <Mic className="w-12 h-12 text-primary/50 mb-4 animate-pulse" />
+            <h3 className="text-2xl font-bold text-white mb-2">Voice Studio</h3>
+            <p className="text-white/50 max-w-md text-center">
+                Clone your voice, generate TTS voiceovers, and replace dialogue in existing videos. Coming together shortly.
+            </p>
+        </div>
+    );
+}
+
+// ----------------------------------------------------------------------
+// HELPER COMPONENTS
+// ----------------------------------------------------------------------
 
 function SelectPill({
     label,

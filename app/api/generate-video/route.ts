@@ -191,7 +191,6 @@ async function generateFalVideo(
 
         if (statusJson.status === "COMPLETED") {
             const videoUrl = statusJson.video?.url || statusJson.video_url?.url || statusJson.images?.[0]?.url; // Check structure
-            // Kling usually returns `video: { url: ... }`
             if (!videoUrl) throw new Error("Fal completed but returned no video URL");
             return videoUrl;
         }
@@ -202,10 +201,56 @@ async function generateFalVideo(
     throw new Error(`Fal Timeout (${maxAttempts / 60} min)`);
 }
 
+async function mergeFalAudioVideo(videoUrl: string, audioUrl: string): Promise<string> {
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) throw new Error("Missing FAL_KEY");
+
+    const endpoint = `https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video`;
+    const payload = { video_url: videoUrl, audio_url: audioUrl };
+
+    console.log(`Fal Merge Request:`, payload);
+
+    const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Authorization": `Key ${falKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Fal Merge start failed: ${res.status} ${err}`);
+    }
+
+    const { request_id } = await res.json();
+    console.log("Fal Merge Request ID:", request_id);
+
+    let attempts = 0;
+    while (attempts < 120) {
+        attempts++;
+        await new Promise(r => setTimeout(r, 1000));
+        const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video/requests/${request_id}`, {
+            headers: { "Authorization": `Key ${falKey}` },
+        });
+
+        if (!statusRes.ok) continue;
+        const statusJson = await statusRes.json();
+
+        if (statusJson.status === "COMPLETED") {
+            const mergedVideoUrl = statusJson.video?.url || statusJson.url || statusJson.video_url;
+            if (!mergedVideoUrl) throw new Error("Fal merge completed but returned no URL");
+            return mergedVideoUrl;
+        }
+        if (statusJson.status === "IN_QUEUE" || statusJson.status === "IN_PROGRESS") continue;
+
+        throw new Error(`Fal Merge Failed: ${JSON.stringify(statusJson)}`);
+    }
+    throw new Error(`Fal Merge Timeout`);
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64, aspectRatio, promptId, modelId: requestedModelId } = body;
+        const { image, prompt, dialogue, sourceImageId, inputVideo, mainSubjectBase64, secondarySubjectBase64, aspectRatio, promptId, modelId: requestedModelId, audioUrl } = body;
 
         // 1. Auth via Session
         const supabase = await createSupabaseServerClient();
@@ -278,10 +323,15 @@ export async function POST(req: Request) {
             // Frontend sends URL for video input mostly.
 
             try {
-                const generatedVideoUrl = await generateFalVideo(falModelId, prompt, finalImageUrl, finalVideoUrl, aspectRatio);
+                let generatedVideoUrl = await generateFalVideo(falModelId, prompt, finalImageUrl, finalVideoUrl, aspectRatio);
+
+                if (audioUrl) {
+                    console.log("Merging audio track to Fal video...");
+                    generatedVideoUrl = await mergeFalAudioVideo(generatedVideoUrl, audioUrl);
+                }
 
                 // Fal returns a public URL (usually temporary). We should download and store it to Supabase Generatons bucket.
-                console.log("Fal Video Generated:", generatedVideoUrl);
+                console.log("Fal Video Ready:", generatedVideoUrl);
 
                 // Download
                 const vRes = await fetch(generatedVideoUrl);
@@ -696,7 +746,22 @@ export async function POST(req: Request) {
         }
 
         const { data: pubUrl } = admin.storage.from(GENERATIONS_BUCKET).getPublicUrl(filePath);
-        const videoUrl = pubUrl.publicUrl;
+        let videoUrl = pubUrl.publicUrl;
+
+        // 8b. Merge Audio if requested
+        if (audioUrl) {
+            console.log("Merging audio track to Veo video...");
+            const tempMergedUrl = await mergeFalAudioVideo(videoUrl, audioUrl);
+
+            // Re-download merged video to store on Supabase
+            const mRes = await fetch(tempMergedUrl);
+            const mBlob = await mRes.blob();
+            const mBuffer = Buffer.from(await mBlob.arrayBuffer());
+            const mFilePath = `videos/${userId}/merged_${Date.now()}.mp4`;
+            await admin.storage.from(GENERATIONS_BUCKET).upload(mFilePath, mBuffer, { contentType: "video/mp4" });
+            const { data: mPubUrl } = admin.storage.from(GENERATIONS_BUCKET).getPublicUrl(mFilePath);
+            videoUrl = mPubUrl.publicUrl;
+        }
 
         // 9. Save DB Record
         let thumbnailUrl: string | null = null;
