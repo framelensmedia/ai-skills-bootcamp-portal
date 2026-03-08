@@ -89,8 +89,10 @@ export async function generateTTS(text: string, voiceId: string, refAudioUrl: st
             }
 
             const data = await response.json();
-            if (data.audio && data.audio.url) {
-                audioUrl = data.audio.url;
+            if (data.audio_url && data.audio_url.url) {
+                audioUrl = data.audio_url.url;
+            } else if (data.audio && data.audio.url) {
+                audioUrl = data.audio.url; // fallback just in case
             } else {
                 throw new Error("No audio URL returned from Fal.ai (F5-TTS)");
             }
