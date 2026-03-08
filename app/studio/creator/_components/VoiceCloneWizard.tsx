@@ -117,7 +117,7 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             if (!user) throw new Error("Not logged in");
 
             let targetBlob: Blob | File | null = null;
-            let fileExt = "webm"; // Default for media recorder on most browsers
+            let fileExt = "webm";
 
             if (method === "upload") {
                 if (!uploadedFile) throw new Error("Missing upload file");
@@ -126,6 +126,13 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             } else {
                 targetBlob = audioBlob;
                 if (!targetBlob) throw new Error("Missing recording");
+
+                // Infer extension from the blob's actual mime type (important for iOS Safari which uses mp4)
+                if (targetBlob.type.includes("mp4")) fileExt = "mp4";
+                else if (targetBlob.type.includes("wav")) fileExt = "wav";
+                else if (targetBlob.type.includes("mpeg")) fileExt = "mp3";
+                else if (targetBlob.type.includes("webm")) fileExt = "webm";
+                else fileExt = "m4a"; // Fallback for some iOS encodings
             }
 
             const filePath = `${user.id}/${Date.now()}_clone.${fileExt}`;
@@ -199,7 +206,10 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             };
 
             mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                // Use the browser's native mime-type instead of forcing webm, 
+                // as iOS Safari uses audio/mp4 and will fail to play if marked as webm.
+                const mimeType = mediaRecorder.mimeType || "audio/webm";
+                const blob = new Blob(audioChunksRef.current, { type: mimeType });
                 setAudioBlob(blob);
                 const url = URL.createObjectURL(blob);
                 setAudioUrl(url);
