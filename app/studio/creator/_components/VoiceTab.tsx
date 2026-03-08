@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Loader2, Download, AlertTriangle, ListMusic, Plus, Trash2, X, AudioLines, Sparkles } from "lucide-react";
+import { Mic, Loader2, Download, AlertTriangle, ListMusic, Plus, Trash2, X, AudioLines, Sparkles, Play, Pause } from "lucide-react";
 import { generateTTS, getVoices } from "@/app/actions/falVoice";
 import { getVoiceGenerations, deleteVoiceGeneration } from "@/app/actions/voiceStudio";
 import WaveformPlayer from "./WaveformPlayer";
@@ -28,6 +28,10 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
     // Cloning Modal
     const [isCloning, setIsCloning] = useState(false);
 
+    // Preview Playback
+    const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     const VOICE_COST = 5;
     const hasCredits = isAdmin || (userCredits ?? 0) >= VOICE_COST;
 
@@ -51,7 +55,44 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
 
     useEffect(() => {
         fetchData();
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+        };
     }, []);
+
+    // Stop playback when selected voice changes
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlayingPreview(false);
+        }
+    }, [selectedVoice]);
+
+    const togglePreview = () => {
+        if (!selectedVoice) return;
+        const voiceObj = voices.find(v => v.id === selectedVoice);
+        if (!voiceObj || !voiceObj.ref_audio_url) {
+            alert("No preview audio available for this voice.");
+            return;
+        }
+
+        if (isPlayingPreview && audioRef.current) {
+            audioRef.current.pause();
+            setIsPlayingPreview(false);
+        } else {
+            if (!audioRef.current) {
+                audioRef.current = new Audio(voiceObj.ref_audio_url);
+                audioRef.current.onended = () => setIsPlayingPreview(false);
+            } else if (audioRef.current.src !== voiceObj.ref_audio_url) {
+                audioRef.current.src = voiceObj.ref_audio_url;
+            }
+            audioRef.current.play().catch(e => console.error("Error playing preview:", e));
+            setIsPlayingPreview(true);
+        }
+    };
 
     const handleGenerate = async () => {
         if (!text.trim()) {
@@ -131,26 +172,41 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                             </button>
                         </div>
 
-                        <select
-                            value={selectedVoice || ""}
-                            onChange={(e) => setSelectedVoice(e.target.value)}
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6 shadow-inner"
-                            disabled={generating || voices.length === 0}
-                        >
-                            {voices.length === 0 && <option value="">Loading voices...</option>}
-                            {voices.filter(v => v.type === 'cloned').length > 0 && (
-                                <optgroup label="YOUR CLONED VOICES">
-                                    {voices.filter(v => v.type === 'cloned').map(v => (
-                                        <option key={v.id} value={v.id}>⭐ {v.name}</option>
+                        <div className="flex gap-3 mb-6">
+                            <select
+                                value={selectedVoice || ""}
+                                onChange={(e) => setSelectedVoice(e.target.value)}
+                                className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
+                                disabled={generating || voices.length === 0}
+                            >
+                                {voices.length === 0 && <option value="">Loading voices...</option>}
+                                {voices.filter(v => v.type === 'cloned').length > 0 && (
+                                    <optgroup label="YOUR CLONED VOICES">
+                                        {voices.filter(v => v.type === 'cloned').map(v => (
+                                            <option key={v.id} value={v.id}>⭐ {v.name}</option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                <optgroup label="PREMIUM PRESETS">
+                                    {voices.filter(v => v.type === 'preset').map(v => (
+                                        <option key={v.id} value={v.id}>{v.name}</option>
                                     ))}
                                 </optgroup>
-                            )}
-                            <optgroup label="PREMIUM PRESETS">
-                                {voices.filter(v => v.type === 'preset').map(v => (
-                                    <option key={v.id} value={v.id}>{v.name}</option>
-                                ))}
-                            </optgroup>
-                        </select>
+                            </select>
+
+                            <button
+                                onClick={togglePreview}
+                                disabled={!selectedVoice || !voices.find(v => v.id === selectedVoice)?.ref_audio_url}
+                                className="shrink-0 aspect-square h-[50px] w-[50px] flex justify-center items-center bg-white/5 hover:bg-primary/20 hover:text-primary text-white/50 border border-white/10 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/50"
+                                title="Preview Voice"
+                            >
+                                {isPlayingPreview ? (
+                                    <Pause fill="currentColor" size={20} />
+                                ) : (
+                                    <Play fill="currentColor" size={20} className="ml-1" />
+                                )}
+                            </button>
+                        </div>
 
                         <label className="text-xs font-bold text-white/50 mb-2 uppercase tracking-wide flex justify-between">
                             <span>2. Enter Script</span>

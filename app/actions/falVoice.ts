@@ -7,15 +7,15 @@ const FAL_KEY = process.env.FAL_KEY;
 // Define our platform preset voices. 
 // These are the predefined voices supported by ChatterboxHD text-to-speech.
 const PRESET_VOICES = [
-    { id: "Aurora", name: "Aurora", type: "preset", ref_audio_url: "" },
-    { id: "Blade", name: "Blade", type: "preset", ref_audio_url: "" },
-    { id: "Britney", name: "Britney", type: "preset", ref_audio_url: "" },
-    { id: "Carl", name: "Carl", type: "preset", ref_audio_url: "" },
-    { id: "Cliff", name: "Cliff", type: "preset", ref_audio_url: "" },
-    { id: "Richard", name: "Richard", type: "preset", ref_audio_url: "" },
-    { id: "Rico", name: "Rico", type: "preset", ref_audio_url: "" },
-    { id: "Siobhan", name: "Siobhan", type: "preset", ref_audio_url: "" },
-    { id: "Vicky", name: "Vicky", type: "preset", ref_audio_url: "" }
+    { id: "Aurora", name: "Aurora", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/aurora.mp3" },
+    { id: "Blade", name: "Blade", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/blade.mp3" },
+    { id: "Britney", name: "Britney", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/britney.mp3" },
+    { id: "Carl", name: "Carl", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/carl.mp3" },
+    { id: "Cliff", name: "Cliff", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/cliff.mp3" },
+    { id: "Richard", name: "Richard", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/richard.mp3" },
+    { id: "Rico", name: "Rico", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/rico.mp3" },
+    { id: "Siobhan", name: "Siobhan", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/siobhan.mp3" },
+    { id: "Vicky", name: "Vicky", type: "preset", ref_audio_url: "https://rdhsqobxynkilglrclks.supabase.co/storage/v1/object/public/voices/presets/vicky.mp3" }
 ];
 
 export async function generateTTS(text: string, voiceId: string, refAudioUrl: string) {
@@ -98,15 +98,23 @@ export async function generateTTS(text: string, voiceId: string, refAudioUrl: st
             }
         }
 
-        // Save generation history
-        const voiceName = isPreset ? voiceId : "Cloned Voice"; // Usually we pass the voice name from UI, just a fallback
+        // Find the actual name or default to the ID. For cloned voices we need to pass a UUID but F5 accepts name
+        let voiceUUID = isPreset ? null : voiceId;
+
+        // If we want to know the "name" of the voice to show in UI
+        let finalVoiceName = voiceId;
+        if (!isPreset) {
+            // Need to fetch custom voice name from voices table
+            const { data: voiceRow } = await supabase.from('voices').select('name').eq('id', voiceId).single();
+            if (voiceRow) finalVoiceName = voiceRow.name;
+        }
 
         const { error: dbError } = await supabase
             .from('voice_generations')
             .insert({
                 user_id: user.id,
-                voice_id: isPreset ? null : voiceId, // UUID if cloned, null if preset
-                voice_name: isPreset ? voiceId : "Custom Clone", // Fallback, could be retrieved via join but UI knows it
+                voice_id: voiceUUID, // null for presets because they aren't in the Custom Voices UUID table
+                voice_name: finalVoiceName,
                 text_prompt: text,
                 audio_url: audioUrl
             });
