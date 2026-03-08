@@ -121,7 +121,7 @@ function CreatorContent() {
     // Manual mode state
     const [manualPrompt, setManualPrompt] = useState("");
     const [uploads, setUploads] = useState<File[]>([]);
-    const [aspectRatio, setAspectRatio] = useState<AspectRatio>("4:5");
+    const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
     const [mediaType, setMediaType] = useState<"image" | "video">("image");
 
     // Credits
