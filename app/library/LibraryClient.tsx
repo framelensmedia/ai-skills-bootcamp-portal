@@ -1343,25 +1343,29 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                                 </div>
                                             )}
 
-                                            {/* Voice Replace Button — only for video items */}
-                                            {it.mediaType === "video" && it.videoUrl && activeTab === "remixes" && !isSelectionMode && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setVoiceModalVideoUrl(it.videoUrl!);
-                                                        setIsVoiceModalOpen(true);
-                                                    }}
-                                                    className="absolute bottom-10 right-2 opacity-0 group-hover:opacity-100 transition-all bg-cyan-500/90 hover:bg-cyan-400 text-black text-[10px] font-bold rounded-lg px-2 py-1.5 flex items-center gap-1 backdrop-blur-sm"
-                                                    title="Replace or add a voice to this video"
-                                                >
-                                                    <Mic size={11} strokeWidth={3} />
-                                                    Voice
-                                                </button>
-                                            )}
 
                                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
-                                                <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
+                                                        <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
+                                                    </div>
+                                                    {it.mediaType === "video" && it.videoUrl && activeTab === "remixes" && !isSelectionMode && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setVoiceModalVideoUrl(it.videoUrl!);
+                                                                setIsVoiceModalOpen(true);
+                                                            }}
+                                                            className="shrink-0 bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black text-[10px] font-bold rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-all"
+                                                            title="Replace or add a voice to this video"
+                                                        >
+                                                            <Mic size={11} strokeWidth={3} />
+                                                            Voice
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
