@@ -8,12 +8,13 @@ import GenerationLightbox from "@/components/GenerationLightbox";
 import {
     Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon,
     Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder,
-    Globe, Lock, Film
+    Globe, Lock, Film, Mic
 } from "lucide-react";
 import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
 import EditModeModal from "@/components/EditModeModal";
 import VideoGeneratorModal from "@/components/VideoGeneratorModal";
+import VoiceReplaceModal from "@/components/VoiceReplaceModal";
 import LazyMedia from "@/components/LazyMedia";
 import { compressImage } from "@/lib/compressImage";
 import { DEFAULT_MODEL_ID } from "@/lib/model-config";
@@ -153,6 +154,9 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
     const [videoSourceId, setVideoSourceId] = useState<string | undefined>(undefined);
     const [videoSourceVideo, setVideoSourceVideo] = useState<string | null>(null); // For video-to-video editing
 
+    // Voice Replace Modal
+    const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+    const [voiceModalVideoUrl, setVoiceModalVideoUrl] = useState<string>("");
 
     // Derived state for the toggle
     const areAllPrivate = remixItems.length > 0 && remixItems.every(i => !i.is_public);
@@ -1013,374 +1017,423 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
     }, [activeTab, remixItems, favoriteItems, selectedFolder, mediaFilter]);
 
     return (
-        <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans pb-32">
-            {/* ... Modal and Lightbox ... */}
-            {isMoveModalOpen && (
-                <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                            <h3 className="font-bold text-white">Move {selectedIds.size} items</h3>
-                            <button onClick={() => setIsMoveModalOpen(false)}><X size={20} className="text-white/50 hover:text-white" /></button>
-                        </div>
-                        <div className="max-h-[50vh] overflow-y-auto p-2">
-                            <button onClick={() => handleMoveSelected(null)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
-                                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center"><Library size={16} /></div>
-                                <span>Main Library (No Folder)</span>
-                            </button>
-                            {folders.map(f => (
-                                <button key={f.id} onClick={() => handleMoveSelected(f.id)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded bg-[#B7FF00]/10 flex items-center justify-center text-[#B7FF00]"><Folder size={16} /></div>
-                                    <span className="truncate">{f.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <GenerationLightbox
-                open={lightboxOpen}
-                url={lightboxUrl}
-                id={lightboxItemId || undefined}
-                videoUrl={lbVideoUrl}
-                mediaType={lbMediaType}
-                onClose={closeLightbox}
-                originalPromptText={lbOriginal}
-                remixPromptText={lbRemix}
-                combinedPromptText={lbCombined}
-                onShare={handleShare}
-                onRemix={handleRemix}
-                onEdit={isOwnedByCurrentUser ? () => {
-                    if (lbMediaType !== "video") {
-                        setLightboxOpen(false);
-                        setEditModalOpen(true);
-                    }
-                } : undefined}
-                onDelete={isOwnedByCurrentUser ? () => {
-                    if (lightboxItemId) {
-                        handleDelete(lightboxItemId).then(() => closeLightbox());
-                    }
-                } : undefined}
-                title="Remix"
-                fullQualityUrl={lbFullQualityUrl}
-                onAnimate={lbMediaType === "image" ? () => {
-                    if (!lightboxUrl) return;
-                    setVideoSourceImage(lightboxUrl);
-                    setVideoSourceId(lightboxItemId || undefined);
-                    setLightboxOpen(false);
-                    setIsVideoModalOpen(true);
-                } : undefined}
-            />
-
-            {/* Edit Mode Modal */}
-            <EditModeModal
-                isOpen={editModalOpen}
-                onClose={() => !isEditing && setEditModalOpen(false)}
-                sourceImageUrl={lightboxUrl || ""}
-                onGenerate={handleEditGenerate}
-                isGenerating={isEditing}
-            />
-
-            {/* Video Generator Modal */}
-            {(videoSourceImage || videoSourceVideo) && (
-                <VideoGeneratorModal
-                    isOpen={isVideoModalOpen}
-                    onClose={() => {
-                        setIsVideoModalOpen(false);
-                        setVideoSourceVideo(null); // Reset source video on close
-                    }}
-                    sourceImage={videoSourceImage || undefined}
-                    sourceImageId={videoSourceId}
-                    sourceVideo={videoSourceVideo || undefined} // For video-to-video editing
-                    userId={undefined} // Route handles authentication
-                    onVideoGenerated={(data) => {
-                        const newVideo: LibraryItem = {
-                            id: `temp-${Date.now()}`,
-                            imageUrl: "",
-                            videoUrl: data.videoUrl,
-                            thumbnailUrl: null,
-                            mediaType: "video",
-                            createdAt: new Date().toISOString(),
-                            createdAtMs: Date.now(),
-                            promptId: null,
-                            promptSlug: null,
-                            aspectRatio: "16:9",
-                            promptTitle: data.prompt?.slice(0, 50) || "Animated Scene",
-                            promptCategory: null,
-                            originalPromptText: data.prompt || "",
-                            remixPromptText: "",
-                            combinedPromptText: data.prompt || "",
-                            folder: null,
-                            folder_id: null,
-                            is_public: true
-                        };
-                        setRemixItems(prev => [newVideo, ...prev]);
-                        setIsVideoModalOpen(false);
-                        setVideoSourceVideo(null);
-                        showToast("Video added to Library");
-                    }}
-                />
-            )}
-
-            <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-1">My Library</h1>
-                    <div className="flex items-center gap-2 text-sm text-white/50 font-mono uppercase tracking-wide">
-                        <span className={selectedFolder ? "text-white/30" : "text-[#B7FF00]"}>{activeTab === "remixes" ? "Remixes" : "Favorites"}</span>
-                        {selectedFolder && (
-                            <>
-                                <span className="text-white/30">/</span>
-                                <span className="text-[#B7FF00]">{folders.find(f => f.id === selectedFolder)?.name}</span>
-                            </>
-                        )}
-                    </div>
-                </div>
-                <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
-                    <button onClick={() => { setActiveTab("remixes"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "remixes" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Remixes</button>
-                    <button onClick={() => { setActiveTab("favorites"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "favorites" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Favorites</button>
-                </div>
-            </div>
-
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs font-mono text-white/40 uppercase">{displayedItems.length} ITEMS</div>
-                <div className="flex flex-wrap gap-2">
-                    {isSelectionMode && selectedIds.size > 0 && (
-                        <>
-                            <button onClick={() => setIsMoveModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-zinc-800 text-white hover:bg-zinc-700 whitespace-nowrap">
-                                <FolderInput size={14} /> Move
-                            </button>
-                            <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20 whitespace-nowrap">
-                                <Trash2 size={14} /> Delete
-                            </button>
-                        </>
-                    )}
-
-                    {activeTab === "remixes" && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 border border-white/10">
-                            <span className="text-xs font-bold uppercase tracking-wider text-white/70">
-                                {areAllPrivate ? "Private Mode" : "Public Mode"} {isPro ? "" : "(Pro)"}
-                            </span>
-                            <button
-                                onClick={handleToggleGlobalPrivacy}
-                                disabled={isUpdatingPrivacy}
-                                className={`relative h-5 w-9 rounded-full transition-colors ${areAllPrivate ? "bg-[#B7FF00]" : "bg-white/10 hover:bg-white/20"} ${isUpdatingPrivacy ? "opacity-50 cursor-wait" : ""}`}
-                            >
-                                <span className={`absolute top-1 left-1 h-3 w-3 rounded-full bg-white transition-transform ${areAllPrivate ? "translate-x-4 bg-black" : "translate-x-0"}`} />
-                            </button>
-                        </div>
-                    )}
-
-                    <button
-                        onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
-                    >
-                        {isSelectionMode ? <CheckSquare size={14} /> : <Square size={14} />}
-                        Select
-                    </button>
-
-                    <div className="flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden shrink-0">
-                        <button onClick={() => setViewMode("grid")} className={`p-2 hover:bg-white/5 ${viewMode === "grid" ? "bg-white/10 text-white" : "text-white/50"}`}><Grid3X3 size={16} /></button>
-                        <div className="w-px bg-white/10" />
-                        <button onClick={() => setViewMode("list")} className={`p-2 hover:bg-white/5 ${viewMode === "list" ? "bg-white/10 text-white" : "text-white/50"}`}><List size={16} /></button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-8">
-                <aside className="w-full lg:w-48 shrink-0">
-                    <div className="flex items-center justify-between px-2 mb-2 lg:mb-2">
-                        <h3 className="text-xs font-bold uppercase text-white/40 hidden lg:block">Folders</h3>
-                        <div className="flex items-center justify-between w-full lg:w-auto">
-                            <span className="lg:hidden text-xs font-bold uppercase text-white/40">Folder:</span>
-                            <button onClick={handleCreateFolder} className="text-white/40 hover:text-[#B7FF00] flex items-center gap-1">
-                                <Pencil size={12} />
-                                <span className="lg:hidden text-[10px] uppercase">New Folder</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="lg:hidden relative mb-6">
-                        <select
-                            value={selectedFolder || ""}
-                            onChange={(e) => setSelectedFolder(e.target.value || null)}
-                            className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-3 py-2.5 appearance-none focus:border-[#B7FF00] focus:outline-none"
-                        >
-                            <option value="">All {activeTab === "remixes" ? "Remixes" : "Favorites"}</option>
-                            {folders.map(f => (
-                                <option key={f.id} value={f.id}>
-                                    {f.name} ({activeTab === "remixes" ? remixItems.filter(i => i.folder_id === f.id).length : favoriteItems.filter(i => i.folder_id === f.id).length})
-                                </option>
-                            ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
-                            <Folder size={14} />
-                        </div>
-                    </div>
-
-                    {/* Media Type Filter - Mobile */}
-                    {activeTab === "remixes" && (
-                        <div className="lg:hidden flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mb-6">
-                            <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
-                            <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} />Images</button>
-                            <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} />Videos</button>
-                        </div>
-                    )}
-
-                    <div className="hidden lg:block space-y-1">
-                        <button onClick={() => setSelectedFolder(null)} className={`w-full text-left px-3 py-2 rounded text-sm mb-1 ${!selectedFolder ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}>All {activeTab === "remixes" ? "Remixes" : "Favorites"}</button>
-                        {folders.map(f => (
-                            <button
-                                key={f.id}
-                                onClick={() => setSelectedFolder(f.id)}
-                                className={`group/folder flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${selectedFolder === f.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
-                            >
-                                <span className="truncate">{f.name}</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs opacity-50">
-                                        {activeTab === "remixes"
-                                            ? remixItems.filter(i => i.folder_id === f.id).length
-                                            : favoriteItems.filter(i => i.folder_id === f.id).length
-                                        }
-                                    </span>
-                                    <div className="flex items-center gap-1 transition">
-                                        <div
-                                            onClick={(e) => { e.stopPropagation(); handleRenameFolder(f.id, f.name); }}
-                                            className="text-white/20 hover:text-white p-1"
-                                            title="Rename"
-                                        >
-                                            <Pencil size={12} />
-                                        </div>
-                                        <div
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f.id); }}
-                                            className="text-white/20 hover:text-red-400 p-1"
-                                            title="Delete"
-                                        >
-                                            <Trash2 size={12} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Media Type Filter - Desktop */}
-                    {activeTab === "remixes" && (
-                        <div className="hidden lg:flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mt-4">
-                            <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
-                            <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} /></button>
-                            <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} /></button>
-                        </div>
-                    )}
-                </aside>
-
-                <section className="flex-1 min-h-[50vh]">
-                    {loading ? <Loading /> : displayedItems.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 px-4 border border-dashed border-white/10 rounded-2xl bg-zinc-900/50 text-center">
-                            <div className="mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-zinc-800 text-white/30">
-                                <Library size={32} />
+        <>
+            <main className="mx-auto w-full max-w-7xl px-4 py-8 text-white font-sans pb-32">
+                {/* ... Modal and Lightbox ... */}
+                {isMoveModalOpen && (
+                    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                                <h3 className="font-bold text-white">Move {selectedIds.size} items</h3>
+                                <button onClick={() => setIsMoveModalOpen(false)}><X size={20} className="text-white/50 hover:text-white" /></button>
                             </div>
-                            <h3 className="text-lg font-bold text-white mb-2">Library is empty</h3>
-                            <p className="text-sm text-white/50 max-w-sm mx-auto">
-                                {activeTab === "remixes"
-                                    ? "You haven't generated any remixes yet. Go to the Studio to start creating!"
-                                    : "You haven't added any favorites yet."}
-                            </p>
-                            {activeTab === "remixes" && (
-                                <button onClick={() => router.push('/studio/creator')} className="mt-6 px-5 py-2.5 rounded-lg bg-[#B7FF00] text-black text-sm font-bold hover:bg-[#B7FF00]/90 transition">
-                                    Open Creator Studio
+                            <div className="max-h-[50vh] overflow-y-auto p-2">
+                                <button onClick={() => handleMoveSelected(null)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center"><Library size={16} /></div>
+                                    <span>Main Library (No Folder)</span>
                                 </button>
+                                {folders.map(f => (
+                                    <button key={f.id} onClick={() => handleMoveSelected(f.id)} className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-white/70 hover:text-white flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-[#B7FF00]/10 flex items-center justify-center text-[#B7FF00]"><Folder size={16} /></div>
+                                        <span className="truncate">{f.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <GenerationLightbox
+                    open={lightboxOpen}
+                    url={lightboxUrl}
+                    id={lightboxItemId || undefined}
+                    videoUrl={lbVideoUrl}
+                    mediaType={lbMediaType}
+                    onClose={closeLightbox}
+                    originalPromptText={lbOriginal}
+                    remixPromptText={lbRemix}
+                    combinedPromptText={lbCombined}
+                    onShare={handleShare}
+                    onRemix={handleRemix}
+                    onEdit={isOwnedByCurrentUser ? () => {
+                        if (lbMediaType !== "video") {
+                            setLightboxOpen(false);
+                            setEditModalOpen(true);
+                        }
+                    } : undefined}
+                    onDelete={isOwnedByCurrentUser ? () => {
+                        if (lightboxItemId) {
+                            handleDelete(lightboxItemId).then(() => closeLightbox());
+                        }
+                    } : undefined}
+                    title="Remix"
+                    fullQualityUrl={lbFullQualityUrl}
+                    onAnimate={lbMediaType === "image" ? () => {
+                        if (!lightboxUrl) return;
+                        setVideoSourceImage(lightboxUrl);
+                        setVideoSourceId(lightboxItemId || undefined);
+                        setLightboxOpen(false);
+                        setIsVideoModalOpen(true);
+                    } : undefined}
+                />
+
+                {/* Edit Mode Modal */}
+                <EditModeModal
+                    isOpen={editModalOpen}
+                    onClose={() => !isEditing && setEditModalOpen(false)}
+                    sourceImageUrl={lightboxUrl || ""}
+                    onGenerate={handleEditGenerate}
+                    isGenerating={isEditing}
+                />
+
+                {/* Video Generator Modal */}
+                {(videoSourceImage || videoSourceVideo) && (
+                    <VideoGeneratorModal
+                        isOpen={isVideoModalOpen}
+                        onClose={() => {
+                            setIsVideoModalOpen(false);
+                            setVideoSourceVideo(null); // Reset source video on close
+                        }}
+                        sourceImage={videoSourceImage || undefined}
+                        sourceImageId={videoSourceId}
+                        sourceVideo={videoSourceVideo || undefined} // For video-to-video editing
+                        userId={undefined} // Route handles authentication
+                        onVideoGenerated={(data) => {
+                            const newVideo: LibraryItem = {
+                                id: `temp-${Date.now()}`,
+                                imageUrl: "",
+                                videoUrl: data.videoUrl,
+                                thumbnailUrl: null,
+                                mediaType: "video",
+                                createdAt: new Date().toISOString(),
+                                createdAtMs: Date.now(),
+                                promptId: null,
+                                promptSlug: null,
+                                aspectRatio: "16:9",
+                                promptTitle: data.prompt?.slice(0, 50) || "Animated Scene",
+                                promptCategory: null,
+                                originalPromptText: data.prompt || "",
+                                remixPromptText: "",
+                                combinedPromptText: data.prompt || "",
+                                folder: null,
+                                folder_id: null,
+                                is_public: true
+                            };
+                            setRemixItems(prev => [newVideo, ...prev]);
+                            setIsVideoModalOpen(false);
+                            setVideoSourceVideo(null);
+                            showToast("Video added to Library");
+                        }}
+                    />
+                )}
+
+                <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-white mb-1">My Library</h1>
+                        <div className="flex items-center gap-2 text-sm text-white/50 font-mono uppercase tracking-wide">
+                            <span className={selectedFolder ? "text-white/30" : "text-[#B7FF00]"}>{activeTab === "remixes" ? "Remixes" : "Favorites"}</span>
+                            {selectedFolder && (
+                                <>
+                                    <span className="text-white/30">/</span>
+                                    <span className="text-[#B7FF00]">{folders.find(f => f.id === selectedFolder)?.name}</span>
+                                </>
                             )}
                         </div>
-                    ) : (
-                        viewMode === "grid" ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {displayedItems.map(it => (
-                                    <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => handleItemClick(it)}>
-                                        {/* Render Video or Image */}
-                                        <LazyMedia
-                                            type={it.mediaType}
-                                            src={it.mediaType === "video" ? (it.videoUrl || "") : it.imageUrl}
-                                            poster={it.thumbnailUrl || it.imageUrl}
-                                            alt={it.promptTitle}
-                                            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                            unoptimized // Keep unoptimized for now in Library if we suspect domain issues, or remove if confident. Let's remove to test optimization.
-                                        />
+                    </div>
+                    <div className="flex bg-zinc-900 p-1 rounded-lg self-start">
+                        <button onClick={() => { setActiveTab("remixes"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "remixes" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Remixes</button>
+                        <button onClick={() => { setActiveTab("favorites"); setSelectedFolder(null); }} className={`px-4 py-1.5 text-xs font-bold uppercase rounded ${activeTab === "favorites" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>Favorites</button>
+                    </div>
+                </div>
 
-                                        {activeTab === "remixes" && (
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs font-mono text-white/40 uppercase">{displayedItems.length} ITEMS</div>
+                    <div className="flex flex-wrap gap-2">
+                        {isSelectionMode && selectedIds.size > 0 && (
+                            <>
+                                <button onClick={() => setIsMoveModalOpen(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-zinc-800 text-white hover:bg-zinc-700 whitespace-nowrap">
+                                    <FolderInput size={14} /> Move
+                                </button>
+                                <button onClick={handleDeleteSelected} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20 whitespace-nowrap">
+                                    <Trash2 size={14} /> Delete
+                                </button>
+                            </>
+                        )}
+
+                        {activeTab === "remixes" && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 border border-white/10">
+                                <span className="text-xs font-bold uppercase tracking-wider text-white/70">
+                                    {areAllPrivate ? "Private Mode" : "Public Mode"} {isPro ? "" : "(Pro)"}
+                                </span>
+                                <button
+                                    onClick={handleToggleGlobalPrivacy}
+                                    disabled={isUpdatingPrivacy}
+                                    className={`relative h-5 w-9 rounded-full transition-colors ${areAllPrivate ? "bg-[#B7FF00]" : "bg-white/10 hover:bg-white/20"} ${isUpdatingPrivacy ? "opacity-50 cursor-wait" : ""}`}
+                                >
+                                    <span className={`absolute top-1 left-1 h-3 w-3 rounded-full bg-white transition-transform ${areAllPrivate ? "translate-x-4 bg-black" : "translate-x-0"}`} />
+                                </button>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border whitespace-nowrap ${isSelectionMode ? "bg-[#B7FF00] text-black border-[#B7FF00]" : "bg-zinc-900 text-white/70 border-white/10"}`}
+                        >
+                            {isSelectionMode ? <CheckSquare size={14} /> : <Square size={14} />}
+                            Select
+                        </button>
+
+                        <div className="flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden shrink-0">
+                            <button onClick={() => setViewMode("grid")} className={`p-2 hover:bg-white/5 ${viewMode === "grid" ? "bg-white/10 text-white" : "text-white/50"}`}><Grid3X3 size={16} /></button>
+                            <div className="w-px bg-white/10" />
+                            <button onClick={() => setViewMode("list")} className={`p-2 hover:bg-white/5 ${viewMode === "list" ? "bg-white/10 text-white" : "text-white/50"}`}><List size={16} /></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col lg:flex-row gap-8">
+                    <aside className="w-full lg:w-48 shrink-0">
+                        <div className="flex items-center justify-between px-2 mb-2 lg:mb-2">
+                            <h3 className="text-xs font-bold uppercase text-white/40 hidden lg:block">Folders</h3>
+                            <div className="flex items-center justify-between w-full lg:w-auto">
+                                <span className="lg:hidden text-xs font-bold uppercase text-white/40">Folder:</span>
+                                <button onClick={handleCreateFolder} className="text-white/40 hover:text-[#B7FF00] flex items-center gap-1">
+                                    <Pencil size={12} />
+                                    <span className="lg:hidden text-[10px] uppercase">New Folder</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="lg:hidden relative mb-6">
+                            <select
+                                value={selectedFolder || ""}
+                                onChange={(e) => setSelectedFolder(e.target.value || null)}
+                                className="w-full bg-zinc-900 border border-white/10 text-white text-sm rounded-lg px-3 py-2.5 appearance-none focus:border-[#B7FF00] focus:outline-none"
+                            >
+                                <option value="">All {activeTab === "remixes" ? "Remixes" : "Favorites"}</option>
+                                {folders.map(f => (
+                                    <option key={f.id} value={f.id}>
+                                        {f.name} ({activeTab === "remixes" ? remixItems.filter(i => i.folder_id === f.id).length : favoriteItems.filter(i => i.folder_id === f.id).length})
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
+                                <Folder size={14} />
+                            </div>
+                        </div>
+
+                        {/* Media Type Filter - Mobile */}
+                        {activeTab === "remixes" && (
+                            <div className="lg:hidden flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mb-6">
+                                <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
+                                <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} />Images</button>
+                                <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} />Videos</button>
+                            </div>
+                        )}
+
+                        <div className="hidden lg:block space-y-1">
+                            <button onClick={() => setSelectedFolder(null)} className={`w-full text-left px-3 py-2 rounded text-sm mb-1 ${!selectedFolder ? "bg-white/10 text-white" : "text-white/60 hover:text-white"}`}>All {activeTab === "remixes" ? "Remixes" : "Favorites"}</button>
+                            {folders.map(f => (
+                                <button
+                                    key={f.id}
+                                    onClick={() => setSelectedFolder(f.id)}
+                                    className={`group/folder flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${selectedFolder === f.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
+                                >
+                                    <span className="truncate">{f.name}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs opacity-50">
+                                            {activeTab === "remixes"
+                                                ? remixItems.filter(i => i.folder_id === f.id).length
+                                                : favoriteItems.filter(i => i.folder_id === f.id).length
+                                            }
+                                        </span>
+                                        <div className="flex items-center gap-1 transition">
                                             <div
-                                                onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }}
-                                                className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 cursor-pointer transition ${it.is_public ? "bg-white/90 text-black hover:bg-white" : "bg-black/60 text-white/70 hover:bg-black/80 backdrop-blur-md"}`}
-                                                title={it.is_public ? "Public: Visible in Feed" : "Private: Only you can see this"}
+                                                onClick={(e) => { e.stopPropagation(); handleRenameFolder(f.id, f.name); }}
+                                                className="text-white/20 hover:text-white p-1"
+                                                title="Rename"
                                             >
-                                                {it.is_public ? <Globe size={9} /> : <Lock size={9} />}
-                                                <span className="hidden group-hover:block">{it.is_public ? "Public" : "Private"}</span>
+                                                <Pencil size={12} />
                                             </div>
-                                        )}
-
-                                        {activeTab === "favorites" && (
                                             <div
-                                                onClick={(e) => handleRemoveFavorite(it.id, e)}
-                                                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-pink-500 hover:bg-black hover:text-red-500 transition opacity-0 group-hover:opacity-100"
-                                                title="Remove from favorites"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteFolder(f.id); }}
+                                                className="text-white/20 hover:text-red-400 p-1"
+                                                title="Delete"
                                             >
-                                                <Heart size={14} fill="currentColor" />
+                                                <Trash2 size={12} />
                                             </div>
-                                        )}
-
-                                        {isSelectionMode && activeTab === "remixes" && (
-                                            <div className="absolute top-2 right-2">
-                                                {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
-                                            </div>
-                                        )}
-                                        {isSelectionMode && activeTab === "favorites" && (
-                                            <div className="absolute top-2 left-2">
-                                                {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
-                                            </div>
-                                        )}
-
-                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
-                                            <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
                                         </div>
                                     </div>
-                                ))}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Media Type Filter - Desktop */}
+                        {activeTab === "remixes" && (
+                            <div className="hidden lg:flex rounded-lg border border-white/10 bg-zinc-900 overflow-hidden mt-4">
+                                <button onClick={() => setMediaFilter("all")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase ${mediaFilter === "all" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}>All</button>
+                                <button onClick={() => setMediaFilter("images")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "images" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><ImageIcon size={12} /></button>
+                                <button onClick={() => setMediaFilter("videos")} className={`flex-1 px-3 py-2 text-xs font-bold uppercase flex items-center justify-center gap-1 ${mediaFilter === "videos" ? "bg-[#B7FF00] text-black" : "text-white/50"}`}><Film size={12} /></button>
+                            </div>
+                        )}
+                    </aside>
+
+                    <section className="flex-1 min-h-[50vh]">
+                        {loading ? <Loading /> : displayedItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 px-4 border border-dashed border-white/10 rounded-2xl bg-zinc-900/50 text-center">
+                                <div className="mb-4 h-16 w-16 flex items-center justify-center rounded-full bg-zinc-800 text-white/30">
+                                    <Library size={32} />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Library is empty</h3>
+                                <p className="text-sm text-white/50 max-w-sm mx-auto">
+                                    {activeTab === "remixes"
+                                        ? "You haven't generated any remixes yet. Go to the Studio to start creating!"
+                                        : "You haven't added any favorites yet."}
+                                </p>
+                                {activeTab === "remixes" && (
+                                    <button onClick={() => router.push('/studio/creator')} className="mt-6 px-5 py-2.5 rounded-lg bg-[#B7FF00] text-black text-sm font-bold hover:bg-[#B7FF00]/90 transition">
+                                        Open Creator Studio
+                                    </button>
+                                )}
                             </div>
                         ) : (
-                            <div className="space-y-2">
-                                {displayedItems.map(it => (
-                                    <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => handleItemClick(it)}>
-                                        <div className="relative w-12 h-12 bg-black shrink-0 rounded overflow-hidden">
-                                            {it.imageUrl ? (
-                                                <Image src={it.imageUrl} alt="" fill className="object-cover" unoptimized />
-                                            ) : <div className="bg-white/5 w-full h-full" />}
+                            viewMode === "grid" ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {displayedItems.map(it => (
+                                        <div key={it.id} className={`group relative aspect-square bg-zinc-900 border ${selectedIds.has(it.id) ? "border-[#B7FF00] ring-1 ring-[#B7FF00]" : "border-white/10"} overflow-hidden cursor-pointer rounded-lg`} onClick={() => handleItemClick(it)}>
+                                            {/* Render Video or Image */}
+                                            <LazyMedia
+                                                type={it.mediaType}
+                                                src={it.mediaType === "video" ? (it.videoUrl || "") : it.imageUrl}
+                                                poster={it.thumbnailUrl || it.imageUrl}
+                                                alt={it.promptTitle}
+                                                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                unoptimized // Keep unoptimized for now in Library if we suspect domain issues, or remove if confident. Let's remove to test optimization.
+                                            />
 
-                                            {isSelectionMode && selectedIds.has(it.id) && <div className="absolute inset-0 bg-[#B7FF00]/20 flex items-center justify-center"><Check size={16} className="text-[#B7FF00]" /></div>}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-medium text-white truncate">{it.promptTitle}</div>
-                                            <div className="flex items-center gap-3 text-xs text-white/40">
-                                                <span>{new Date(it.createdAt).toLocaleDateString()}</span>
-                                                {activeTab === "remixes" && (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }} className={`flex items-center gap-1 hover:text-white ${it.is_public ? "text-green-400" : ""}`}>
-                                                        {it.is_public ? <Globe size={10} /> : <Lock size={10} />}
-                                                        <span>{it.is_public ? "Public" : "Private"}</span>
-                                                    </button>
-                                                )}
-                                                {activeTab === "favorites" && (
-                                                    <button onClick={(e) => handleRemoveFavorite(it.id, e)} className="flex items-center gap-1 text-pink-500 hover:text-red-500">
-                                                        <Heart size={10} fill="currentColor" />
-                                                        <span>Remove</span>
-                                                    </button>
-                                                )}
+                                            {activeTab === "remixes" && (
+                                                <div
+                                                    onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }}
+                                                    className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 cursor-pointer transition ${it.is_public ? "bg-white/90 text-black hover:bg-white" : "bg-black/60 text-white/70 hover:bg-black/80 backdrop-blur-md"}`}
+                                                    title={it.is_public ? "Public: Visible in Feed" : "Private: Only you can see this"}
+                                                >
+                                                    {it.is_public ? <Globe size={9} /> : <Lock size={9} />}
+                                                    <span className="hidden group-hover:block">{it.is_public ? "Public" : "Private"}</span>
+                                                </div>
+                                            )}
+
+                                            {activeTab === "favorites" && (
+                                                <div
+                                                    onClick={(e) => handleRemoveFavorite(it.id, e)}
+                                                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-pink-500 hover:bg-black hover:text-red-500 transition opacity-0 group-hover:opacity-100"
+                                                    title="Remove from favorites"
+                                                >
+                                                    <Heart size={14} fill="currentColor" />
+                                                </div>
+                                            )}
+
+                                            {isSelectionMode && activeTab === "remixes" && (
+                                                <div className="absolute top-2 right-2">
+                                                    {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
+                                                </div>
+                                            )}
+                                            {isSelectionMode && activeTab === "favorites" && (
+                                                <div className="absolute top-2 left-2">
+                                                    {selectedIds.has(it.id) ? <div className="bg-[#B7FF00] text-black rounded shadow-sm"><CheckSquare size={20} /></div> : <div className="bg-black/50 text-white/50 rounded shadow-sm"><Square size={20} /></div>}
+                                                </div>
+                                            )}
+
+                                            {/* Voice Replace Button — only for video items */}
+                                            {it.mediaType === "video" && it.videoUrl && activeTab === "remixes" && !isSelectionMode && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setVoiceModalVideoUrl(it.videoUrl!);
+                                                        setIsVoiceModalOpen(true);
+                                                    }}
+                                                    className="absolute bottom-10 right-2 opacity-0 group-hover:opacity-100 transition-all bg-cyan-500/90 hover:bg-cyan-400 text-black text-[10px] font-bold rounded-lg px-2 py-1.5 flex items-center gap-1 backdrop-blur-sm"
+                                                    title="Replace or add a voice to this video"
+                                                >
+                                                    <Mic size={11} strokeWidth={3} />
+                                                    Voice
+                                                </button>
+                                            )}
+
+                                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="text-xs font-medium text-white truncate">{it.promptTitle}</div>
+                                                <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )
-                    )}
-                </section>
-            </div>
-        </main>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {displayedItems.map(it => (
+                                        <div key={it.id} className={`flex items-center gap-4 p-2 rounded-lg border ${selectedIds.has(it.id) ? "border-[#B7FF00] bg-[#B7FF00]/5" : "border-white/5 bg-zinc-900/50"} cursor-pointer hover:bg-zinc-900 transition`} onClick={() => handleItemClick(it)}>
+                                            <div className="relative w-12 h-12 bg-black shrink-0 rounded overflow-hidden">
+                                                {it.imageUrl ? (
+                                                    <Image src={it.imageUrl} alt="" fill className="object-cover" unoptimized />
+                                                ) : <div className="bg-white/5 w-full h-full" />}
+
+                                                {isSelectionMode && selectedIds.has(it.id) && <div className="absolute inset-0 bg-[#B7FF00]/20 flex items-center justify-center"><Check size={16} className="text-[#B7FF00]" /></div>}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-sm font-medium text-white truncate">{it.promptTitle}</div>
+                                                <div className="flex items-center gap-3 text-xs text-white/40">
+                                                    <span>{new Date(it.createdAt).toLocaleDateString()}</span>
+                                                    {activeTab === "remixes" && (
+                                                        <button onClick={(e) => { e.stopPropagation(); handleToggleVisibility(it); }} className={`flex items-center gap-1 hover:text-white ${it.is_public ? "text-green-400" : ""}`}>
+                                                            {it.is_public ? <Globe size={10} /> : <Lock size={10} />}
+                                                            <span>{it.is_public ? "Public" : "Private"}</span>
+                                                        </button>
+                                                    )}
+                                                    {activeTab === "favorites" && (
+                                                        <button onClick={(e) => handleRemoveFavorite(it.id, e)} className="flex items-center gap-1 text-pink-500 hover:text-red-500">
+                                                            <Heart size={10} fill="currentColor" />
+                                                            <span>Remove</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
+                    </section>
+                </div>
+            </main>
+
+            {/* Voice Replace Modal */}
+            <VoiceReplaceModal
+                isOpen={isVoiceModalOpen}
+                videoUrl={voiceModalVideoUrl}
+                onClose={() => setIsVoiceModalOpen(false)}
+                onSuccess={(newVideoUrl, newItemId) => {
+                    const newItem: LibraryItem = {
+                        id: newItemId || `voice-${Date.now()}`,
+                        imageUrl: "",
+                        videoUrl: newVideoUrl,
+                        mediaType: "video",
+                        createdAt: new Date().toISOString(),
+                        createdAtMs: Date.now(),
+                        promptId: null,
+                        promptSlug: null,
+                        aspectRatio: "16:9",
+                        promptTitle: "Voice Remix",
+                        promptCategory: null,
+                        originalPromptText: "",
+                        remixPromptText: "",
+                        combinedPromptText: "",
+                        folder: null,
+                        folder_id: null,
+                        is_public: true,
+                        fullQualityUrl: null,
+                    };
+                    setRemixItems(prev => [newItem, ...prev]);
+                    showToast("Voice applied! New video added to library.", "success");
+                }}
+            />
+        </>
     );
 }
