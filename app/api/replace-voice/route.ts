@@ -7,115 +7,168 @@ export const maxDuration = 300;
 
 const FAL_KEY = process.env.FAL_KEY!;
 
-// ------------ Helpers ------------
-
-async function generateTTSAudio(voiceId: string, refAudioUrl: string, script: string): Promise<string> {
-    const isPreset = !voiceId.includes("-"); // UUIDs have dashes, preset names don't
-
-    if (isPreset) {
-        // ChatterboxHD Text-to-Speech
-        const res = await fetch("https://fal.run/resemble-ai/chatterboxhd/text-to-speech", {
-            method: "POST",
-            headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ text: script, voice: voiceId })
-        });
-        if (!res.ok) throw new Error(`ChatterboxHD TTS failed: ${res.status} ${await res.text()}`);
-        const data = await res.json();
-        if (data.audio?.url) return data.audio.url;
-        throw new Error("ChatterboxHD returned no audio URL");
-    } else {
-        // F5-TTS for cloned voices
-        if (!refAudioUrl) throw new Error("A reference audio URL is required for cloned voice TTS");
-        const res = await fetch("https://fal.run/fal-ai/f5-tts", {
-            method: "POST",
-            headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ gen_text: script, ref_audio_url: refAudioUrl, model_type: "F5-TTS", remove_silence: true })
-        });
-        if (!res.ok) throw new Error(`F5-TTS failed: ${res.status} ${await res.text()}`);
-        const data = await res.json();
-        if (data.audio_url?.url) return data.audio_url.url;
-        if (data.audio?.url) return data.audio.url;
-        throw new Error("F5-TTS returned no audio URL");
-    }
-}
-
-async function extractAudioFromVideo(videoUrl: string): Promise<string> {
-    // Use Fal FFmpeg to extract audio track from the video for S2S mode
-    const endpoint = "https://queue.fal.run/fal-ai/ffmpeg-api/extract-audio";
-    const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ video_url: videoUrl })
-    });
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Audio extraction failed: ${res.status} ${err}`);
-    }
-    const { request_id } = await res.json();
-
-    for (let i = 0; i < 120; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/extract-audio/requests/${request_id}`, {
-            headers: { "Authorization": `Key ${FAL_KEY}` }
-        });
-        if (!statusRes.ok) continue;
-        const data = await statusRes.json();
-        if (data.status === "COMPLETED") {
-            const audioUrl = data.audio?.url || data.audio_url?.url || data.url;
-            if (!audioUrl) throw new Error("Extract audio completed but returned no URL");
-            return audioUrl;
+// ─── Helper: Poll any Fal queue endpoint ────────────────────────────────────
+async function falPoll(statusUrl: string, resultUrl: string, label: string, maxSeconds = 240): Promise<any> {
+    const maxAttempts = Math.ceil(maxSeconds / 2);
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const st = await fetch(statusUrl, { headers: { Authorization: `Key ${FAL_KEY}` } });
+        if (!st.ok) { console.warn(`${label} poll HTTP ${st.status}`); continue; }
+        const data = await st.json();
+        const status = (data.status || "").toUpperCase();
+        if (i % 10 === 0) console.log(`${label} poll ${i * 2}s: ${data.status}`);
+        if (status === "COMPLETED") {
+            const res = await fetch(resultUrl, { headers: { Authorization: `Key ${FAL_KEY}` } });
+            const result = await res.json();
+            if (result.detail && !result.video && !result.audio) {
+                const msg = Array.isArray(result.detail) ? result.detail.map((d: any) => d.msg).join("; ") : String(result.detail);
+                throw new Error(`${label} API error: ${msg}`);
+            }
+            console.log(`${label} done.`);
+            return result;
         }
-        if (data.status === "FAILED" || data.status === "ERROR") throw new Error(`Audio extraction failed: ${JSON.stringify(data)}`);
+        if (status === "FAILED" || status === "ERROR") throw new Error(`${label} failed: ${JSON.stringify(data)}`);
     }
-    throw new Error("Audio extraction timed out");
+    throw new Error(`${label} timed out after ${maxSeconds}s`);
 }
 
-async function runChatterboxS2S(sourceAudioUrl: string, refAudioUrl: string): Promise<string> {
-    const res = await fetch("https://fal.run/resemble-ai/chatterboxhd/speech-to-speech", {
+// ─── Helper: Submit to Fal queue and get URLs ────────────────────────────────
+async function falQueue(endpoint: string, payload: object): Promise<{ statusUrl: string; resultUrl: string; requestId: string }> {
+    const res = await fetch(`https://queue.fal.run/${endpoint}`, {
         method: "POST",
-        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ audio_url: sourceAudioUrl, ref_audio_url: refAudioUrl })
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error(`ChatterboxHD S2S failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(`${endpoint} submit failed: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    return { statusUrl: data.status_url, resultUrl: data.response_url, requestId: data.request_id };
+}
+
+// ─── Transcription (Whisper) ─────────────────────────────────────────────────
+async function transcribeWithWhisper(videoUrl: string): Promise<string> {
+    console.log("Transcribing with Whisper...");
+    const res = await fetch("https://fal.run/fal-ai/wizper", {
+        method: "POST",
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ audio_url: videoUrl, task: "transcribe", language: "en", chunk_level: "segment", version: "3" }),
+    });
+    if (!res.ok) throw new Error(`Whisper failed: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    const transcript = data.text?.trim();
+    if (!transcript) throw new Error(`Whisper returned no transcript: ${JSON.stringify(data).slice(0, 200)}`);
+    console.log("Transcript:", transcript.slice(0, 120));
+    return transcript;
+}
+
+// ─── TTS: Preset voices via ChatterboxHD ────────────────────────────────────
+async function ttsChatterbox(text: string, voiceId: string): Promise<string> {
+    console.log("ChatterboxHD TTS:", voiceId);
+    const res = await fetch("https://fal.run/resemble-ai/chatterboxhd/text-to-speech", {
+        method: "POST",
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice: voiceId }),
+    });
+    if (!res.ok) throw new Error(`ChatterboxHD TTS failed: ${res.status} ${await res.text()}`);
     const data = await res.json();
     if (data.audio?.url) return data.audio.url;
-    if (data.audio_url?.url) return data.audio_url.url;
-    throw new Error("ChatterboxHD S2S returned no audio URL");
+    throw new Error(`ChatterboxHD returned no audio: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
-async function mergeAudioVideo(videoUrl: string, audioUrl: string): Promise<string> {
-    const endpoint = "https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video";
-    const res = await fetch(endpoint, {
+// ─── TTS: Cloned voices via MiniMax ─────────────────────────────────────────
+async function ttsWithMinimax(text: string, minimaxVoiceId: string): Promise<string> {
+    console.log("MiniMax TTS with voice_id:", minimaxVoiceId);
+    const res = await fetch("https://fal.run/fal-ai/minimax/speech-02-hd", {
         method: "POST",
-        headers: { "Authorization": `Key ${FAL_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ video_url: videoUrl, audio_url: audioUrl })
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+            text,
+            voice_setting: { voice_id: minimaxVoiceId, speed: 1.0, vol: 1.0, pitch: 0 },
+            output_format: "url",
+        }),
     });
-    if (!res.ok) throw new Error(`Merge start failed: ${res.status} ${await res.text()}`);
-    const { request_id } = await res.json();
-
-    for (let i = 0; i < 120; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        const statusRes = await fetch(`https://queue.fal.run/fal-ai/ffmpeg-api/merge-audio-video/requests/${request_id}`, {
-            headers: { "Authorization": `Key ${FAL_KEY}` }
-        });
-        if (!statusRes.ok) continue;
-        const data = await statusRes.json();
-        if (data.status === "COMPLETED") {
-            const url = data.video?.url || data.url || data.video_url;
-            if (!url) throw new Error("Merge completed but returned no URL");
-            return url;
-        }
-        if (data.status === "FAILED" || data.status === "ERROR") throw new Error(`Merge failed: ${JSON.stringify(data)}`);
-    }
-    throw new Error("Merge timed out");
+    if (!res.ok) throw new Error(`MiniMax TTS failed: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    if (data.audio?.url) return data.audio.url;
+    throw new Error(`MiniMax TTS returned no audio: ${JSON.stringify(data).slice(0, 200)}`);
 }
 
-// ------------ Route Handler ------------
+// ─── Clone voice via MiniMax (or return cached ID) ───────────────────────────
+async function getOrCloneMinimax(voiceId: string, refAudioUrl: string, supabaseAdmin: any): Promise<string> {
+    // Check if we already have a cached minimax_voice_id for this voice
+    const { data: voiceRow } = await supabaseAdmin
+        .from("voices")
+        .select("minimax_voice_id, name")
+        .eq("id", voiceId)
+        .single();
 
+    if (voiceRow?.minimax_voice_id) {
+        console.log("Reusing cached MiniMax voice_id:", voiceRow.minimax_voice_id);
+        return voiceRow.minimax_voice_id;
+    }
+
+    // Clone the voice on MiniMax — costs $1.50 but gets cached for future uses
+    const customVoiceId = `voice_${voiceId.replace(/-/g, "").slice(0, 20)}_${Date.now().toString(36)}`;
+    console.log("Cloning voice on MiniMax, custom_voice_id:", customVoiceId);
+
+    const res = await fetch("https://fal.run/fal-ai/minimax/voice-clone", {
+        method: "POST",
+        headers: { Authorization: `Key ${FAL_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+            audio_url: refAudioUrl,
+            custom_voice_id: customVoiceId,
+            noise_reduction: true,
+            need_volume_normalization: true,
+            text: "Testing this cloned voice.",
+        }),
+    });
+    if (!res.ok) throw new Error(`MiniMax voice clone failed: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    console.log("MiniMax clone response:", JSON.stringify(data).slice(0, 200));
+
+    const returnedVoiceId = data.custom_voice_id || customVoiceId;
+
+    // Cache the minimax_voice_id in our DB so we don't clone again
+    await supabaseAdmin.from("voices").update({ minimax_voice_id: returnedVoiceId }).eq("id", voiceId);
+    console.log("Cached MiniMax voice_id:", returnedVoiceId);
+
+    return returnedVoiceId;
+}
+
+// ─── Sync Lipsync ────────────────────────────────────────────────────────────
+async function syncLipsync(videoUrl: string, audioUrl: string): Promise<string> {
+    console.log("Sync Lipsync: merging audio + video with lip sync...");
+    const { statusUrl, resultUrl } = await falQueue("fal-ai/sync-lipsync/v2/pro", {
+        video_url: videoUrl,
+        audio_url: audioUrl,
+        sync_mode: "remap", // stretches/compresses audio to fit video duration
+        model: "lipsync-2-pro",
+    });
+    const result = await falPoll(statusUrl, resultUrl, "Sync Lipsync", 240);
+    const url = result.video?.url || result.video_url || result.url || result.output?.video?.url;
+    if (!url) throw new Error(`Sync Lipsync returned no video URL: ${JSON.stringify(result).slice(0, 300)}`);
+    return url;
+}
+
+// ─── Merge audio only (no lipsync) ───────────────────────────────────────────
+async function mergeAudioVideo(videoUrl: string, audioUrl: string): Promise<string> {
+    console.log("FFmpeg merge (audio only)...");
+    const { statusUrl, resultUrl } = await falQueue("fal-ai/ffmpeg-api/merge-audio-video", {
+        video_url: videoUrl,
+        audio_url: audioUrl,
+    });
+    const result = await falPoll(statusUrl, resultUrl, "FFmpeg Merge", 180);
+    const url = result.video?.url || result.url || result.video_url;
+    if (!url) throw new Error(`FFmpeg merge returned no URL: ${JSON.stringify(result).slice(0, 300)}`);
+    return url;
+}
+
+// ─── Route Handler ────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { videoUrl, mode, voiceId, refAudioUrl, script } = body;
+
+        console.log("[replace-voice]", { mode, voiceId, refAudioUrl: refAudioUrl?.slice(0, 60), hasScript: !!script });
 
         if (!videoUrl) return NextResponse.json({ error: "videoUrl is required" }, { status: 400 });
         if (!voiceId) return NextResponse.json({ error: "voiceId is required" }, { status: 400 });
@@ -128,58 +181,70 @@ export async function POST(req: Request) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        // Credits check
-        const VOICE_VIDEO_COST = 10;
+        // Credits
+        const COST = 15;
         const { data: profile } = await supabase.from("profiles").select("credits, role").eq("user_id", user.id).single();
         const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
-        if (!isAdmin && (profile?.credits ?? 0) < VOICE_VIDEO_COST) {
-            return NextResponse.json({ error: `You need at least ${VOICE_VIDEO_COST} credits for this feature` }, { status: 403 });
+        if (!isAdmin && (profile?.credits ?? 0) < COST) {
+            return NextResponse.json({ error: `You need at least ${COST} credits for this feature` }, { status: 403 });
         }
 
-        let finalAudioUrl: string;
+        const isPreset = !voiceId.includes("-"); // UUIDs have dashes
 
-        if (mode === "s2s") {
-            // Step 1: Extract original audio from the video
-            const sourceAudioUrl = await extractAudioFromVideo(videoUrl);
-            // Step 2: Run ChatterboxHD Speech-to-Speech with the user's reference voice
-            finalAudioUrl = await runChatterboxS2S(sourceAudioUrl, refAudioUrl);
-        } else {
-            // Voiceover mode: generate fresh TTS from script
-            if (!script?.trim()) return NextResponse.json({ error: "A script is required for voiceover mode" }, { status: 400 });
-            finalAudioUrl = await generateTTSAudio(voiceId, refAudioUrl, script);
-        }
-
-        // Step 3: Merge audio onto video
-        const mergedVideoUrl = await mergeAudioVideo(videoUrl, finalAudioUrl);
-
-        // Step 4: Download and re-upload to Supabase for persistence
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const admin = createClient(supabaseUrl, serviceRole, {
-            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+        // Admin Supabase client for DB writes
+        const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         });
 
+        let ttsAudioUrl: string;
+        let textToSpeak: string;
+
+        if (mode === "s2s") {
+            // Step 1: Transcribe what's being said in the video
+            textToSpeak = await transcribeWithWhisper(videoUrl);
+        } else {
+            // Voiceover mode: user provided the script
+            if (!script?.trim()) return NextResponse.json({ error: "A script is required for voiceover mode" }, { status: 400 });
+            textToSpeak = script.trim();
+        }
+
+        // Step 2: Generate TTS with the selected voice
+        if (isPreset) {
+            // Preset voices — ChatterboxHD has great distinct voices
+            ttsAudioUrl = await ttsChatterbox(textToSpeak, voiceId);
+        } else {
+            // Cloned voice — use MiniMax for high-quality voice cloning
+            if (!refAudioUrl) return NextResponse.json({ error: "refAudioUrl is required for cloned voice" }, { status: 400 });
+            const minimaxVoiceId = await getOrCloneMinimax(voiceId, refAudioUrl, admin);
+            ttsAudioUrl = await ttsWithMinimax(textToSpeak, minimaxVoiceId);
+        }
+
+        // Step 3: Apply lip sync (Replace Voice mode) or simple merge (Voiceover mode)
+        let finalVideoUrl: string;
+        if (mode === "s2s") {
+            finalVideoUrl = await syncLipsync(videoUrl, ttsAudioUrl);
+        } else {
+            finalVideoUrl = await mergeAudioVideo(videoUrl, ttsAudioUrl);
+        }
+
+        // Step 4: Download and re-upload to Supabase
         const BUCKET = process.env.NEXT_PUBLIC_GENERATIONS_BUCKET || "generations";
-        const modeLabel = mode === "s2s" ? "s2s" : "voiced";
-        const filePath = `videos/${user.id}/${modeLabel}_${Date.now()}.mp4`;
+        const label = mode === "s2s" ? "lipsync" : "voiceover";
+        const filePath = `videos/${user.id}/${label}_${Date.now()}.mp4`;
 
-        const videoRes = await fetch(mergedVideoUrl);
-        const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-
-        const { error: uploadError } = await admin.storage
-            .from(BUCKET)
-            .upload(filePath, videoBuffer, { contentType: "video/mp4", upsert: false });
-
-        if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+        const dlRes = await fetch(finalVideoUrl);
+        const buffer = Buffer.from(await dlRes.arrayBuffer());
+        const { error: uploadErr } = await admin.storage.from(BUCKET).upload(filePath, buffer, { contentType: "video/mp4", upsert: false });
+        if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
 
         const { data: pubData } = admin.storage.from(BUCKET).getPublicUrl(filePath);
-        const savedVideoUrl = pubData.publicUrl;
+        const savedUrl = pubData.publicUrl;
 
         // Step 5: Save to DB
         const { data: newRow, error: dbErr } = await admin.from("video_generations").insert({
             user_id: user.id,
-            video_url: savedVideoUrl,
-            prompt: mode === "s2s" ? `[Voice Replaced] Original video with voice replaced` : `[Voiceover] ${script?.slice(0, 100)}`,
+            video_url: savedUrl,
+            prompt: mode === "s2s" ? `[Voice Replace] ${textToSpeak.slice(0, 100)}` : `[Voiceover] ${textToSpeak.slice(0, 100)}`,
             status: "completed",
             is_public: true,
         }).select().single();
@@ -188,10 +253,10 @@ export async function POST(req: Request) {
 
         // Deduct credits
         if (!isAdmin) {
-            await admin.rpc("decrement_credits", { x: VOICE_VIDEO_COST, user_id_param: user.id });
+            await admin.rpc("decrement_credits", { x: COST, user_id_param: user.id });
         }
 
-        return NextResponse.json({ videoUrl: savedVideoUrl, id: newRow?.id });
+        return NextResponse.json({ videoUrl: savedUrl, id: newRow?.id });
 
     } catch (e: any) {
         console.error("Replace Voice Error:", e);

@@ -4,6 +4,61 @@ import { useState, useRef, useEffect } from "react";
 import { Plus, X, Mic, Square, Play, Pause, Upload, AudioLines, ChevronRight, ChevronLeft, Check, Loader2, RefreshCw } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 
+// Utility to convert decoded AudioBuffer to a WAV Blob
+function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
+    const numOfChan = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChan * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+    const channels = [];
+    let sampleRate = audioBuffer.sampleRate;
+    let offset = 0;
+    let pos = 0;
+
+    const setUint32 = (data: number) => { view.setUint32(pos, data, true); pos += 4; };
+    const setUint16 = (data: number) => { view.setUint16(pos, data, true); pos += 2; };
+    const writeString = (name: string) => { for (let i = 0; i < name.length; i++) { view.setUint8(pos, name.charCodeAt(i)); pos++; } };
+
+    // WAV Header
+    writeString('RIFF');
+    setUint32(length - 8);
+    writeString('WAVE');
+    writeString('fmt ');
+    setUint32(16);
+    setUint16(1); // PCM
+    setUint16(numOfChan);
+    setUint32(sampleRate);
+    setUint32(sampleRate * 2 * numOfChan);
+    setUint16(numOfChan * 2);
+    setUint16(16); // 16-bit
+    writeString('data');
+    setUint32(length - pos - 4);
+
+    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+        channels.push(audioBuffer.getChannelData(i));
+    }
+
+    while (pos < length) {
+        for (let i = 0; i < numOfChan; i++) {
+            let sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+            sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;     // scale to 16-bit integer
+            view.setInt16(pos, sample, true);                            // write 16-bit sample
+            pos += 2;
+        }
+        offset++;
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+}
+
+// Helper to decode any audio blob and return a WAV blob
+async function convertBlobToWav(blob: Blob): Promise<Blob> {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    return audioBufferToWavBlob(audioBuffer);
+}
+
 interface VoiceCloneWizardProps {
     isOpen: boolean;
     onClose: () => void;
@@ -38,6 +93,10 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
 
+    // Device Selection State
+    const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+
     // Processing State
     const [isUploading, setIsUploading] = useState(false);
 
@@ -52,6 +111,35 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
     useEffect(() => {
         setScriptIndex(Math.floor(Math.random() * DEMO_SCRIPTS.length));
     }, [isOpen]);
+
+    // Sync audioUrl → audio element src whenever it changes
+    useEffect(() => {
+        if (!audioRef.current) return;
+        audioRef.current.src = audioUrl || "";
+        if (audioUrl) audioRef.current.load();
+        setIsPlaying(false);
+    }, [audioUrl]);
+
+    // Fetch Audio Devices
+    const fetchDevices = async () => {
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioInputs = devices.filter(device => device.kind === "audioinput");
+            setAudioDevices(audioInputs);
+            if (audioInputs.length > 0 && !selectedDeviceId) {
+                setSelectedDeviceId(audioInputs[0].deviceId);
+            }
+        } catch (err) {
+            console.error("Error fetching audio devices:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen && step === 2) {
+            fetchDevices();
+        }
+    }, [isOpen, step]);
 
     // Timer Logic
     useEffect(() => {
@@ -116,31 +204,39 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Not logged in");
 
-            let targetBlob: Blob | File | null = null;
-            let fileExt = "webm";
+            // Convert tracking variables
+            let finalBlob: Blob | File | null = null;
 
             if (method === "upload") {
                 if (!uploadedFile) throw new Error("Missing upload file");
-                targetBlob = uploadedFile;
-                fileExt = uploadedFile.name.split('.').pop() || "wav";
+                // If it's an MP3 or WAV, we can likely use it directly. 
+                // We'll safely convert it to WAV if it's not mp3 or wav.
+                const ext = uploadedFile.name.split('.').pop()?.toLowerCase() || "";
+                if (ext === "wav" || ext === "mp3") {
+                    finalBlob = uploadedFile;
+                } else {
+                    console.log(`Converting uploaded ${uploadedFile.type} file to WAV...`);
+                    finalBlob = await convertBlobToWav(uploadedFile);
+                }
             } else {
-                targetBlob = audioBlob;
-                if (!targetBlob) throw new Error("Missing recording");
-
-                // Infer extension from the blob's actual mime type (important for iOS Safari which uses mp4)
-                if (targetBlob.type.includes("mp4")) fileExt = "mp4";
-                else if (targetBlob.type.includes("wav")) fileExt = "wav";
-                else if (targetBlob.type.includes("mpeg")) fileExt = "mp3";
-                else if (targetBlob.type.includes("webm")) fileExt = "webm";
-                else fileExt = "m4a"; // Fallback for some iOS encodings
+                if (!audioBlob) throw new Error("Missing recording");
+                // The browser recording is always .webm or .mp4, which Minimax rejects.
+                // We must decode and convert to PCM .wav format.
+                console.log(`Converting recorded ${audioBlob.type} blob to WAV...`);
+                finalBlob = await convertBlobToWav(audioBlob);
             }
+
+            // Always save as .wav unless it was a pre-existing clean mp3/wav
+            const fileExt = method === "upload" && finalBlob instanceof File
+                ? finalBlob.name.split('.').pop()?.toLowerCase() || "wav"
+                : "wav";
 
             const filePath = `${user.id}/${Date.now()}_clone.${fileExt}`;
 
             // 1. Upload to Supabase Storage
             const { error: uploadError } = await supabase.storage
                 .from('voices')
-                .upload(filePath, targetBlob);
+                .upload(filePath, finalBlob as Blob);
 
             if (uploadError) throw new Error(`Upload error: ${uploadError.message}`);
 
@@ -194,7 +290,12 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
     const startRecording = async () => {
         setErrorMessage("");
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const constraints = {
+                audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Initialize raw — let the browser choose its preferred default codec/container
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
@@ -206,13 +307,14 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             };
 
             mediaRecorder.onstop = () => {
-                // Use the browser's native mime-type instead of forcing webm, 
-                // as iOS Safari uses audio/mp4 and will fail to play if marked as webm.
-                const mimeType = mediaRecorder.mimeType || "audio/webm";
-                const blob = new Blob(audioChunksRef.current, { type: mimeType });
+                // Let the Blob assume the native type of the recorded chunks
+                const blob = new Blob(audioChunksRef.current);
+                console.log(`[Recording Stopped] Blob size: ${blob.size} bytes | Type: ${blob.type || mediaRecorder.mimeType} | Chunks: ${audioChunksRef.current.length}`);
+
                 setAudioBlob(blob);
                 const url = URL.createObjectURL(blob);
                 setAudioUrl(url);
+                setIsPlaying(false);
 
                 // Stop all tracks
                 stream.getTracks().forEach((track) => track.stop());
@@ -225,6 +327,7 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
             setIsRecording(true);
         } catch (err) {
             console.error("Microphone Access Error:", err);
+
             setErrorMessage("Microphone access denied or unavailable.");
         }
     };
@@ -237,13 +340,20 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
     };
 
     const togglePlayback = () => {
-        if (!audioRef.current || !audioUrl) return;
+        if (!audioUrl || !audioRef.current) return;
         if (isPlaying) {
             audioRef.current.pause();
+            setIsPlaying(false);
         } else {
-            audioRef.current.play();
+            // Re-seek to start so re-playing always works
+            audioRef.current.currentTime = 0;
+            audioRef.current.play()
+                .then(() => setIsPlaying(true))
+                .catch(e => {
+                    console.error("Playback failed:", e);
+                    setIsPlaying(false);
+                });
         }
-        setIsPlaying(!isPlaying);
     };
 
     const onAudioEnded = () => setIsPlaying(false);
@@ -254,7 +364,8 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
         if (file) {
             setUploadedFile(file);
             const url = URL.createObjectURL(file);
-            setAudioUrl(url); // Also use audio player for uploaded file
+            setAudioUrl(url);
+            setIsPlaying(false);
             setErrorMessage("");
         }
     };
@@ -264,6 +375,13 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            {/* Always-mounted hidden audio element so ref is always valid */}
+            <audio
+                ref={audioRef}
+                preload="auto"
+                onEnded={() => setIsPlaying(false)}
+                style={{ display: "none" }}
+            />
             <div className="bg-[#0f0f11] max-w-2xl w-full rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
 
                 {/* Header */}
@@ -343,6 +461,28 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
                             {/* RECORDING MODE */}
                             {method === "record" && (
                                 <div className="flex flex-col items-center">
+
+                                    {/* Microphone Selector */}
+                                    {audioDevices.length > 1 && !isRecording && !audioBlob && (
+                                        <div className="w-full mb-6">
+                                            <label className="text-white/40 text-xs font-bold uppercase tracking-widest mb-2 block text-center">
+                                                Select Microphone
+                                            </label>
+                                            <select
+                                                value={selectedDeviceId}
+                                                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                                                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white/90 outline-none focus:border-primary/50 transition-colors cursor-pointer appearance-none text-center"
+                                                style={{ textAlignLast: "center" }}
+                                            >
+                                                {audioDevices.map((device) => (
+                                                    <option key={device.deviceId} value={device.deviceId} className="bg-[#0f0f11] text-left">
+                                                        {device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
                                     <div className="bg-black/30 border border-white/5 rounded-3xl p-6 w-full mb-8 relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-3">
                                             <button
@@ -388,22 +528,33 @@ export default function VoiceCloneWizard({ isOpen, onClose, onComplete }: VoiceC
                                                 </button>
                                             )}
 
-                                            {(!isRecording && audioBlob) && (
-                                                <div className="flex items-center gap-4">
-                                                    <button
-                                                        onClick={startRecording}
-                                                        className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-all border border-white/10"
-                                                    >
-                                                        Record Again
-                                                    </button>
-                                                    <button
-                                                        onClick={togglePlayback}
-                                                        className="w-16 h-16 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105"
-                                                    >
-                                                        {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
-                                                    </button>
+                                            {(!isRecording && audioBlob && audioUrl) && (
+                                                <div className="flex flex-col items-center gap-4 w-full px-4">
+                                                    {/* Native browser audio player — most reliable playback */}
+                                                    <audio
+                                                        src={audioUrl}
+                                                        controls
+                                                        className="w-full rounded-xl"
+                                                        style={{ colorScheme: "dark" }}
+                                                    />
+                                                    <div className="flex items-center gap-4">
+                                                        <button
+                                                            onClick={startRecording}
+                                                            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-all border border-white/10"
+                                                        >
+                                                            🔄 Record Again
+                                                        </button>
+                                                        <a
+                                                            href={audioUrl}
+                                                            download="test-recording.webm"
+                                                            className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-sm font-medium transition-all"
+                                                        >
+                                                            💾 Download to test
+                                                        </a>
+                                                    </div>
                                                 </div>
                                             )}
+
                                         </div>
                                     </div>
                                     <p className="text-center text-xs text-white/30 mt-4 max-w-sm">

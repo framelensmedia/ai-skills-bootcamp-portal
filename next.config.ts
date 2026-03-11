@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3000', 'drucilla-ectrodactylous-barefootedly.ngrok-free.dev', '*.ngrok-free.dev'],
     },
   },
+  serverExternalPackages: ['@ffmpeg-installer/ffmpeg', 'fluent-ffmpeg'],
 };
 
 export default nextConfig;

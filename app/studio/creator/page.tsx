@@ -26,10 +26,15 @@ import { ArrowRight, Library, TriangleAlert, Mic } from "lucide-react";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
 import StudioCommunityFeed from "@/components/StudioCommunityFeed";
 import VoiceTab from "./_components/VoiceTab";
+import MusicTab from "./_components/MusicTab";
+import AnimateTab from "./_components/AnimateTab";
+import AudioVideoTab from "./_components/AudioVideoTab";
+import KlingMotionTab from "./_components/KlingMotionTab";
 import { getVoiceGenerations } from "@/app/actions/voiceStudio";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
+type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "klingmotion" | "edit";
 
 function TypeWriter({ text }: { text: string }) {
     const [visible, setVisible] = useState(false);
@@ -132,14 +137,29 @@ function CreatorContent() {
     const [manualPrompt, setManualPrompt] = useState("");
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
-    const [activeTab, setActiveTab] = useState<"image" | "video" | "voice">("image");
+    const [activeTab, setActiveTab] = useState<TabType>("image");
 
     // Credits
     const [userCredits, setUserCredits] = useState<number | null>(null);
     const VIDEO_COST = 30;
     const IMAGE_COST = 3;
     const VOICE_COST = 5; // placeholder cost for voice
-    const currentCost = activeTab === "video" ? VIDEO_COST : activeTab === "voice" ? VOICE_COST : IMAGE_COST;
+    const ANIMATE_COST = 5;
+    const AUDIO2VIDEO_COST = 10;
+    const VEO_COST = 15;
+
+    // Derived costs depending on active tab
+    const getActiveCost = () => {
+        if (activeTab === "video") return VIDEO_COST;
+        if (activeTab === "animate") return ANIMATE_COST;
+        if (activeTab === "audio2video") return AUDIO2VIDEO_COST;
+        if (activeTab === "voice") return VOICE_COST;
+        if (activeTab === "music") return 10; // Music cost
+        if (activeTab === "klingmotion") return 20; // Kling is an expensive model
+        if (activeTab === "edit") return 0;
+        return IMAGE_COST; // Default for 'image' tab
+    };
+    const currentCost = getActiveCost();
     const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
     const creditError = !hasCredits && userCredits !== null ? `Insufficient credits. Need ${currentCost}, have ${userCredits}.` : null;
 
@@ -202,9 +222,8 @@ function CreatorContent() {
         return "aspect-[4/5]";
     }, [aspectRatio, previewImage]);
 
-    // Switch Default Model when Media Type Changes
     useEffect(() => {
-        if (activeTab === "video" || activeTab === "voice") {
+        if (activeTab === "video" || activeTab === "animate" || activeTab === "audio2video" || activeTab === "voice" || activeTab === "klingmotion") {
             setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
         } else setSelectedModel(DEFAULT_MODEL_ID);
     }, [activeTab]);
@@ -734,8 +753,8 @@ function CreatorContent() {
             </div>
 
             {/* Master Tabs */}
-            <div className="mb-8 flex items-center gap-6 border-b border-border">
-                {(["image", "video", "voice"] as const).map((tab) => (
+            <div className="mb-8 flex flex-wrap items-center gap-6 border-b border-border relative">
+                {(["image", "video", "animate", "audio2video", "voice", "music", "klingmotion"] as const).map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -744,12 +763,18 @@ function CreatorContent() {
                             : "text-muted-foreground hover:text-foreground"
                             }`}
                     >
-                        {tab}
+                        {tab === "animate" ? "motion capture" : tab === "audio2video" ? "audio-to-video" : tab === "klingmotion" ? "kling motion" : tab}
                         {activeTab === tab && (
                             <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary rounded-t-sm" />
                         )}
                     </button>
                 ))}
+                <Link
+                    href="/studio/edit"
+                    className="pb-3 px-1 text-sm font-bold uppercase tracking-wider transition-colors relative outline-none text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-primary flex items-center gap-1"
+                >
+                    EDIT
+                </Link>
             </div>
 
             {/* GLOBAL PAUSE BANNER */}
@@ -773,7 +798,40 @@ function CreatorContent() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {activeTab !== "voice" ? (
+                {activeTab === "animate" ? (
+                    <div className="col-span-12">
+                        <AnimateTab
+                            isAdmin={isAdmin}
+                            hasCredits={hasCredits}
+                            userCredits={userCredits}
+                            creditError={creditError}
+                            ANIMATE_COST={ANIMATE_COST}
+                            onCreditsUpdate={setUserCredits}
+                        />
+                    </div>
+                ) : activeTab === "audio2video" ? (
+                    <div className="col-span-12">
+                        <AudioVideoTab
+                            isAdmin={isAdmin}
+                            hasCredits={hasCredits}
+                            userCredits={userCredits}
+                            creditError={creditError}
+                            COST={AUDIO2VIDEO_COST}
+                            onCreditsUpdate={setUserCredits}
+                        />
+                    </div>
+                ) : activeTab === "klingmotion" ? (
+                    <div className="col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <KlingMotionTab
+                            isAdmin={isAdmin}
+                            hasCredits={hasCredits}
+                            userCredits={userCredits}
+                            creditError={creditError}
+                            COST={20}
+                            onCreditsUpdate={setUserCredits}
+                        />
+                    </div>
+                ) : activeTab !== "voice" && activeTab !== "music" ? (
                     <>
                         {/* LEFT COLUMN: Controls */}
                         <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
@@ -1166,7 +1224,7 @@ function CreatorContent() {
                             </div>
                         </div>
                     </>
-                ) : (
+                ) : activeTab === "voice" ? (
                     <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
                         <VoiceTab
                             userCredits={userCredits}
@@ -1174,11 +1232,30 @@ function CreatorContent() {
                             onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
-                )}
+                ) : activeTab === "music" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <MusicTab
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
+                        />
+                    </div>
+                ) : activeTab === "klingmotion" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <KlingMotionTab
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            hasCredits={hasCredits}
+                            creditError={creditError}
+                            COST={15}
+                            onCreditsUpdate={(amount) => setUserCredits(amount)}
+                        />
+                    </div>
+                ) : null}
             </div>
 
             {/* Global Modals for Image/Video */}
-            {activeTab !== "voice" && (
+            {activeTab !== "voice" && activeTab !== "music" && activeTab !== "klingmotion" && (
                 <>
                     {/* Video Modal is only used for Remix Cards / Library items now, 
                         Studio handles its own inline generation */}

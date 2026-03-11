@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { revalidatePath } from "next/cache";
 
 const FAL_KEY = process.env.FAL_KEY;
 
@@ -132,6 +133,9 @@ export async function generateTTS(text: string, voiceId: string, refAudioUrl: st
 }
 
 export async function getVoices() {
+    // Bust Next.js aggressive cache so newly cloned voices appear immediately
+    revalidatePath("/studio/creator");
+
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 

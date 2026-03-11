@@ -3,12 +3,13 @@
 import Image from "next/image";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import {
     Pencil, Check, X, Trash2, Heart, Library, Image as ImageIcon,
     Star, Grid3X3, List, CheckSquare, Square, FolderInput, Folder,
-    Globe, Lock, Film, Mic
+    Globe, Lock, Film, Mic, AudioLines
 } from "lucide-react";
 import Loading from "@/components/Loading";
 import { useToast } from "@/context/ToastContext";
@@ -1351,19 +1352,30 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                                                         <div className="text-[10px] text-white/50">{new Date(it.createdAt).toLocaleDateString()}</div>
                                                     </div>
                                                     {it.mediaType === "video" && it.videoUrl && activeTab === "remixes" && !isSelectionMode && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                setVoiceModalVideoUrl(it.videoUrl!);
-                                                                setIsVoiceModalOpen(true);
-                                                            }}
-                                                            className="shrink-0 bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black text-[10px] font-bold rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-all"
-                                                            title="Replace or add a voice to this video"
-                                                        >
-                                                            <Mic size={11} strokeWidth={3} />
-                                                            Voice
-                                                        </button>
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setVoiceModalVideoUrl(it.videoUrl!);
+                                                                    setIsVoiceModalOpen(true);
+                                                                }}
+                                                                className="bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-black text-[10px] font-bold rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-all"
+                                                                title="Replace or add a voice to this video"
+                                                            >
+                                                                <Mic size={11} strokeWidth={3} />
+                                                                Voice
+                                                            </button>
+                                                            <Link
+                                                                href={`/editor/${it.id}`}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="bg-indigo-500 hover:bg-indigo-400 active:scale-95 text-white text-[10px] font-bold rounded-lg px-2.5 py-1.5 flex items-center gap-1 transition-all"
+                                                                title="Mix background music and audio"
+                                                            >
+                                                                <AudioLines size={11} strokeWidth={3} />
+                                                                Mix
+                                                            </Link>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
