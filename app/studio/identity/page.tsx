@@ -75,13 +75,13 @@ export default function IdentityStudioPage() {
                 <div className="flex items-center gap-4">
                     <Link
                         href="/studio"
-                        className="flex items-center justify-center rounded-full bg-white/5 p-3 text-white/60 transition hover:bg-white/10 hover:text-white"
+                        className="flex items-center justify-center rounded-full bg-[#111] p-3 text-white/60 transition hover:bg-white/10 hover:text-white"
                     >
                         <ArrowLeft size={20} />
                     </Link>
                     <div>
                         <h1 className="text-3xl font-bold flex items-center gap-3">
-                            Identity Studio <Sparkles className="text-[#B7FF00]" size={24} />
+                            Identity Studio <Sparkles className="text-lime-400" size={24} />
                         </h1>
                         <p className="text-white/50">Manage your AI references and digital likenesses.</p>
                     </div>
@@ -95,7 +95,7 @@ export default function IdentityStudioPage() {
                         setIdentities((prev) => [newIdentity, ...prev]);
                     }} />
 
-                    <div className="mt-6 rounded-2xl border border-white/5 bg-zinc-900/30 p-6">
+                    <div className="mt-6 rounded-2xl border border-white/5 bg-[#111] p-6">
                         <h4 className="flex items-center gap-2 font-bold text-white mb-2">
                             <ShieldCheck className="text-green-400" size={18} />
                             Privacy First
@@ -112,12 +112,12 @@ export default function IdentityStudioPage() {
                     <h3 className="mb-4 text-xl font-bold text-white/90">Your Identities</h3>
 
                     {loading ? (
-                        <div className="flex h-40 items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/30">
+                        <div className="flex h-40 items-center justify-center rounded-2xl border border-white/5 bg-[#111]">
                             <p className="text-white/30">Loading identity vault...</p>
                         </div>
                     ) : identities.length === 0 ? (
-                        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-zinc-900/30 text-center">
-                            <div className="mb-4 rounded-full bg-white/5 p-4 text-white/20">
+                        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#111] text-center">
+                            <div className="mb-4 rounded-full bg-[#111] p-4 text-white/20">
                                 <Sparkles size={32} />
                             </div>
                             <h4 className="text-lg font-medium text-white/80">No Identities Yet</h4>
@@ -130,7 +130,7 @@ export default function IdentityStudioPage() {
                             {identities.map((identity) => (
                                 <div
                                     key={identity.id}
-                                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-xl transition hover:border-white/20"
+                                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#111] shadow-xl transition hover:border-white/20"
                                 >
                                     {/* Image */}
                                     <div className="aspect-square relative bg-black">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useRef, useEffect, useCallback } from 'react';
 
 export type MediaType = 'video' | 'audio' | 'image' | 'voice' | 'music';
 
@@ -34,6 +34,7 @@ export interface TimelineTrack {
     name: string;
     visible: boolean;
     muted: boolean;
+    volume: number; // 0.0 to 1.0 track-level volume multiplier
     clips: TimelineClip[];
 }
 
@@ -49,9 +50,19 @@ interface NleState {
     // Selection
     selectedClipId: string | null;
     selectedTrackId: string | null;
+    activeTrackId: string; // The track where new media from the library will be placed
 
     // Zoom
     zoomLevel: number; // Pixels per second
+
+    // Settings
+    isFullscreen: boolean;
+    setIsFullscreen: React.Dispatch<React.SetStateAction<boolean>>;
+    aspectRatio: '16:9' | '9:16' | '1:1';
+    setAspectRatio: React.Dispatch<React.SetStateAction<'16:9' | '9:16' | '1:1'>>;
+
+    // High-performance ref for playhead (bypasses React during playback)
+    playheadRef: React.MutableRefObject<number>;
 
     // Setters
     setPlayhead: React.Dispatch<React.SetStateAction<number>>;
@@ -59,6 +70,7 @@ interface NleState {
     setZoomLevel: React.Dispatch<React.SetStateAction<number>>;
     setSelectedClipId: (id: string | null) => void;
     setSelectedTrackId: (id: string | null) => void;
+    setActiveTrackId: (id: string) => void;
 
     // Mutations
     addTrack: (name: string) => void;
@@ -66,24 +78,39 @@ interface NleState {
     removeTrack: (trackId: string) => void;
     toggleTrackMute: (trackId: string) => void;
     toggleTrackVisibility: (trackId: string) => void;
+    setTrackVolume: (trackId: string, volume: number) => void;
     addClipToTrack: (trackId: string, clip: Omit<TimelineClip, 'id'>) => void;
     updateClip: (trackId: string, clipId: string, updates: Partial<TimelineClip>) => void;
     removeClip: (trackId: string, clipId: string) => void;
 
     // Calculated Getters
     getClipsAtTime: (time: number) => { track: TimelineTrack, clip: TimelineClip }[];
+
+    // Project Persistence
+    projectId: string | null;
+    projectName: string;
+    setProjectName: (name: string) => void;
+    isDraft: boolean;
+    hasUnsavedChanges: boolean;
+    saveStatus: 'idle' | 'saving' | 'saved' | 'error';
+    saveProject: (asDraft?: boolean) => Promise<void>;
+    loadProject: (id: string) => Promise<void>;
+    newProject: () => void;
+    setTracks: React.Dispatch<React.SetStateAction<TimelineTrack[]>>;
 }
 
 const NleContext = createContext<NleState | undefined>(undefined);
 
 export function NleProvider({ children }: { children: React.ReactNode }) {
 
+    const DEFAULT_TRACKS: TimelineTrack[] = [
+        { id: 't3', name: 'Track 3', visible: true, muted: false, volume: 1.0, clips: [] },
+        { id: 't2', name: 'Track 2', visible: true, muted: false, volume: 1.0, clips: [] },
+        { id: 't1', name: 'Track 1', visible: true, muted: false, volume: 1.0, clips: [] },
+    ];
+
     // Default Initial State: 3 Generic Tracks
-    const [tracks, setTracks] = useState<TimelineTrack[]>([
-        { id: 't3', name: 'Track 3', visible: true, muted: false, clips: [] },
-        { id: 't2', name: 'Track 2', visible: true, muted: false, clips: [] },
-        { id: 't1', name: 'Track 1', visible: true, muted: false, clips: [] },
-    ]);
+    const [tracks, setTracks] = useState<TimelineTrack[]>(DEFAULT_TRACKS);
 
     const [playhead, setPlayhead] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -91,6 +118,21 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
 
     const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
     const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+    const [activeTrackId, setActiveTrackId] = useState<string>('t1');
+
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
+
+    // === Project Persistence State ===
+    const [projectId, setProjectId] = useState<string | null>(null);
+    const [projectName, setProjectName] = useState('Untitled Project');
+    const [isDraft, setIsDraft] = useState(true);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+    // High-performance shared ref — updated by PlaybackEngine, read by Timeline/TransportBar
+    const playheadRef = useRef(0);
+    useEffect(() => { playheadRef.current = playhead; }, [playhead]);
 
     // Auto-calculate project duration based on the furthest outPoint of any clip
     const duration = useMemo(() => {
@@ -111,6 +153,7 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
             name,
             visible: true,
             muted: false,
+            volume: 1.0,
             clips: []
         };
         setTracks(prev => [newTrack, ...prev]);
@@ -150,6 +193,10 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
         setTracks(prev => prev.map(t => t.id === trackId ? { ...t, visible: !t.visible } : t));
     };
 
+    const setTrackVolume = (trackId: string, volume: number) => {
+        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, volume } : t));
+    };
+
     const addClipToTrack = (trackId: string, clip: Omit<TimelineClip, 'id'>) => {
         const newClip: TimelineClip = { ...clip, id: Math.random().toString(36).substr(2, 9) };
         setTracks(prev => prev.map(t => {
@@ -181,13 +228,114 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
         }));
     };
 
+    // Mark as unsaved whenever tracks change (after initial load)
+    const isInitialLoad = useRef(true);
+    useEffect(() => {
+        if (isInitialLoad.current) {
+            isInitialLoad.current = false;
+            return;
+        }
+        setHasUnsavedChanges(true);
+        setSaveStatus('idle');
+    }, [tracks, aspectRatio]);
+
+    // === Save Project ===
+    const saveProject = useCallback(async (asDraft = true) => {
+        try {
+            setSaveStatus('saving');
+            const projectData = { tracks, aspectRatio };
+
+            if (projectId) {
+                // Update existing project
+                const res = await fetch(`/api/nle-projects/${projectId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: projectName, data: projectData, is_draft: asDraft }),
+                });
+                if (!res.ok) throw new Error('Failed to save');
+            } else {
+                // Create new project
+                const res = await fetch('/api/nle-projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: projectName, data: projectData, is_draft: asDraft }),
+                });
+                if (!res.ok) throw new Error('Failed to create project');
+                const { project } = await res.json();
+                setProjectId(project.id);
+                // Update URL without navigation
+                window.history.replaceState(null, '', `/studio/edit?project=${project.id}`);
+            }
+
+            setIsDraft(asDraft);
+            setHasUnsavedChanges(false);
+            setSaveStatus('saved');
+
+            // Reset status after 3s
+            setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 3000);
+        } catch (e) {
+            console.error('Save project error:', e);
+            setSaveStatus('error');
+        }
+    }, [projectId, projectName, tracks, aspectRatio]);
+
+    // === Load Project ===
+    const loadProject = useCallback(async (id: string) => {
+        try {
+            const res = await fetch(`/api/nle-projects/${id}`);
+            if (!res.ok) throw new Error('Project not found');
+            const { project } = await res.json();
+
+            setProjectId(project.id);
+            setProjectName(project.name);
+            setIsDraft(project.is_draft);
+
+            // Hydrate state from saved data
+            const rawData = project.data;
+            const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+
+            if (data?.tracks) setTracks(data.tracks);
+            if (data?.aspectRatio) {
+                setAspectRatio(data.aspectRatio);
+            } else {
+                setAspectRatio('9:16');
+            }
+
+            setPlayhead(0);
+            playheadRef.current = 0;
+            setHasUnsavedChanges(false);
+            isInitialLoad.current = true; // Prevent the tracks useEffect from marking as unsaved
+            setSaveStatus('saved');
+        } catch (e) {
+            console.error('Load project error:', e);
+        }
+    }, [setPlayhead]);
+
+    // === New Project (reset to defaults) ===
+    const newProject = useCallback(() => {
+        setTracks(DEFAULT_TRACKS);
+        setAspectRatio('9:16');
+        setPlayhead(0);
+        playheadRef.current = 0;
+        setIsPlaying(false);
+        setProjectId(null);
+        setProjectName('Untitled Project');
+        setIsDraft(true);
+        setHasUnsavedChanges(false);
+        isInitialLoad.current = true;
+        setSaveStatus('idle');
+        window.history.replaceState(null, '', '/studio/edit');
+    }, [setPlayhead, setIsPlaying]);
+
     const getClipsAtTime = (time: number) => {
         const activeClips: { track: TimelineTrack, clip: TimelineClip }[] = [];
         tracks.forEach(t => {
+            if (!t.visible) return; // Do not render clips from hidden tracks
             t.clips.forEach(c => {
                 const duration = c.outPoint - c.inPoint;
                 if (time >= c.startTime && time <= c.startTime + duration) {
-                    activeClips.push({ track: t, clip: c });
+                    // Override the piped trackVolume to 0 if the track is muted
+                    activeClips.push({ track: { ...t, volume: t.muted ? 0 : t.volume }, clip: c });
                 }
             });
         });
@@ -197,9 +345,10 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
     return (
         <NleContext.Provider value={{
             tracks, duration, playhead, isPlaying, zoomLevel,
-            selectedClipId, selectedTrackId,
-            setPlayhead, setIsPlaying, setZoomLevel, setSelectedClipId, setSelectedTrackId,
-            addTrack, duplicateTrack, removeTrack, toggleTrackMute, toggleTrackVisibility, addClipToTrack, updateClip, removeClip, getClipsAtTime
+            selectedClipId, selectedTrackId, activeTrackId, isFullscreen, aspectRatio, playheadRef,
+            projectId, projectName, setProjectName, isDraft, hasUnsavedChanges, saveStatus, saveProject, loadProject, newProject, setTracks,
+            setPlayhead, setIsPlaying, setZoomLevel, setSelectedClipId, setSelectedTrackId, setActiveTrackId, setIsFullscreen, setAspectRatio,
+            addTrack, duplicateTrack, removeTrack, toggleTrackMute, toggleTrackVisibility, setTrackVolume, addClipToTrack, updateClip, removeClip, getClipsAtTime
         }}>
             {children}
         </NleContext.Provider>

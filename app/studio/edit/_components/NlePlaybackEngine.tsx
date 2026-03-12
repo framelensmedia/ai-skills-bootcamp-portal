@@ -1,216 +1,209 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNle, TimelineClip } from "../_context/NleContext";
-import { Play, Pause, SkipBack } from "lucide-react";
 
-export default function NlePlaybackEngine() {
-    const { playhead, setPlayhead, isPlaying, setIsPlaying, duration, getClipsAtTime } = useNle();
+/**
+ * High-Performance NLE Playback Engine
+ * 
+ * During playback: Updates shared playheadRef (from context) on every rAF frame.
+ * Syncs back to React state every ~250ms for UI updates (timecode, playhead line).
+ * Media elements self-manage via native .play() — no per-frame seeking.
+ */
+export default function NlePlaybackEngine({ isFullscreen = false }: { isFullscreen?: boolean }) {
+    const { playhead, setPlayhead, isPlaying, setIsPlaying, duration, tracks, aspectRatio, playheadRef } = useNle();
 
-    // Which clips should be visible/audible RIGHT NOW based on the playhead?
-    const [activeMedia, setActiveMedia] = useState<{ id: string, clip: TimelineClip }[]>([]);
-
-    // The master rAF loop reference
+    const isPlayingRef = useRef(isPlaying);
+    const durationRef = useRef(duration);
+    const tracksRef = useRef(tracks);
     const requestRef = useRef<number | undefined>(undefined);
-    const lastTimeRef = useRef<number | undefined>(undefined);
+    const lastFrameTimeRef = useRef<number | undefined>(undefined);
+    const lastSyncRef = useRef<number>(0);
 
-    // 1. Calculate Active Clips whenever playhead changes
-    useEffect(() => {
-        const clips = getClipsAtTime(playhead).map(c => ({ id: c.clip.id, clip: c.clip }));
-        setActiveMedia(clips);
-    }, [playhead, getClipsAtTime]);
+    // Sync refs with React state
+    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+    useEffect(() => { durationRef.current = duration; }, [duration]);
+    useEffect(() => { tracksRef.current = tracks; }, [tracks]);
 
+    // Active media clips (recalculated on play/stop/scrub + periodic sync)
+    const [activeMedia, setActiveMedia] = useState<{ id: string, clip: TimelineClip, trackVolume: number }[]>([]);
 
-    // 2. The Playback Loop (Master Clock)
-    const animate = (time: number) => {
-        if (lastTimeRef.current != undefined && isPlaying) {
-            const deltaTime = (time - lastTimeRef.current) / 1000; // diff in seconds
-
-            setPlayhead((prev) => {
-                const next = prev + deltaTime;
-                if (next >= duration) {
-                    setIsPlaying(false);
-                    return 0; // Loop back or stop
+    const getClipsAtTimeLocal = useCallback((time: number) => {
+        const activeClips: { id: string, clip: TimelineClip, trackVolume: number }[] = [];
+        tracksRef.current.forEach(t => {
+            if (!t.visible) return;
+            t.clips.forEach(c => {
+                const clipDuration = c.outPoint - c.inPoint;
+                if (time >= c.startTime && time <= c.startTime + clipDuration) {
+                    activeClips.push({ id: c.id, clip: c, trackVolume: t.muted ? 0 : t.volume });
                 }
-                return next;
             });
-        }
-        lastTimeRef.current = time;
-        if (isPlaying) {
-            requestRef.current = requestAnimationFrame(animate);
-        }
-    };
+        });
+        return activeClips;
+    }, []);
 
+    // Update active media when NOT playing (scrubbing / track changes)
+    useEffect(() => {
+        if (!isPlaying) {
+            setActiveMedia(getClipsAtTimeLocal(playhead));
+        }
+    }, [playhead, isPlaying, tracks, getClipsAtTimeLocal]);
+
+    // === Master Playback Loop ===
+    const animate = useCallback((timestamp: number) => {
+        if (!isPlayingRef.current) return;
+
+        if (lastFrameTimeRef.current !== undefined) {
+            const deltaTime = (timestamp - lastFrameTimeRef.current) / 1000;
+            playheadRef.current += deltaTime;
+
+            if (playheadRef.current >= durationRef.current) {
+                playheadRef.current = 0;
+                setPlayhead(0);
+                setIsPlaying(false);
+                return;
+            }
+
+            // Periodic React state sync every ~250ms (for UI updates like timecode)
+            if (timestamp - lastSyncRef.current > 250) {
+                lastSyncRef.current = timestamp;
+                setPlayhead(playheadRef.current);
+            }
+        }
+
+        lastFrameTimeRef.current = timestamp;
+        requestRef.current = requestAnimationFrame(animate);
+    }, [setPlayhead, setIsPlaying, playheadRef]);
+
+    // Start / Stop
     useEffect(() => {
         if (isPlaying) {
+            playheadRef.current = playhead;
+            lastFrameTimeRef.current = undefined;
+            lastSyncRef.current = 0;
+            setActiveMedia(getClipsAtTimeLocal(playhead));
             requestRef.current = requestAnimationFrame(animate);
-        } else if (requestRef.current) {
-            cancelAnimationFrame(requestRef.current);
-        }
-        return () => {
+        } else {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        };
-    }, [isPlaying, duration]);
+            // Final sync
+            setPlayhead(playheadRef.current);
+            setActiveMedia(getClipsAtTimeLocal(playheadRef.current));
+        }
+        return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+    }, [isPlaying]);
 
+    // === Dynamic Sizing Logic ===
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    // Format Time Helper
-    const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        const ms = Math.floor((seconds % 1) * 100);
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-    };
+    useEffect(() => {
+        const obs = new ResizeObserver((entries) => {
+            if (!entries[0]) return;
+            setContainerSize({
+                width: entries[0].contentRect.width,
+                height: entries[0].contentRect.height
+            });
+        });
+        if (containerRef.current) obs.observe(containerRef.current);
+        return () => obs.disconnect();
+    }, []);
+
+    const ratio = aspectRatio === '16:9' ? 16 / 9 : aspectRatio === '1:1' ? 1 : 9 / 16;
+    let canvasWidth = containerSize.width;
+    let canvasHeight = canvasWidth / ratio;
+
+    if (canvasHeight > containerSize.height) {
+        canvasHeight = containerSize.height;
+        canvasWidth = canvasHeight * ratio;
+    }
 
     return (
-        <div className="flex-1 bg-black relative flex flex-col items-center justify-center border-b border-white/10 p-4">
-
-            {/* 3. The Live Compositing Canvas */}
-            <div className="aspect-video w-full max-w-4xl bg-[#090909] rounded-xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden flex items-center justify-center">
-
+        <div ref={containerRef} className="flex-1 w-full h-full bg-black relative flex items-center justify-center p-2 lg:p-4 min-h-0 min-w-0">
+            <div
+                style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }}
+                className="bg-[#090909] rounded-xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden flex items-center justify-center flex-shrink-0"
+            >
                 {activeMedia.length === 0 && (
                     <p className="text-white/20 font-mono text-sm uppercase tracking-widest z-0">No Media at Playhead</p>
                 )}
 
-                {/* Render all active clips */}
-                {activeMedia.map(({ id, clip }) => {
-                    // Calculate where we should be seeking within the media file
-                    // Offset from the start of the clip + the inPoint trim
-                    const currentMediaTime = (playhead - clip.startTime) + clip.inPoint;
-
-                    if (clip.mediaType === 'video') {
-                        return (
-                            <VideoRenderer
-                                key={id}
-                                clip={clip}
-                                mediaTime={currentMediaTime}
-                                isPlaying={isPlaying}
-                            />
-                        );
-                    } else if (clip.mediaType === 'image') {
-                        return (
-                            <img
-                                key={id}
-                                src={clip.url}
-                                style={{
-                                    position: 'absolute',
-                                    left: `${clip.x ?? 0}%`,
-                                    top: `${clip.y ?? 0}%`,
-                                    width: `${clip.width ?? 100}%`,
-                                    height: clip.height ? `${clip.height}%` : 'auto',
-                                    opacity: clip.opacity ?? 1.0,
-                                    objectFit: 'contain'
-                                }}
-                            />
-                        );
-                    } else {
-                        // Audio / Voice
-                        return (
-                            <AudioRenderer
-                                key={id}
-                                clip={clip}
-                                mediaTime={currentMediaTime}
-                                isPlaying={isPlaying}
-                            />
-                        );
-                    }
-                })}
+                {activeMedia.map(({ id, clip, trackVolume }) => (
+                    <div key={id} className="absolute inset-0">
+                        {clip.mediaType === 'video' ? (
+                            <VideoRenderer clip={clip} isPlaying={isPlaying} trackVolume={trackVolume} playheadRef={playheadRef} />
+                        ) : clip.mediaType === 'image' ? (
+                            <img src={clip.url} alt="" style={{
+                                position: 'absolute', left: `${clip.x ?? 0}%`, top: `${clip.y ?? 0}%`,
+                                width: `${clip.width ?? 100}%`, height: `${clip.height ?? 100}%`,
+                                opacity: clip.opacity ?? 1.0, objectFit: 'contain'
+                            }} />
+                        ) : (
+                            <AudioRenderer clip={clip} isPlaying={isPlaying} trackVolume={trackVolume} playheadRef={playheadRef} />
+                        )}
+                    </div>
+                ))}
             </div>
-
-            {/* 4. Playback Controls */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-black/80 backdrop-blur-xl px-8 py-3 rounded-full border border-white/10 shadow-2xl">
-                <button
-                    onClick={() => { setPlayhead(0); setIsPlaying(false); }}
-                    className="text-white/50 hover:text-white transition"
-                >
-                    <SkipBack size={20} className="fill-current" />
-                </button>
-
-                <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-12 h-12 bg-white text-black hover:bg-indigo-400 hover:scale-105 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-                >
-                    {isPlaying ? <Pause size={24} className="fill-current" /> : <Play size={24} className="fill-current ml-1" />}
-                </button>
-
-                <span className="font-mono text-sm text-white/50 tracking-wider">
-                    <span className="text-white">{formatTime(playhead)}</span> / {formatTime(duration)}
-                </span>
-            </div>
-
         </div>
     );
 }
 
-// === Sub-Renderers to handle syncing individual HTML5 elements ===
+// === Sub-Renderers ===
 
-function VideoRenderer({ clip, mediaTime, isPlaying }: { clip: TimelineClip, mediaTime: number, isPlaying: boolean }) {
+interface MediaRendererProps {
+    clip: TimelineClip;
+    isPlaying: boolean;
+    trackVolume: number;
+    playheadRef: React.MutableRefObject<number>;
+}
+
+function VideoRenderer({ clip, isPlaying, trackVolume, playheadRef }: MediaRendererProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
         if (!videoRef.current) return;
+        const video = videoRef.current;
+        video.volume = Math.min(clip.volume * trackVolume, 1.0);
 
-        // Sync the video time if we are out of sync by more than ~0.2s
-        if (Math.abs(videoRef.current.currentTime - mediaTime) > 0.2) {
-            videoRef.current.currentTime = mediaTime;
+        const mediaTime = (playheadRef.current - clip.startTime) + clip.inPoint;
+        video.currentTime = mediaTime;
+
+        if (isPlaying) {
+            video.play().catch(() => { });
+        } else {
+            video.pause();
         }
-
-        if (isPlaying && videoRef.current.paused) {
-            videoRef.current.play().catch(() => { });
-        } else if (!isPlaying && !videoRef.current.paused) {
-            videoRef.current.pause();
-        }
-
-        // Clamp volume preview to 1.0 max
-        videoRef.current.volume = Math.min(clip.volume, 1.0);
-
-    }, [mediaTime, isPlaying, clip.volume]);
+    }, [isPlaying, clip.volume, trackVolume]);
 
     return (
-        <video
-            ref={videoRef}
-            src={clip.url}
-            muted={clip.volume === 0}
+        <video ref={videoRef} src={clip.url} muted={clip.volume === 0 || trackVolume === 0} playsInline
             style={{
-                position: 'absolute',
-                left: `${clip.x ?? 0}%`,
-                top: `${clip.y ?? 0}%`,
-                width: `${clip.width ?? 100}%`,
-                height: clip.height ? `${clip.height}%` : 'auto',
-                opacity: clip.opacity ?? 1.0,
-                objectFit: 'contain' // Prevent stretching
+                position: 'absolute', left: `${clip.x ?? 0}%`, top: `${clip.y ?? 0}%`,
+                width: `${clip.width ?? 100}%`, height: `${clip.height ?? 100}%`,
+                opacity: clip.opacity ?? 1.0, objectFit: 'contain'
             }}
         />
     );
 }
 
-function AudioRenderer({ clip, mediaTime, isPlaying }: { clip: TimelineClip, mediaTime: number, isPlaying: boolean }) {
+function AudioRenderer({ clip, isPlaying, trackVolume, playheadRef }: MediaRendererProps) {
     const audioRef = useRef<HTMLAudioElement>(null);
 
     useEffect(() => {
         if (!audioRef.current) return;
+        const audio = audioRef.current;
+        audio.volume = Math.min(clip.volume * trackVolume, 1.0);
 
-        // Sync the audio time if we are out of sync by more than ~0.2s
-        if (Math.abs(audioRef.current.currentTime - mediaTime) > 0.2) {
-            audioRef.current.currentTime = mediaTime;
+        const mediaTime = (playheadRef.current - clip.startTime) + clip.inPoint;
+        audio.currentTime = mediaTime;
+
+        if (isPlaying) {
+            audio.play().catch(() => { });
+        } else {
+            audio.pause();
         }
-
-        if (isPlaying && audioRef.current.paused) {
-            audioRef.current.play().catch(() => { });
-        } else if (!isPlaying && !audioRef.current.paused) {
-            audioRef.current.pause();
-        }
-
-        // Clamp volume preview to 1.0 max
-        audioRef.current.volume = Math.min(clip.volume, 1.0);
-
-    }, [mediaTime, isPlaying, clip.volume]);
+    }, [isPlaying, clip.volume, trackVolume]);
 
     return (
-        <audio
-            ref={audioRef}
-            src={clip.url}
-            muted={clip.volume === 0}
-            className="hidden" // Never visible
-        />
+        <audio ref={audioRef} src={clip.url} muted={clip.volume === 0 || trackVolume === 0} className="hidden" />
     );
 }

@@ -2,89 +2,178 @@
 
 import { useNle, TimelineClip, TimelineTrack } from "../_context/NleContext";
 import { Rnd } from "react-rnd";
-import { Eye, EyeOff, Volume2, VolumeX, Trash2, Plus, Copy } from "lucide-react";
-import { useState } from "react";
-import NleLibraryModal from "./NleLibraryModal";
+import { Eye, EyeOff, Volume2, VolumeX, Trash2, Plus, Copy, ChevronRight, ChevronLeft, Settings2 } from "lucide-react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
-export default function NleTimeline() {
-    const { tracks, duration, zoomLevel, playhead, setPlayhead, isPlaying, duplicateTrack, toggleTrackMute, toggleTrackVisibility } = useNle();
-    const [addingToTrack, setAddingToTrack] = useState<string | null>(null);
+// Add global styles for hiding scrollbars but keeping functionality
+const HideScrollbarStyles = () => (
+    <style dangerouslySetInnerHTML={{
+        __html: `
+        .custom-scrollbar-none::-webkit-scrollbar { display: none; }
+        .custom-scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+    `}} />
+);
+
+export default function NleTimeline({ isFullscreen = false }: { isFullscreen?: boolean }) {
+    const { tracks, duration, zoomLevel, playhead, setPlayhead, isPlaying, setIsPlaying, duplicateTrack, toggleTrackMute, toggleTrackVisibility, activeTrackId, setActiveTrackId, setTrackVolume, playheadRef } = useNle();
+    const [isControlsExpanded, setIsControlsExpanded] = useState(false);
+
+    // DOM refs for direct manipulation during playback
+    const rulerPlayheadRef = useRef<HTMLDivElement>(null);
+    const trackPlayheadRef = useRef<HTMLDivElement>(null);
+    const rulerContainerRef = useRef<HTMLDivElement>(null);
+    const rafRef = useRef<number | undefined>(undefined);
+
+    // High-performance playhead line update via rAF (reads shared playheadRef)
+    useEffect(() => {
+        const updatePlayheadLine = () => {
+            const pos = `${playheadRef.current * zoomLevel}px`;
+            if (rulerPlayheadRef.current) rulerPlayheadRef.current.style.left = pos;
+            if (trackPlayheadRef.current) trackPlayheadRef.current.style.left = pos;
+            rafRef.current = requestAnimationFrame(updatePlayheadLine);
+        };
+
+        rafRef.current = requestAnimationFrame(updatePlayheadLine);
+        return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    }, [zoomLevel, playheadRef]);
+
+    // === Touch & Click Scrubbing (Mobile-First) ===
+    const scrubFromPosition = useCallback((clientX: number) => {
+        if (!rulerContainerRef.current) return;
+        const rect = rulerContainerRef.current.getBoundingClientRect();
+        const x = clientX - rect.left + rulerContainerRef.current.scrollLeft;
+        const newTime = Math.max(0, Math.min(x / zoomLevel, duration));
+        playheadRef.current = newTime;
+        setPlayhead(newTime);
+    }, [zoomLevel, duration, setPlayhead, playheadRef]);
+
+    // Touch handlers for ruler scrubbing
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        e.preventDefault();
+        if (isPlaying) setIsPlaying(false);
+        scrubFromPosition(e.touches[0].clientX);
+    }, [isPlaying, setIsPlaying, scrubFromPosition]);
+
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
+        e.preventDefault();
+        scrubFromPosition(e.touches[0].clientX);
+    }, [scrubFromPosition]);
+
+    const handleClick = useCallback((e: React.MouseEvent) => {
+        scrubFromPosition(e.clientX);
+    }, [scrubFromPosition]);
+
+    // Mouse drag scrubbing
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        if (isPlaying) setIsPlaying(false);
+        scrubFromPosition(e.clientX);
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            scrubFromPosition(moveEvent.clientX);
+        };
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [isPlaying, setIsPlaying, scrubFromPosition]);
 
     return (
-        <div className="h-72 bg-[#121212] shrink-0 flex flex-col border-t border-white/5 relative z-10">
+        <div className={`flex flex-col border-t border-white/5 relative z-10 ${isFullscreen ? "flex-1 h-full bg-[#0A0A0A]" : "h-72 bg-[#121212] shrink-0"}`}>
+            <HideScrollbarStyles />
 
             {/* Top Ruler / Playhead Controls */}
-            <div className="h-8 border-b border-white/5 bg-[#1A1A1A] flex items-center relative overflow-hidden">
+            <div className="h-8 border-b border-white/5 bg-[#1A1A1A] flex items-center relative">
                 {/* Left spacer for track headers */}
-                <div className="w-64 h-full shrink-0 border-r border-white/5 bg-[#1F1F1F] flex items-center px-4 shadow-xl z-20">
-                    <span className="text-[10px] text-white/30 font-mono tracking-widest uppercase">Timeline</span>
+                <div className={`${isControlsExpanded ? "w-48 lg:w-64" : "w-12 lg:w-64"} h-full shrink-0 border-r border-white/5 bg-[#1F1F1F] flex items-center justify-between px-3 shadow-xl z-20 transition-all duration-300`}>
+                    <span className={`text-[10px] text-white/30 font-mono tracking-widest uppercase truncate ${!isControlsExpanded && 'hidden lg:block'}`}>Timeline</span>
+                    <button
+                        onClick={() => setIsControlsExpanded(!isControlsExpanded)}
+                        className="lg:hidden w-6 h-6 rounded bg-white/5 flex items-center justify-center text-white/40 hover:text-white"
+                    >
+                        {isControlsExpanded ? <ChevronLeft size={14} /> : <Settings2 size={14} />}
+                    </button>
                 </div>
 
-                {/* Playhead Ruler */}
+                {/* Playhead Ruler (Scrubable via touch + click + drag) */}
                 <div
-                    className="flex-1 h-full relative cursor-text bg-[length:50px_100%] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGgwLjV2NDBIMHptMTAgMjVoMC41djE1SDEwem0xMCAwaDAuNXYxNUgyMHptMTAgMGgwLjV2MTVIMzB6bTEwIDBoMC41djE1SDQweiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')]"
-                    onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const clickX = e.clientX - rect.left;
-                        setPlayhead(clickX / zoomLevel);
-                    }}
+                    ref={rulerContainerRef}
+                    className="flex-1 h-full relative cursor-text touch-none bg-[length:50px_100%] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGgwLjV2NDBIMHptMTAgMjVoMC41djE1SDEwem0xMCAwaDAuNXYxNUgyMHptMTAgMGgwLjV2MTVIMzB6bTEwIDBoMC41djE1SDQweiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')] overflow-x-auto overflow-y-hidden custom-scrollbar-none"
+                    onMouseDown={handleMouseDown}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    style={{ overflowX: 'auto' }}
                 >
-                    {/* Playhead Line Indicator inside ruler */}
-                    <div
-                        className="absolute top-0 bottom-0 w-[11px] -ml-[5px] cursor-grab active:cursor-grabbing hover:bg-white/10 z-50 flex justify-center"
-                        style={{ left: `${playhead * zoomLevel}px` }}
-                    >
-                        <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-red-500 mt-0" />
-                        <div className="absolute top-[6px] bottom-0 w-[1px] bg-red-500" />
-                    </div>
-
-                    {/* Time markers every 1 second (based on zoom) */}
-                    {Array.from({ length: duration }).map((_, i) => (
-                        <span
-                            key={i}
-                            className="absolute text-[9px] text-white/30 font-mono top-1"
-                            style={{ left: `${i * zoomLevel + 2}px` }}
+                    {/* Width of content to enable scrolling */}
+                    <div style={{ width: `${duration * zoomLevel}px`, height: '100%', position: 'relative' }}>
+                        {/* Playhead Line Indicator inside ruler (DOM-driven) */}
+                        <div
+                            ref={rulerPlayheadRef}
+                            className="absolute top-0 bottom-0 w-[11px] -ml-[5px] z-50 flex justify-center pointer-events-none"
+                            style={{ left: `${playhead * zoomLevel}px` }}
                         >
-                            00:{(i).toString().padStart(2, '0')}
-                        </span>
-                    ))}
+                            <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-red-500 mt-0" />
+                            <div className="absolute top-[6px] bottom-0 w-[1px] bg-red-500" />
+                        </div>
+
+                        {/* Time markers every 1 second */}
+                        {Array.from({ length: duration }).map((_, i) => (
+                            <span
+                                key={i}
+                                className="absolute text-[9px] text-white/30 font-mono top-1 pointer-events-none select-none"
+                                style={{ left: `${i * zoomLevel + 2}px` }}
+                            >
+                                00:{(i).toString().padStart(2, '0')}
+                            </span>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* Tracks Area */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden relative flex bg-[#0A0A0A]">
+            <div className="flex-1 overflow-y-auto relative flex bg-[#0A0A0A]">
 
                 {/* Track Headers (Fixed left) */}
-                <div className="w-64 border-r border-white/5 bg-[#1A1A1A] flex flex-col shrink-0 z-20 shadow-xl relative">
+                <div className={`${isControlsExpanded ? "w-48 lg:w-64" : "w-12 lg:w-64"} border-r border-white/5 bg-[#1A1A1A] flex flex-col shrink-0 z-20 shadow-xl relative transition-all duration-300 ${isFullscreen ? "bg-[#111]" : ""}`}>
                     {tracks.map(t => (
                         <TrackHeader
                             key={t.id}
                             track={t}
-                            onAddClick={() => setAddingToTrack(t.id)}
+                            isActive={activeTrackId === t.id}
+                            isExpanded={isControlsExpanded}
+                            onAddClick={() => setActiveTrackId(t.id)}
                             onDuplicate={() => duplicateTrack(t.id)}
                             onToggleMute={() => toggleTrackMute(t.id)}
                             onToggleVisibility={() => toggleTrackVisibility(t.id)}
+                            onVolumeChange={(val) => setTrackVolume(t.id, val)}
                         />
                     ))}
                 </div>
 
                 {/* Track Spans (Scrollable Right) */}
-                <div className="flex-1 relative overflow-x-auto min-w-0" style={{ width: `${duration * zoomLevel}px` }}>
-                    {/* Vertical Playhead Line across all tracks */}
-                    <div
-                        className="absolute top-0 bottom-0 w-[1px] bg-red-500/80 z-40 pointer-events-none shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                        style={{ left: `${playhead * zoomLevel}px` }}
-                    />
+                <div
+                    className="flex-1 relative overflow-x-auto overflow-y-hidden custom-scrollbar-none min-w-0"
+                    onScroll={(e) => {
+                        if (rulerContainerRef.current) {
+                            rulerContainerRef.current.scrollLeft = (e.currentTarget as HTMLDivElement).scrollLeft;
+                        }
+                    }}
+                >
+                    <div style={{ width: `${duration * zoomLevel}px`, position: 'relative', minHeight: '100%' }}>
+                        {/* Vertical Playhead Line across all tracks (DOM-driven) */}
+                        <div
+                            ref={trackPlayheadRef}
+                            className="absolute top-0 bottom-0 w-[1px] bg-red-500/80 z-40 pointer-events-none shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                            style={{ left: `${playhead * zoomLevel}px` }}
+                        />
 
-                    {/* Render Track Rows */}
-                    {tracks.map(t => <TrackRow key={t.id} track={t} />)}
+                        {/* Render Track Rows */}
+                        {tracks.map(t => <TrackRow key={t.id} track={t} isFullscreen={isFullscreen} />)}
+                    </div>
                 </div>
 
             </div>
-
-            {addingToTrack && (
-                <NleLibraryModal trackId={addingToTrack} onClose={() => setAddingToTrack(null)} />
-            )}
         </div>
     );
 }
@@ -93,46 +182,73 @@ export default function NleTimeline() {
 
 interface TrackHeaderProps {
     track: TimelineTrack;
+    isActive: boolean;
+    isExpanded: boolean;
     onAddClick: () => void;
     onDuplicate: () => void;
     onToggleMute: () => void;
     onToggleVisibility: () => void;
+    onVolumeChange: (val: number) => void;
 }
 
-function TrackHeader({ track, onAddClick, onDuplicate, onToggleMute, onToggleVisibility }: TrackHeaderProps) {
+function TrackHeader({ track, isActive, isExpanded, onAddClick, onDuplicate, onToggleMute, onToggleVisibility, onVolumeChange }: TrackHeaderProps) {
     return (
-        <div className="h-16 border-b border-white/5 flex items-center px-4 justify-between group bg-[#111] hover:bg-[#1A1A1A] transition shrink-0 relative">
-            <div className="flex flex-col">
-                <span className="text-xs font-bold text-white/80">
+        <div className={`h-16 border-b border-white/5 flex items-center px-3 transition-all duration-300 gap-2 group shrink-0 relative ${isActive ? "bg-[#181818] border-l-2 border-l-lime-500" : "bg-[#111] hover:bg-[#1A1A1A]"}`}>
+            {/* Track Name */}
+            <div className={`flex flex-col min-w-0 shrink-0 ${!isExpanded && "lg:flex hidden"}`}>
+                <span className={`text-[10px] lg:text-xs font-bold truncate ${isActive ? "text-lime-400" : "text-white/80"}`}>
                     {track.name}
                 </span>
-                <span className="text-[10px] text-white/30 uppercase mt-0.5">TRACK</span>
+                <span className="text-[8px] lg:text-[10px] text-white/30 uppercase">TRACK</span>
             </div>
 
-            <div className="flex items-center gap-2 opacity-100 md:opacity-50 group-hover:opacity-100 transition">
-                <button onClick={onDuplicate} title="Duplicate Track" className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70">
-                    <Copy size={12} />
-                </button>
-                <button onClick={onToggleMute} title={track.muted ? "Unmute" : "Mute"} className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70">
+            {/* Collapsed view indicator (Only on mobile when not expanded) */}
+            {!isExpanded && (
+                <div className="lg:hidden flex-1 flex items-center justify-center">
+                    <div className={`w-1 h-8 rounded-full ${isActive ? 'bg-lime-500' : 'bg-white/10'}`} />
+                </div>
+            )}
+
+            {/* Volume Slider */}
+            <div className={`flex items-center gap-1.5 flex-1 min-w-0 px-1 ${(isExpanded || 'lg:flex hidden') ? 'flex' : 'hidden'}`}>
+                <button onClick={onToggleMute} title={track.muted ? "Unmute" : "Mute"} className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white transition shrink-0">
                     {track.muted ? <VolumeX size={12} className="text-red-400" /> : <Volume2 size={12} />}
                 </button>
-                <button onClick={onToggleVisibility} title={track.visible ? "Hide" : "Show"} className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70">
-                    {track.visible ? <Eye size={12} /> : <EyeOff size={12} className="text-red-400" />}
+                <input
+                    type="range"
+                    min="0" max="1" step="0.01"
+                    value={track.muted ? 0 : track.volume}
+                    onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                    className="flex-1 h-1 min-w-0 bg-white/10 rounded-full appearance-none cursor-pointer accent-lime-500"
+                    style={{ accentColor: track.muted ? '#ef4444' : '#6366f1' }}
+                />
+                <span className="text-[9px] font-mono text-white/30 w-6 text-right shrink-0">
+                    {track.muted ? '0' : Math.round(track.volume * 100)}
+                </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className={`items-center gap-1 shrink-0 ${(isExpanded || 'lg:flex hidden') ? 'flex' : 'hidden'}`}>
+                <button onClick={onDuplicate} title="Duplicate Track" className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+                    <Copy size={10} />
                 </button>
-                <button onClick={onAddClick} title="Add Media" className="w-6 h-6 rounded bg-indigo-500/20 hover:bg-indigo-500 flex items-center justify-center text-indigo-400 hover:text-white ml-2 transition">
-                    <Plus size={14} />
+                <button onClick={onToggleVisibility} title={track.visible ? "Hide" : "Show"} className="w-5 h-5 rounded bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+                    {track.visible ? <Eye size={10} /> : <EyeOff size={10} className="text-red-400" />}
+                </button>
+                <button onClick={onAddClick} title="Set Active Track" className="w-5 h-5 rounded bg-lime-500/20 hover:bg-lime-500 flex items-center justify-center text-lime-400 hover:text-black transition">
+                    <Plus size={12} />
                 </button>
             </div>
         </div>
     );
 }
 
-function TrackRow({ track }: { track: TimelineTrack }) {
+function TrackRow({ track, isFullscreen }: { track: TimelineTrack, isFullscreen: boolean }) {
     const { zoomLevel } = useNle();
 
     return (
         <div
-            className="h-16 border-b border-white/5 relative bg-[length:50px_100%] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI2NCI+PHBhdGggZD0iTTAgMEgwLjVWNjRIMHoiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMSkiLz48L3N2Zz4=')] bg-repeat-x"
+            className={`${isFullscreen ? "flex-1 min-h-[64px]" : "h-16"} border-b border-white/5 relative bg-[length:50px_100%] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSI2NCI+PHBhdGggZD0iTTAgMEgwLjVWNjRIMHoiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMSkiLz48L3N2Zz4=')] bg-repeat-x`}
         >
             {track.clips.map(c => (
                 <ClipBlock key={c.id} clip={c} trackId={track.id} />
@@ -151,9 +267,9 @@ function ClipBlock({ clip, trackId }: { clip: TimelineClip, trackId: string }) {
     const left = clip.startTime * zoomLevel;
 
     // Colors
-    let bColor = "border-indigo-500/30";
-    let bgGradient = "from-indigo-500/20 to-indigo-500/5";
-    let iconColor = "text-indigo-400";
+    let bColor = "border-lime-500/30";
+    let bgGradient = "from-lime-500/20 to-lime-500/5";
+    let iconColor = "text-lime-400";
 
     if (clip.mediaType === 'video') {
         bColor = "border-amber-500/30"; bgGradient = "from-amber-500/20 to-amber-500/5"; iconColor = "text-amber-400";

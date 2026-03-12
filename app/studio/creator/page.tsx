@@ -10,7 +10,7 @@ import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download, Image as ImageIcon, Film, Activity, Music, Scissors } from "lucide-react";
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import SubjectControls from "../components/SubjectControls";
@@ -29,12 +29,11 @@ import VoiceTab from "./_components/VoiceTab";
 import MusicTab from "./_components/MusicTab";
 import AnimateTab from "./_components/AnimateTab";
 import AudioVideoTab from "./_components/AudioVideoTab";
-import KlingMotionTab from "./_components/KlingMotionTab";
 import { getVoiceGenerations } from "@/app/actions/voiceStudio";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
-type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "klingmotion" | "edit";
+type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "edit";
 
 function TypeWriter({ text }: { text: string }) {
     const [visible, setVisible] = useState(false);
@@ -52,7 +51,7 @@ function TypeWriter({ text }: { text: string }) {
     }, []);
 
     return (
-        <div ref={ref} className="text-xl font-bold text-foreground tracking-tight mb-4 min-h-[28px]">
+        <div ref={ref} className="text-xl font-bold text-white tracking-tight mb-4 min-h-[28px]">
             {text.split("").map((char, i) => (
                 <span
                     key={i}
@@ -62,7 +61,7 @@ function TypeWriter({ text }: { text: string }) {
                     {char === " " ? "\u00A0" : char}
                 </span>
             ))}
-            <span className={`inline-block ml-0.5 animate-pulse text-primary ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
+            <span className={`inline-block ml-0.5 animate-pulse text-lime-400 ${visible ? 'opacity-100' : 'opacity-0'}`}>|</span>
         </div>
     );
 }
@@ -155,7 +154,6 @@ function CreatorContent() {
         if (activeTab === "audio2video") return AUDIO2VIDEO_COST;
         if (activeTab === "voice") return VOICE_COST;
         if (activeTab === "music") return 10; // Music cost
-        if (activeTab === "klingmotion") return 20; // Kling is an expensive model
         if (activeTab === "edit") return 0;
         return IMAGE_COST; // Default for 'image' tab
     };
@@ -183,7 +181,16 @@ function CreatorContent() {
 
     // Intent check
     useEffect(() => {
-        if (searchParams?.get("intent") === "video") {
+        const tab = searchParams?.get("tab");
+        const intent = searchParams?.get("intent");
+
+        if (tab) {
+            // Only allow valid tabs
+            const validTabs = ["image", "video", "animate", "audio2video", "voice", "music", "edit"];
+            if (validTabs.includes(tab)) {
+                setActiveTab(tab as any);
+            }
+        } else if (intent === "video") {
             setActiveTab("video");
         }
     }, [searchParams]);
@@ -223,7 +230,7 @@ function CreatorContent() {
     }, [aspectRatio, previewImage]);
 
     useEffect(() => {
-        if (activeTab === "video" || activeTab === "animate" || activeTab === "audio2video" || activeTab === "voice" || activeTab === "klingmotion") {
+        if (activeTab === "video" || activeTab === "animate" || activeTab === "audio2video" || activeTab === "voice") {
             setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
         } else setSelectedModel(DEFAULT_MODEL_ID);
     }, [activeTab]);
@@ -740,41 +747,55 @@ function CreatorContent() {
         }
     ];
 
+    const headerInfo = useMemo(() => {
+        switch (activeTab) {
+            case "image": return { title: "Image Studio", icon: ImageIcon, desc: "Generate stunning high-fidelity images" };
+            case "video": return { title: "Video Studio", icon: Film, desc: "Create and extend cinematic video shots" };
+            case "animate": return { title: "Motion Capture", icon: Activity, desc: "Animate your subjects with lifelike motion" };
+            case "audio2video": return { title: "Audio-to-Video", icon: Mic, desc: "Drive character lip-sync and expressions with audio" };
+            case "voice": return { title: "Voice Studio", icon: Mic, desc: "Clone voices and generate lifelike speech" };
+            case "music": return { title: "Music Studio", icon: Music, desc: "Produce professional royalty-free music tracks" };
+            case "edit": return { title: "NLE Editor", icon: Scissors, desc: "Non-linear multi-track media editor" };
+            default: return { title: "Creator Studio", icon: Clapperboard, desc: "The complete AI Media Production engine" };
+        }
+    }, [activeTab]);
+
     return (
         <main className="mx-auto w-full max-w-7xl px-4 py-8">
             <TourGuide tourId="studio_tour_v5" steps={studioTourSteps} triggerParamName="studio" />
             {/* Page Header */}
-            <div className="mb-8">
-                <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
-                    <Clapperboard className="w-8 h-8 md:w-10 md:h-10 text-primary" />
-                    Creator Studio
-                </h1>
-                <p className="mt-2 text-muted-foreground">The complete AI Media Production engine</p>
-            </div>
+            <div className="mb-8 flex flex-col md:flex-row gap-4 md:items-end md:justify-between border-b border-white/10 pb-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 mb-1">
+                        <headerInfo.icon className="w-8 h-8 text-[#B7FF00]" />
+                        {headerInfo.title}
+                    </h1>
+                    <p className="text-sm text-white/50">{headerInfo.desc}</p>
+                </div>
 
-            {/* Master Tabs */}
-            <div className="mb-8 flex flex-wrap items-center gap-6 border-b border-border relative">
-                {(["image", "video", "animate", "audio2video", "voice", "music", "klingmotion"] as const).map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`pb-3 px-1 text-sm font-bold uppercase tracking-wider transition-colors relative outline-none ${activeTab === tab
-                            ? "text-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                            }`}
-                    >
-                        {tab === "animate" ? "motion capture" : tab === "audio2video" ? "audio-to-video" : tab === "klingmotion" ? "kling motion" : tab}
-                        {activeTab === tab && (
-                            <div className="absolute bottom-[-1px] left-0 w-full h-0.5 bg-primary rounded-t-sm" />
-                        )}
-                    </button>
-                ))}
-                <Link
-                    href="/studio/edit"
-                    className="pb-3 px-1 text-sm font-bold uppercase tracking-wider transition-colors relative outline-none text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-primary flex items-center gap-1"
-                >
-                    EDIT
-                </Link>
+                {/* Master Tabs */}
+                <div className="relative max-w-full mx-4 sm:mx-0">
+                    <div className="flex bg-zinc-900/50 backdrop-blur-md border border-white/5 p-1 rounded-xl self-start overflow-x-auto scrollbar-none [mask-image:linear-gradient(to_right,white_85%,transparent_100%)] sm:[mask-image:none]">
+                        {(["image", "video", "animate", "audio2video", "voice", "music"] as const).map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab)}
+                                className={`px-4 py-2 text-[10px] font-bold uppercase rounded-lg whitespace-nowrap transition-all duration-200 ${activeTab === tab
+                                    ? "bg-[#B7FF00] text-black shadow-[0_0_15px_-3px_rgba(183,255,0,0.5)]"
+                                    : "text-white/40 hover:text-white hover:bg-white/5"
+                                    }`}
+                            >
+                                {tab === "animate" ? "motion" : tab === "audio2video" ? "audio-to-video" : tab}
+                            </button>
+                        ))}
+                        <Link
+                            href="/studio/edit"
+                            className="px-4 py-2 text-[10px] font-bold uppercase rounded-lg whitespace-nowrap transition-all text-white/40 hover:text-white hover:bg-white/5 ml-2 border-l border-white/10"
+                        >
+                            EDIT
+                        </Link>
+                    </div>
+                </div>
             </div>
 
             {/* GLOBAL PAUSE BANNER */}
@@ -820,24 +841,13 @@ function CreatorContent() {
                             onCreditsUpdate={setUserCredits}
                         />
                     </div>
-                ) : activeTab === "klingmotion" ? (
-                    <div className="col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <KlingMotionTab
-                            isAdmin={isAdmin}
-                            hasCredits={hasCredits}
-                            userCredits={userCredits}
-                            creditError={creditError}
-                            COST={20}
-                            onCreditsUpdate={setUserCredits}
-                        />
-                    </div>
                 ) : activeTab !== "voice" && activeTab !== "music" ? (
                     <>
                         {/* LEFT COLUMN: Controls */}
                         <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
                             <div className="flex items-center justify-between">
-                                <h2 className="tour-studio-welcome text-lg font-bold text-foreground">Prompt Tool</h2>
-                                <div className="text-xs font-bold text-primary uppercase tracking-wider">AI Studio</div>
+                                <h2 className="tour-studio-welcome text-lg font-bold text-white">Prompt Tool</h2>
+                                <div className="text-xs font-bold text-lime-400 uppercase tracking-wider">AI Studio</div>
                             </div>
 
                             <p className="text-xs text-muted-foreground/60 text-center italic">
@@ -845,12 +855,12 @@ function CreatorContent() {
                             </p>
 
                             {/* Settings Card */}
-                            <div className="tour-studio-settings rounded-3xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
+                            <div className="tour-studio-settings rounded-xl border border-border bg-card p-6 backdrop-blur-2xl shadow-sm ring-1 ring-border/5">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="text-sm font-bold text-foreground">Settings</div>
+                                        <div className="text-sm font-bold text-white">Settings</div>
                                     </div>
-                                    <div className="text-xs font-mono text-primary">
+                                    <div className="text-xs font-mono text-lime-400">
                                         {activeTab.toUpperCase()} / {aspectRatio}
                                     </div>
                                 </div>
@@ -956,7 +966,7 @@ function CreatorContent() {
                                         <select
                                             value={audioTrackUrl || ""}
                                             onChange={(e) => setAudioTrackUrl(e.target.value === "" ? null : e.target.value)}
-                                            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-inner truncate"
+                                            className="w-full bg-black/50 border border-border rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary shadow-inner truncate"
                                         >
                                             <option value="">None (Silent Video)</option>
                                             {voiceGenerations.map((g: any) => (
@@ -984,8 +994,8 @@ function CreatorContent() {
                                             className={`
                                             relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all group overflow-hidden
                                             ${stylePreset === preset.id
-                                                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
-                                                    : "bg-secondary border-border text-muted-foreground hover:bg-accent hover:text-foreground hover:border-border"
+                                                    ? "bg-primary border-primary text-black shadow-sm"
+                                                    : "bg-secondary border-border text-muted-foreground hover:bg-accent hover:text-white hover:border-border"
                                                 }
                                         `}
                                         >
@@ -1009,7 +1019,7 @@ function CreatorContent() {
 
                             {/* Prompt Tool Card */
                             }
-                            <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
+                            <div className="relative rounded-xl border border-white/10 bg-[#111] p-6 backdrop-blur-2xl shadow-2xl ring-1 ring-white/5 overflow-hidden min-h-[300px]">
                                 {/* Choice Overlay Removed as requested */}
 
                                 <RemixChatWizard
@@ -1053,7 +1063,7 @@ function CreatorContent() {
                                             <button
                                                 type="button"
                                                 onClick={() => setLibraryModalOpen(true)}
-                                                className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_#B7FF00] active:scale-[0.98]"
+                                                className="group relative flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-lime-400/30 bg-lime-400/5 py-4 text-sm font-bold text-lime-400 transition-all hover:border-lime-400 hover:bg-lime-400/10 hover:shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)] active:scale-[0.98]"
                                             >
                                                 <Library size={18} className="transition-transform group-hover:scale-110" />
                                                 <span>PICK FROM YOUR LIBRARY</span>
@@ -1114,7 +1124,7 @@ function CreatorContent() {
                             {activeTab === "video" ? (
                                 <button
                                     className={[
-                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-[0_0_20px_-5px_#B7FF00]",
+                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] active:scale-[0.98] shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)]",
                                         animating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                                     ].join(" ")}
                                     onClick={handleAnimate}
@@ -1135,7 +1145,7 @@ function CreatorContent() {
                             ) : (
                                 <button
                                     className={[
-                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_#B7FF00]",
+                                        "tour-studio-generate w-full inline-flex items-center justify-center rounded-2xl px-8 py-5 text-base font-bold tracking-tight text-black transition-all transform hover:scale-[1.01] shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)]",
                                         generating || !hasCredits ? "bg-lime-400/60 opacity-70 cursor-not-allowed" : "bg-lime-400 hover:bg-lime-300",
                                     ].join(" ")}
                                     onClick={mode === "auto" ? undefined : handleManualGenerate}
@@ -1164,7 +1174,7 @@ function CreatorContent() {
                         {/* RIGHT COLUMN: Preview / Results */}
                         <div className="lg:col-span-7 order-1 lg:order-2" ref={previewRef}>
                             <div className="sticky top-8 w-full flex flex-col space-y-4">
-                                <div className={`order-2 lg:order-1 relative w-full rounded-3xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
+                                <div className={`order-2 lg:order-1 relative w-full rounded-xl border border-white/10 bg-black/40 backdrop-blur-sm overflow-hidden shadow-2xl transition-all duration-300 ${previewAspectClass}`}>
                                     {/* Generating Overlay */}
                                     {(generating || animating) && (
                                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl">
@@ -1186,7 +1196,7 @@ function CreatorContent() {
                                             src={previewImage}
                                             alt="Preview"
                                             fill
-                                            className={`object-cover ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
+                                            className={`${previewImage === "/orb-neon.gif" ? "object-scale-down" : "object-cover"} ${previewImage !== "/orb-neon.gif" ? "opacity-80" : ""}`}
                                             unoptimized
                                         />
                                     )}
@@ -1240,22 +1250,11 @@ function CreatorContent() {
                             onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
-                ) : activeTab === "klingmotion" ? (
-                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <KlingMotionTab
-                            userCredits={userCredits}
-                            isAdmin={isAdmin}
-                            hasCredits={hasCredits}
-                            creditError={creditError}
-                            COST={15}
-                            onCreditsUpdate={(amount) => setUserCredits(amount)}
-                        />
-                    </div>
                 ) : null}
             </div>
 
             {/* Global Modals for Image/Video */}
-            {activeTab !== "voice" && activeTab !== "music" && activeTab !== "klingmotion" && (
+            {activeTab !== "voice" && activeTab !== "music" && (
                 <>
                     {/* Video Modal is only used for Remix Cards / Library items now, 
                         Studio handles its own inline generation */}
@@ -1318,8 +1317,8 @@ function CreatorContent() {
 
 function VoiceTabSkeleton() {
     return (
-        <div className="w-full min-h-[500px] flex flex-col items-center justify-center border border-white/10 bg-white/5 rounded-3xl backdrop-blur-2xl">
-            <Mic className="w-12 h-12 text-primary/50 mb-4 animate-pulse" />
+        <div className="w-full min-h-[500px] flex flex-col items-center justify-center border border-white/10 bg-[#111] rounded-xl backdrop-blur-2xl">
+            <Mic className="w-12 h-12 text-lime-400/50 mb-4 animate-pulse" />
             <h3 className="text-2xl font-bold text-white mb-2">Voice Studio</h3>
             <p className="text-white/50 max-w-md text-center">
                 Clone your voice, generate TTS voiceovers, and replace dialogue in existing videos. Coming together shortly.
@@ -1348,9 +1347,9 @@ function SelectPill({
     onClick?: () => void;
 }) {
     const base = "group relative flex flex-col items-center justify-center gap-2 rounded-xl border px-2 py-3 text-center transition-all active:scale-[0.98] h-full";
-    const disabledCls = "cursor-not-allowed border-white/5 bg-white/5 text-white/20";
-    const idleCls = "border-white/10 bg-zinc-900/50 text-zinc-400 hover:border-white/20 hover:bg-zinc-900 hover:text-white";
-    const selectedCls = "border-[#B7FF00] bg-[#B7FF00]/5 text-[#B7FF00] shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]";
+    const disabledCls = "cursor-not-allowed border-white/5 bg-[#111] text-white/20";
+    const idleCls = "border-white/10 bg-[#111]/50 text-zinc-400 hover:border-white/20 hover:bg-[#111] hover:text-white";
+    const selectedCls = "border-lime-400 bg-lime-400/5 text-lime-400 shadow-[0_0_15px_-5px_rgba(183,255,0,0.3)]";
 
     return (
         <button
@@ -1360,10 +1359,10 @@ function SelectPill({
             className={[base, disabled ? disabledCls : selected ? selectedCls : idleCls].join(" ")}
             aria-pressed={selected ? "true" : "false"}
         >
-            {icon && <div className={`flex-shrink-0 transition-colors ${selected ? "text-[#B7FF00]" : "text-white/40 group-hover:text-white"}`}>{icon}</div>}
+            {icon && <div className={`flex-shrink-0 transition-colors ${selected ? "text-lime-400" : "text-white/40 group-hover:text-white"}`}>{icon}</div>}
             <div className="min-w-0">
-                <div className={`text-[10px] font-bold uppercase tracking-wider ${selected ? "text-[#B7FF00]" : "text-white group-hover:text-white"}`}>{label}</div>
-                {description && <div className={`text-[9px] mt-0.5 truncate ${selected ? "text-[#B7FF00]/70" : "text-white/30 group-hover:text-white/50"}`}>{description}</div>}
+                <div className={`text-[10px] font-bold uppercase tracking-wider ${selected ? "text-lime-400" : "text-white group-hover:text-white"}`}>{label}</div>
+                {description && <div className={`text-[9px] mt-0.5 truncate ${selected ? "text-lime-400/70" : "text-white/30 group-hover:text-white/50"}`}>{description}</div>}
             </div>
         </button>
     );
