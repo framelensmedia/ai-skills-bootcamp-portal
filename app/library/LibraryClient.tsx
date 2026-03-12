@@ -519,7 +519,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
         combinedPromptText: string;
     }) {
         const href =
-            `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
+            `/studio/creator?img=${encodeURIComponent(payload.imgUrl)}` +
             `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
         router.push(href);
     }

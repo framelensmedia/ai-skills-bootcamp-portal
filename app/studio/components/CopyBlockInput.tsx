@@ -28,7 +28,7 @@ export default function CopyBlockInput({ value, onChange, disabled, labels = {},
         <div className="space-y-4">
             <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
-                    1. {labels.headline || "Headline"} <span className="text-[#B7FF00]">*</span>
+                    1. {labels.headline || "Headline"} <span className="text-lime-400">*</span>
                 </label>
                 <input
                     type="text"
@@ -36,7 +36,7 @@ export default function CopyBlockInput({ value, onChange, disabled, labels = {},
                     onChange={(e) => onChange({ ...value, headline: e.target.value })}
                     disabled={disabled}
                     placeholder={placeholders.headline || "Main message or title"}
-                    className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                    className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                 />
             </div>
 
@@ -50,7 +50,7 @@ export default function CopyBlockInput({ value, onChange, disabled, labels = {},
                     onChange={(e) => onChange({ ...value, subheadline: e.target.value })}
                     disabled={disabled}
                     placeholder={placeholders.subheadline || "Supporting text or description"}
-                    className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                    className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                 />
             </div>
 
@@ -64,7 +64,7 @@ export default function CopyBlockInput({ value, onChange, disabled, labels = {},
                     onChange={(e) => onChange({ ...value, cta: e.target.value })}
                     disabled={disabled}
                     placeholder={placeholders.cta || "e.g., Shop Now, Learn More, Get Started"}
-                    className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                    className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                 />
             </div>
 
@@ -78,7 +78,7 @@ export default function CopyBlockInput({ value, onChange, disabled, labels = {},
                     onChange={(e) => onChange({ ...value, offer: e.target.value })}
                     disabled={disabled}
                     placeholder={placeholders.offer || "e.g., 50% Off, Limited Time, Free Shipping"}
-                    className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                    className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                 />
             </div>
         </div>

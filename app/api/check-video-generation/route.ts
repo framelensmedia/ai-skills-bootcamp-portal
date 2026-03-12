@@ -40,7 +40,11 @@ export async function GET(req: Request) {
         try {
             const ac = new AbortController();
             const t = setTimeout(() => ac.abort(), 8000); // 8s timeout
-            const falRes = await fetch(falResponseUrl, {
+
+            // Fix: Check the `/status` endpoint via GET (base responseUrl only accepts POST/PUT)
+            const statusUrl = falResponseUrl.endsWith('/status') ? falResponseUrl : `${falResponseUrl}/status`;
+
+            const falRes = await fetch(statusUrl, {
                 headers: { Authorization: `Key ${falKey}` },
                 signal: ac.signal,
             });
@@ -48,24 +52,34 @@ export async function GET(req: Request) {
 
             if (falRes.ok) {
                 const falJson = await falRes.json();
-                const videoUrl = falJson.video?.url;
 
-                if (videoUrl) {
-                    // Update the DB record with the real video URL
+                if (falJson.status === "COMPLETED") {
+                    const videoUrl = falJson.video?.url;
+
+                    if (videoUrl) {
+                        // Update the DB record with the real video URL
+                        await admin
+                            .from("video_generations")
+                            .update({
+                                video_url: videoUrl,
+                                status: "completed",
+                                thumbnail_url: null, // clear the temp URL
+                            })
+                            .eq("id", id);
+
+                        return NextResponse.json({ status: "completed", videoUrl, generationId: id });
+                    }
+                } else if (falJson.status === "FAILED") {
                     await admin
                         .from("video_generations")
-                        .update({
-                            video_url: videoUrl,
-                            status: "completed",
-                            thumbnail_url: null, // clear the temp URL
-                        })
+                        .update({ status: "failed" })
                         .eq("id", id);
-
-                    return NextResponse.json({ status: "completed", videoUrl, generationId: id });
+                    return NextResponse.json({ error: "Generation failed remotely." }, { status: 500 });
                 }
             }
-        } catch {
+        } catch (e) {
             // Timed out or Fal not ready yet
+            console.error("Polling error:", e);
         }
     }
 

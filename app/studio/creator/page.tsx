@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, Suspense, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { waitForGeneration } from "@/lib/waitForGeneration";
@@ -10,7 +10,8 @@ import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download, Image as ImageIcon, Film, Activity, Music, Scissors } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download, Image as ImageIcon, Film, Activity, Music, Scissors, Zap } from "lucide-react";
+
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
 import SubjectControls from "../components/SubjectControls";
@@ -29,11 +30,14 @@ import VoiceTab from "./_components/VoiceTab";
 import MusicTab from "./_components/MusicTab";
 import AnimateTab from "./_components/AnimateTab";
 import AudioVideoTab from "./_components/AudioVideoTab";
+import SoundFxTab from "./_components/SoundFxTab";
+
 import { getVoiceGenerations } from "@/app/actions/voiceStudio";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
-type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "edit";
+type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "soundfx" | "edit";
+
 
 function TypeWriter({ text }: { text: string }) {
     const [visible, setVisible] = useState(false);
@@ -72,6 +76,7 @@ import { DriveStep } from "driver.js";
 function CreatorContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const pathname = usePathname();
     const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
     // Mode state
@@ -179,21 +184,31 @@ function CreatorContent() {
     const [audioTrackUrl, setAudioTrackUrl] = useState<string | null>(null);
     const [voiceGenerations, setVoiceGenerations] = useState<any[]>([]);
 
-    // Intent check
+    // Intent check — tab param > pathname segment > intent param
     useEffect(() => {
         const tab = searchParams?.get("tab");
         const intent = searchParams?.get("intent");
 
         if (tab) {
-            // Only allow valid tabs
-            const validTabs = ["image", "video", "animate", "audio2video", "voice", "music", "edit"];
+            const validTabs = ["image", "video", "animate", "audio2video", "voice", "music", "soundfx", "edit"];
+
             if (validTabs.includes(tab)) {
                 setActiveTab(tab as any);
             }
+        } else if (pathname) {
+            // Named tool routes: /studio/image, /studio/video, /studio/motion, etc.
+            if (pathname.endsWith("/video")) setActiveTab("video");
+            else if (pathname.endsWith("/motion")) setActiveTab("animate");
+            else if (pathname.endsWith("/audio-to-video")) setActiveTab("audio2video");
+            else if (pathname.endsWith("/voice")) setActiveTab("voice");
+            else if (pathname.endsWith("/music")) setActiveTab("music");
+            else if (pathname.endsWith("/edit")) setActiveTab("edit");
+            else if (pathname.endsWith("/image") || pathname === "/studio" || pathname === "/studio/creator") setActiveTab("image");
+            else if (intent === "video") setActiveTab("video");
         } else if (intent === "video") {
             setActiveTab("video");
         }
-    }, [searchParams]);
+    }, [searchParams, pathname]);
 
     const [stylePreset, setStylePreset] = useState<string | null>(null);
 
@@ -261,6 +276,10 @@ function CreatorContent() {
                 setPreviewImage(imgUrl);
             }
 
+            if (remixPrompt) {
+                setManualPrompt(remixPrompt);
+            }
+
             if (promptId) {
                 // Template Remix -> Wizard
                 setMode("wizard");
@@ -285,10 +304,9 @@ function CreatorContent() {
                         }
                     });
             } else {
-                // Custom / Fallback Remix -> Auto Mode
-                // "The idea is that there are never any carbon copies... sending it through the auto mode enforces a completely new generation"
-                setMode("auto");
-                setWizardOpen(false);
+                // Community post remix (has img but no promptId) -> manual mode
+                // Image is already set as preview above; just show the creator tool normally
+                setMode("manual");
             }
         }
     }, [searchParams, supabase]);
@@ -755,8 +773,10 @@ function CreatorContent() {
             case "audio2video": return { title: "Audio-to-Video", icon: Mic, desc: "Drive character lip-sync and expressions with audio" };
             case "voice": return { title: "Voice Studio", icon: Mic, desc: "Clone voices and generate lifelike speech" };
             case "music": return { title: "Music Studio", icon: Music, desc: "Produce professional royalty-free music tracks" };
+            case "soundfx": return { title: "Sound Effects", icon: Zap, desc: "Generate cinematic sound effects from a text description" };
             case "edit": return { title: "NLE Editor", icon: Scissors, desc: "Non-linear multi-track media editor" };
             default: return { title: "Creator Studio", icon: Clapperboard, desc: "The complete AI Media Production engine" };
+
         }
     }, [activeTab]);
 
@@ -776,7 +796,7 @@ function CreatorContent() {
                 {/* Master Tabs */}
                 <div className="relative max-w-full mx-4 sm:mx-0">
                     <div className="flex bg-zinc-900/50 backdrop-blur-md border border-white/5 p-1 rounded-xl self-start overflow-x-auto scrollbar-none [mask-image:linear-gradient(to_right,white_85%,transparent_100%)] sm:[mask-image:none]">
-                        {(["image", "video", "animate", "audio2video", "voice", "music"] as const).map((tab) => (
+                        {(["image", "video", "voice", "music", "soundfx"] as const).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -785,9 +805,10 @@ function CreatorContent() {
                                     : "text-white/40 hover:text-white hover:bg-white/5"
                                     }`}
                             >
-                                {tab === "animate" ? "motion" : tab === "audio2video" ? "audio-to-video" : tab}
+                                {tab === "soundfx" ? "Sound FX" : tab}
                             </button>
                         ))}
+
                         <Link
                             href="/studio/edit"
                             className="px-4 py-2 text-[10px] font-bold uppercase rounded-lg whitespace-nowrap transition-all text-white/40 hover:text-white hover:bg-white/5 ml-2 border-l border-white/10"
@@ -1250,11 +1271,21 @@ function CreatorContent() {
                             onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
+                ) : activeTab === "soundfx" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <SoundFxTab
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
+                        />
+                    </div>
                 ) : null}
+
             </div>
 
             {/* Global Modals for Image/Video */}
-            {activeTab !== "voice" && activeTab !== "music" && (
+            {activeTab !== "voice" && activeTab !== "music" && activeTab !== "soundfx" && (
+
                 <>
                     {/* Video Modal is only used for Remix Cards / Library items now, 
                         Studio handles its own inline generation */}

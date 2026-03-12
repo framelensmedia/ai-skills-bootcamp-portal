@@ -18,9 +18,10 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // History 
+    // History & Pagination
     const [generations, setGenerations] = useState<any[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(true);
+    const [visibleCount, setVisibleCount] = useState(5);
 
     const MUSIC_COST = 10;
     const hasCredits = isAdmin || (userCredits ?? 0) >= MUSIC_COST;
@@ -102,25 +103,25 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                 <div className="lg:w-[45%] flex flex-col gap-6">
                     <div className="mb-4">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-indigo-500/20">
-                                <Music className="text-indigo-400" size={20} />
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-lime-500/20 to-purple-500/20 flex items-center justify-center border border-lime-500/20">
+                                <Music className="text-lime-400" size={20} />
                             </div>
                             <h2 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
                                 Music Studio
                             </h2>
                         </div>
                         <p className="text-white/50 text-sm font-medium leading-relaxed max-w-sm ml-13">
-                            Describe a vibe, genre, and instruments, and MiniMax v2 will compose a unique background track for you.
+                            Describe a vibe, genre, and instruments, and the AI will compose a unique background track for you.
                         </p>
                     </div>
 
-                    <div className="bg-gradient-to-b from-[#1E1E1E] to-[#121212] rounded-3xl p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                    <div className="bg-gradient-to-b from-[#1E1E1E] to-[#121212] rounded-xl p-6 border border-white/5 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-lime-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
 
                         <div className="flex flex-col gap-5 relative z-10">
 
                             <div className="flex items-center gap-2 mb-1">
-                                <Sparkles size={16} className="text-indigo-400" />
+                                <Sparkles size={16} className="text-lime-400" />
                                 <span className="text-sm font-bold text-white tracking-wide uppercase">Music Prompt</span>
                             </div>
 
@@ -128,7 +129,7 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                                 placeholder="E.g. A chill lofi hip hop beat with a smooth saxophone melody, relaxed tempo, and gentle drums..."
-                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none transition-all min-h-[140px]"
+                                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-lime-500/50 resize-none transition-all min-h-[140px]"
                             />
 
                             <div className="flex items-center gap-2 mb-1 mt-2">
@@ -157,8 +158,8 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                                     w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2
                                     transition-all duration-300 transform shadow-lg
                                     ${generating || !prompt.trim() || !hasCredits
-                                        ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5'
-                                        : 'bg-indigo-500 hover:bg-indigo-400 hover:-translate-y-1 text-white shadow-indigo-500/25'}
+                                        ? 'bg-[#1A1A1A] text-zinc-500 cursor-not-allowed border border-white/5'
+                                        : 'bg-lime-500 hover:bg-lime-400 hover:-translate-y-1 text-black shadow-lime-500/25'}
                                 `}
                             >
                                 {generating ? (
@@ -177,12 +178,12 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                     </div>
 
                     {/* Beginner Tips Section */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6">
-                        <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wider text-indigo-400">Pro Tips for Best Results</h4>
+                    <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6">
+                        <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wider text-lime-400">Pro Tips for Best Results</h4>
                         <ul className="space-y-3 text-sm text-white/60">
-                            <li className="flex gap-3"><span className="text-indigo-400 font-bold">•</span> To make a pure beat, leave the lyrics box completely empty. MiniMax will automatically render a high-quality instrumental.</li>
-                            <li className="flex gap-3"><span className="text-indigo-400 font-bold">•</span> In your Prompt, describe the exact genre, instruments, mood, and tempo: "Upbeat Atlanta trap hip hop with 808 bass slides and fast hi-hats."</li>
-                            <li className="flex gap-3"><span className="text-indigo-400 font-bold">•</span> To structure your lyrics, use tags like [Verse], [Chorus], and [Bridge]. MiniMax respects these structural cues when singing!</li>
+                            <li className="flex gap-3"><span className="text-lime-400 font-bold">•</span> To make an instrumental, leave the lyrics box completely empty. The AI will automatically render a high-quality instrumental.</li>
+                            <li className="flex gap-3"><span className="text-lime-400 font-bold">•</span> In your Prompt, describe the exact genre, instruments, mood, and tempo: "Upbeat Atlanta trap hip hop with 808 bass slides and fast hi-hats."</li>
+                            <li className="flex gap-3"><span className="text-lime-400 font-bold">•</span> To structure your lyrics, use tags like [Verse], [Chorus], and [Bridge]. The AI respects these structural cues when singing!</li>
                         </ul>
                     </div>
                 </div>
@@ -194,15 +195,15 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                             <ListMusic size={18} className="text-white/60" />
                             <h3 className="text-xl font-bold text-white/90">Your Tracks</h3>
                         </div>
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-white/5 text-white/40 tracking-wider">
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#111] text-white/40 tracking-wider">
                             {generations.length} {generations.length === 1 ? 'Track' : 'Tracks'}
                         </span>
                     </div>
 
-                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4 pr-2">
                         {loadingHistory ? (
                             <div className="flex items-center justify-center h-48">
-                                <Loader2 className="animate-spin text-indigo-500/50" />
+                                <Loader2 className="animate-spin text-lime-500/50" />
                             </div>
                         ) : generations.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-48 border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
@@ -211,48 +212,59 @@ export default function MusicTab({ userCredits, isAdmin, onCreditsUsed }: MusicT
                                 <p className="text-white/30 text-sm mt-1">Tracks you generate will appear here.</p>
                             </div>
                         ) : (
-                            generations.map((gen) => (
-                                <div key={gen.id} className="group bg-gradient-to-r from-black/60 to-black/40 border border-white/5 rounded-2xl p-5 hover:border-indigo-500/30 transition-all hover:bg-black w-full shadow-md">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
-                                                <AudioLines size={14} />
+                            <>
+                                {generations.slice(0, visibleCount).map((gen) => (
+                                    <div key={gen.id} className="group bg-gradient-to-r from-black/60 to-black/40 border border-white/5 rounded-2xl p-5 hover:border-lime-500/30 transition-all hover:bg-black w-full shadow-md">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1.5 rounded-lg bg-lime-500/20 text-lime-400">
+                                                    <AudioLines size={14} />
+                                                </div>
+                                                <span className="text-xs font-bold text-white/40 font-mono">
+                                                    {new Date(gen.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
                                             </div>
-                                            <span className="text-xs font-bold text-white/40 font-mono">
-                                                {new Date(gen.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                            </span>
+
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={gen.audio_url}
+                                                    download={`track-${gen.id.substring(0, 6)}.mp3`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-white/50 hover:text-lime-400 hover:bg-lime-400/10 rounded-xl"
+                                                    title="Download Track"
+                                                >
+                                                    <Download size={16} />
+                                                </a>
+                                                <button
+                                                    onClick={() => handleDelete(gen.id)}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
-                                            <a
-                                                href={gen.audio_url}
-                                                download={`track-${gen.id.substring(0, 6)}.mp3`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-white/50 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-xl"
-                                                title="Download Track"
-                                            >
-                                                <Download size={16} />
-                                            </a>
-                                            <button
-                                                onClick={() => handleDelete(gen.id)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                        {/* Prompt Text truncated */}
+                                        <p className="text-sm text-white/80 font-medium leading-relaxed line-clamp-2 pr-8 mb-4">
+                                            "{gen.prompt}"
+                                        </p>
+
+                                        {/* Waveform Player */}
+                                        <WaveformPlayer audioUrl={gen.audio_url} />
                                     </div>
+                                ))}
 
-                                    {/* Prompt Text truncated */}
-                                    <p className="text-sm text-white/80 font-medium leading-relaxed line-clamp-2 pr-8 mb-4">
-                                        "{gen.prompt}"
-                                    </p>
-
-                                    {/* Waveform Player */}
-                                    <WaveformPlayer audioUrl={gen.audio_url} />
-                                </div>
-                            ))
+                                {visibleCount < generations.length && (
+                                    <button
+                                        onClick={() => setVisibleCount(prev => prev + 5)}
+                                        className="w-full py-4 rounded-xl border border-white/10 hover:border-lime-500/30 text-white/60 hover:text-white bg-[#111] hover:bg-lime-500/10 transition-all font-bold text-sm tracking-wide uppercase"
+                                    >
+                                        Load More Tracks
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

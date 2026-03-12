@@ -6,6 +6,7 @@ import Image from "next/image";
 import { RefreshCw, User, ArrowBigUp, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AutoplayVideo from "./AutoplayVideo";
+import VideoRemixOnboardingModal from "./VideoRemixOnboardingModal";
 
 // Define the shape of a Remix Item
 export type RemixItem = {
@@ -37,6 +38,7 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
     const [isFavorited, setIsFavorited] = useState(false);
     const [localFavCount, setLocalFavCount] = useState(item.favoritesCount || 0);
     const [favLoading, setFavLoading] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleFavorite = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -67,17 +69,8 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
         }
     };
 
-    const handleRemixClick = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (onRemix) {
-            onRemix(item);
-            return;
-        }
-
-        // Default behavior: Go to Studio with params
-        let href = `/studio?img=${encodeURIComponent(item.imageUrl)}` +
+    const goToStudio = () => {
+        let href = `/studio/prompt?img=${encodeURIComponent(item.imageUrl)}` +
             `&remix=${encodeURIComponent(item.remixPromptText || item.combinedPromptText || "")}`;
 
         if (item.promptId) {
@@ -87,104 +80,130 @@ export default function RemixCard({ item, onRemix }: RemixCardProps) {
         router.push(href);
     };
 
+    const handleRemixClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (onRemix) {
+            onRemix(item);
+            return;
+        }
+
+        if (item.mediaType === "video") {
+            setIsModalOpen(true);
+        } else {
+            goToStudio();
+        }
+    };
+
     return (
-        <div className="tour-remix-card relative group rounded-2xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 hover:bg-white/10 transition-all duration-300">
-            {/* Image Area - Link to Detail Page */}
-            <Link href={`/remix/${item.id}`} className="block relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/40">
-                {item.mediaType === "video" && item.videoUrl ? (
-                    <>
-                        <AutoplayVideo
-                            src={item.videoUrl}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            poster={item.imageUrl || undefined} // Use imageUrl as poster if available
+        <>
+            <VideoRemixOnboardingModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onStart={() => {
+                    setIsModalOpen(false);
+                    goToStudio();
+                }}
+            />
+            <div className="tour-remix-card relative group rounded-2xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 hover:bg-white/10 transition-all duration-300">
+                {/* Image Area - Link to Detail Page */}
+                <Link href={`/remix/${item.id}`} className="block relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/40">
+                    {item.mediaType === "video" && item.videoUrl ? (
+                        <>
+                            <AutoplayVideo
+                                src={item.videoUrl}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                poster={item.imageUrl || undefined} // Use imageUrl as poster if available
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                    <svg className="w-5 h-5 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
+                                Video
+                            </div>
+                        </>
+                    ) : item.imageUrl && !imgFailed ? (
+                        <Image
+                            src={item.imageUrl}
+                            alt={item.title}
+                            fill
+                            className="object-cover transition duration-500 group-hover:scale-105"
+                            sizes="(max-width: 640px) 100vw, 320px"
+                            onError={() => setImgFailed(true)}
                         />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-                                <svg className="w-5 h-5 text-white/90 ml-0.5 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
+                    ) : (
+                        <div className="h-full w-full bg-white/5 flex items-center justify-center text-white/20">
+                            <span className="text-xs">No Preview</span>
+                        </div>
+                    )}
+
+                    {/* Overlay Gradient */}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+
+                    {/* Top Left: User Info */}
+                    <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
+                        <div className="relative h-6 w-6 overflow-hidden rounded-full border border-white/20 bg-zinc-800">
+                            {item.userAvatar ? (
+                                <Image src={item.userAvatar} fill className="object-cover" alt={item.username} sizes="24px" />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-white/50">
+                                    <User size={12} />
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-[11px] font-semibold text-white/90 shadow-sm drop-shadow-md">
+                            {item.username}
+                        </span>
+                    </div>
+                </Link>
+
+                {/* Content Body */}
+                <div className="flex flex-col p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                        <h3 className="line-clamp-1 text-sm font-bold text-white" title={item.title}>
+                            {item.title || "Untitled Remix"}
+                        </h3>
+
+                        <div className="flex items-center gap-2">
+                            {/* Favorite Button */}
+                            <button
+                                onClick={handleFavorite}
+                                className={`flex items-center gap-0.5 text-xs transition-colors ${isFavorited ? 'text-pink-400' : 'text-white/40 hover:text-pink-400'}`}
+                                title={isFavorited ? 'Unfavorite' : 'Favorite'}
+                            >
+                                <Heart size={13} fill={isFavorited ? 'currentColor' : 'none'} />
+                                {localFavCount > 0 && <span>{localFavCount}</span>}
+                            </button>
+
+                            {/* Upvote Count */}
+                            <div className="flex items-center gap-0.5 text-xs text-white/40">
+                                <ArrowBigUp size={14} />
+                                <span>{item.upvotesCount}</span>
                             </div>
                         </div>
-                        <div className="absolute top-2 right-2 z-10 bg-black/70 text-lime-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse" />
-                            Video
-                        </div>
-                    </>
-                ) : item.imageUrl && !imgFailed ? (
-                    <Image
-                        src={item.imageUrl}
-                        alt={item.title}
-                        fill
-                        className="object-cover transition duration-500 group-hover:scale-105"
-                        sizes="(max-width: 640px) 100vw, 320px"
-                        onError={() => setImgFailed(true)}
-                    />
-                ) : (
-                    <div className="h-full w-full bg-white/5 flex items-center justify-center text-white/20">
-                        <span className="text-xs">No Preview</span>
                     </div>
-                )}
 
-                {/* Overlay Gradient */}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
+                    <div className="mt-auto pt-3 flex items-center justify-between gap-3 border-t border-white/5">
+                        <span className="text-xs text-white/40">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                        </span>
 
-                {/* Top Left: User Info */}
-                <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
-                    <div className="relative h-6 w-6 overflow-hidden rounded-full border border-white/20 bg-zinc-800">
-                        {item.userAvatar ? (
-                            <Image src={item.userAvatar} fill className="object-cover" alt={item.username} sizes="24px" />
-                        ) : (
-                            <div className="flex h-full w-full items-center justify-center text-white/50">
-                                <User size={12} />
-                            </div>
-                        )}
-                    </div>
-                    <span className="text-[11px] font-semibold text-white/90 shadow-sm drop-shadow-md">
-                        {item.username}
-                    </span>
-                </div>
-            </Link>
-
-            {/* Content Body */}
-            <div className="flex flex-col p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="line-clamp-1 text-sm font-bold text-white" title={item.title}>
-                        {item.title || "Untitled Remix"}
-                    </h3>
-
-                    <div className="flex items-center gap-2">
-                        {/* Favorite Button */}
                         <button
-                            onClick={handleFavorite}
-                            className={`flex items-center gap-0.5 text-xs transition-colors ${isFavorited ? 'text-pink-400' : 'text-white/40 hover:text-pink-400'}`}
-                            title={isFavorited ? 'Unfavorite' : 'Favorite'}
+                            onClick={handleRemixClick}
+                            title="Click to remix this design"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#B7FF00] text-black transition-transform hover:scale-105 hover:bg-[#B7FF00] hover:text-black shadow-lg shadow-lime-500/20"
                         >
-                            <Heart size={13} fill={isFavorited ? 'currentColor' : 'none'} />
-                            {localFavCount > 0 && <span>{localFavCount}</span>}
+                            <RefreshCw size={16} strokeWidth={2.5} />
                         </button>
-
-                        {/* Upvote Count */}
-                        <div className="flex items-center gap-0.5 text-xs text-white/40">
-                            <ArrowBigUp size={14} />
-                            <span>{item.upvotesCount}</span>
-                        </div>
                     </div>
-                </div>
-
-                <div className="mt-auto pt-3 flex items-center justify-between gap-3 border-t border-white/5">
-                    <span className="text-xs text-white/40">
-                        {new Date(item.createdAt).toLocaleDateString()}
-                    </span>
-
-                    <button
-                        onClick={handleRemixClick}
-                        title="Click to remix this design"
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#B7FF00] text-black transition-transform hover:scale-105 hover:bg-[#B7FF00] hover:text-black shadow-lg shadow-lime-500/20"
-                    >
-                        <RefreshCw size={16} strokeWidth={2.5} />
-                    </button>
                 </div>
             </div>
-        </div >
+        </>
     );
 }

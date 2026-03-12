@@ -84,6 +84,9 @@ function StudioContent() {
   // Video Generator Modal State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
 
+  // Source video for video remix start frame preview
+  const [sourceVideoUrl, setSourceVideoUrl] = useState<string | null>(null);
+
   // Fetch Template Config if promptId is present
   useEffect(() => {
     if (prePromptId) {
@@ -222,8 +225,12 @@ function StudioContent() {
       setInputVideoUrl(videoUrlParam);
       setVideoModalOpen(true);
       if (promptParam) setEditSummary(promptParam);
+    } else if (preIntent === "video" && videoUrlParam) {
+      // Video remix: show the source video as the start frame preview
+      setSourceVideoUrl(videoUrlParam);
     }
-  }, [modeParam, videoUrlParam, promptParam]);
+  }, [modeParam, videoUrlParam, promptParam, preIntent]);
+
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }: { data: { user: any } }) => setUser(data.user));
@@ -300,7 +307,7 @@ function StudioContent() {
     if (!handleAuthGate()) return;
 
     const href =
-      `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
+      `/studio/creator?img=${encodeURIComponent(payload.imgUrl)}` +
       `&original=${encodeURIComponent(payload.originalPromptText || "")}` +
       `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
 
@@ -1222,12 +1229,22 @@ function StudioContent() {
                   controls
                   playsInline
                 />
+              ) : sourceVideoUrl && !preImg ? (
+                // Video remix: show the source video as the start frame preview
+                <video
+                  src={sourceVideoUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
               ) : (
                 <Image
                   src={lastImageUrl || previewImageUrl}
                   alt="Preview"
                   fill
-                  className="object-contain"
+                  className="object-cover"
                   priority={false}
                   unoptimized
                 />

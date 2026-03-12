@@ -118,13 +118,6 @@ export default function PromptCard({
     }
   }
 
-  const safeSlug = (slug ?? "").trim().toLowerCase();
-  const promptPath =
-    safeSlug.length > 0 ? `/prompts/${encodeURIComponent(safeSlug)}` : "/prompts";
-
-  // Allow everyone to view the prompt page. The page itself handles locking logic.
-  const href = promptPath;
-
   const fallbackOrb = "/orb-neon.gif";
   const isPro = String(accessLevel).toLowerCase() === "premium";
 
@@ -139,6 +132,13 @@ export default function PromptCard({
   }, [featuredImageUrl, imageUrl, mediaUrl]);
 
   const resolvedImageUrl = imgFailed ? fallbackOrb : bestImageUrl;
+
+  const safeSlug = (slug ?? "").trim().toLowerCase();
+  const promptPath =
+    safeSlug.length > 0 ? `/prompts/${encodeURIComponent(safeSlug)}` : "/prompts";
+
+  // Allow everyone to view the prompt page. The page itself handles locking logic.
+  const href = `${promptPath}?img=${encodeURIComponent(bestImageUrl)}`;
 
   const isFallbackOrb =
     !resolvedImageUrl || resolvedImageUrl.trim().length === 0 || resolvedImageUrl === fallbackOrb;

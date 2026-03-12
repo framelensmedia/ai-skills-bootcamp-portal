@@ -114,16 +114,29 @@ export default function LibraryVideoPickerModal({ isOpen, onClose, onSelect }: P
                                     }}
                                     className="group relative aspect-video rounded-xl overflow-hidden border border-white/5 bg-white/5 transition-all hover:border-primary/50 hover:scale-[1.02] shadow-lg flex items-center justify-center text-left"
                                 >
-                                    <video
-                                        src={item.video_url}
-                                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        preload="metadata"
-                                        muted
-                                        loop
-                                        playsInline
-                                        onMouseEnter={(e) => e.currentTarget.play()}
-                                        onMouseLeave={(e) => e.currentTarget.pause()}
-                                    />
+                                    {item.video_url ? (
+                                        <video
+                                            src={item.video_url}
+                                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                            preload="metadata"
+                                            muted
+                                            loop
+                                            playsInline
+                                            onMouseEnter={(e) => {
+                                                const playPromise = e.currentTarget.play();
+                                                if (playPromise !== undefined) {
+                                                    playPromise.catch(() => {
+                                                        // Auto-play was prevented or interrupted
+                                                    });
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => e.currentTarget.pause()}
+                                        />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-white/5">
+                                            <Clapperboard className="text-white/20" size={24} />
+                                        </div>
+                                    )}
                                     <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 z-10">
                                         <div className="text-xs text-white/90 line-clamp-2 leading-tight font-medium">
                                             {item.prompt || "Generated Video"}

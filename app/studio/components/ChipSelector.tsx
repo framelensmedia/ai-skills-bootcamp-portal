@@ -27,8 +27,8 @@ export default function ChipSelector({
                         className={[
                             "px-4 py-3 rounded-lg text-sm font-medium transition-all text-left",
                             isSelected
-                                ? "bg-[#B7FF00]/10 border-[#B7FF00] text-[#B7FF00] border-2"
-                                : "bg-zinc-900/50 border-white/10 text-white/80 hover:border-white/20 hover:bg-zinc-900 border",
+                                ? "bg-lime-400/10 border-lime-400 text-lime-400 border-2"
+                                : "bg-[#111]/50 border-white/10 text-white/80 hover:border-white/20 hover:bg-[#111] border",
                             disabled && "opacity-50 cursor-not-allowed",
                         ].join(" ")}
                     >

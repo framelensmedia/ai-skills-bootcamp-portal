@@ -166,7 +166,7 @@ export default function ContentStepper({ items, lessonId, onAllCompleted, initia
         // Redirect to the standard Studio with the template
         const templateId = currentItem.content.explanation;
         if (templateId) {
-            router.push(`/studio?promptId=${templateId}`);
+            router.push(`/studio/creator?promptId=${templateId}`);
         } else {
             console.error("No template ID found for action");
         }

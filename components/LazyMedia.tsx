@@ -15,19 +15,19 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
     const { ref, isInView } = useInView({ threshold: 0.1, rootMargin: "200px 0px" }, true);
     const [isLoaded, setIsLoaded] = useState(false);
 
+    // Resolve the effective source — prefer src, fall back to poster for videos
+    const effectiveSrc = src || (type === "video" ? poster : null) || null;
+
     return (
         <div ref={ref} className={`relative w-full h-full bg-zinc-900 overflow-hidden ${className}`}>
             {type === "video" ? (
-                // Video Logic: Only render <video> tag if in view. 
-                // Render Poster if out of view or waiting.
-                isInView ? (
+                isInView && effectiveSrc ? (
                     <VideoPlayer
-                        src={src}
+                        src={effectiveSrc}
                         poster={poster}
                         className="absolute inset-0 w-full h-full object-cover"
                     />
                 ) : (
-                    // Placeholder / Poster
                     poster ? (
                         <Image
                             src={poster}
@@ -41,18 +41,20 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
                     )
                 )
             ) : (
-                // Image Logic: Use Next.js Image Priority/Lazy handling naturally, 
-                // OR enforce strict DOM injection.
-                isInView ? (
-                    <Image
-                        src={src}
-                        alt={alt}
-                        fill
-                        className="object-cover transition-opacity duration-500"
-                        onLoad={() => setIsLoaded(true)}
-                        unoptimized={unoptimized}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
+                effectiveSrc ? (
+                    isInView ? (
+                        <Image
+                            src={effectiveSrc}
+                            alt={alt}
+                            fill
+                            className="object-cover transition-opacity duration-500"
+                            onLoad={() => setIsLoaded(true)}
+                            unoptimized={unoptimized}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+                    ) : (
+                        <div className="absolute inset-0 bg-white/5 animate-pulse" />
+                    )
                 ) : (
                     <div className="absolute inset-0 bg-white/5 animate-pulse" />
                 )

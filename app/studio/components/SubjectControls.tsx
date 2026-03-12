@@ -28,7 +28,7 @@ export default function SubjectControls({
                 {/* Mode Selector */}
                 <div>
                     <div className="text-[10px] uppercase font-bold text-white/50 mb-1 px-1">Subject Type</div>
-                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-1">
+                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#111] p-1">
                         <button
                             type="button"
                             onClick={() => setSubjectMode("human")}
@@ -52,7 +52,7 @@ export default function SubjectControls({
                         {/* Outfit Mode */}
                         <div>
                             <div className="text-[10px] uppercase font-bold text-white/50 mb-1 px-1">Clothing</div>
-                            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-1">
+                            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#111] p-1">
                                 <button
                                     type="button"
                                     onClick={() => setKeepOutfit(true)}
@@ -71,7 +71,7 @@ export default function SubjectControls({
                         </div>
 
                         {/* Strict Lock Toggle */}
-                        <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                        <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-[#111] p-2 px-3">
                             <input
                                 type="checkbox"
                                 checked={subjectLock}
@@ -88,7 +88,7 @@ export default function SubjectControls({
                         {/* Custom Outfit Input (Only if changing outfit) */}
                         {!keepOutfit && (
                             <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                                <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-2 px-3">
+                                <div className="flex flex-col gap-1 rounded-xl border border-white/10 bg-[#111] p-2 px-3">
                                     <label htmlFor="studio-subject-outfit" className="text-[10px] uppercase font-bold text-white/70">
                                         Describe New Outfit
                                     </label>

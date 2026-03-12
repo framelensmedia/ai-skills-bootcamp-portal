@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { writeFile, unlink } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
 
-export const runtime = "nodejs";
+// Set the ffmpeg path from the installer
+ffmpeg.setFfmpegPath(ffmpegInstaller.path); export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const FAL_KEY = process.env.FAL_KEY!;
@@ -149,17 +155,56 @@ async function syncLipsync(videoUrl: string, audioUrl: string): Promise<string> 
     return url;
 }
 
-// ─── Merge audio only (no lipsync) ───────────────────────────────────────────
+// ─── Merge audio only (no lipsync) using local FFmpeg ───────────────────────
 async function mergeAudioVideo(videoUrl: string, audioUrl: string): Promise<string> {
-    console.log("FFmpeg merge (audio only)...");
-    const { statusUrl, resultUrl } = await falQueue("fal-ai/ffmpeg-api/merge-audio-video", {
-        video_url: videoUrl,
-        audio_url: audioUrl,
-    });
-    const result = await falPoll(statusUrl, resultUrl, "FFmpeg Merge", 180);
-    const url = result.video?.url || result.url || result.video_url;
-    if (!url) throw new Error(`FFmpeg merge returned no URL: ${JSON.stringify(result).slice(0, 300)}`);
-    return url;
+    console.log("Local FFmpeg merge (audio only)... restoring exact aspect ratio");
+
+    const uniqueId = Date.now().toString(36);
+    const videoPath = join(tmpdir(), `in_vid_${uniqueId}.mp4`);
+    const musicPath = join(tmpdir(), `in_mus_${uniqueId}.mp3`);
+    const outPath = join(tmpdir(), `out_${uniqueId}.mp4`);
+
+    try {
+        // Download Video
+        const vidReq = await fetch(videoUrl);
+        const vidBuffer = Buffer.from(await vidReq.arrayBuffer());
+        await writeFile(videoPath, vidBuffer);
+
+        // Download Audio
+        const musReq = await fetch(audioUrl);
+        const musBuffer = Buffer.from(await musReq.arrayBuffer());
+        await writeFile(musicPath, musBuffer);
+
+        // Run FFmpeg Mixing
+        await new Promise((resolve, reject) => {
+            ffmpeg()
+                .input(videoPath)
+                .input(musicPath)
+                .outputOptions([
+                    "-map 0:v",          // Original video
+                    "-map 1:a",          // New audio
+                    "-c:v copy",         // Exact bit-for-bit video copy (0 scaling/quality loss)
+                    "-c:a aac",
+                    "-b:a 192k",
+                    "-shortest"
+                ])
+                .on("end", resolve)
+                .on("error", reject)
+                .save(outPath);
+        });
+
+        // Upload output file... wait! 
+        // We need to return the URL or local file path?
+        // Since `route.ts` expects a URL to download and THEN upload...
+        // Let's just return the local file path and let the Route Handler handle local files!
+        return outPath;
+    } catch (e) {
+        throw new Error(`FFmpeg local merge failed: ${e}`);
+    } finally {
+        // We'll clean up the input paths, leave the output path for the handler to upload
+        try { await unlink(videoPath); } catch (e) { }
+        try { await unlink(musicPath); } catch (e) { }
+    }
 }
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
@@ -232,8 +277,19 @@ export async function POST(req: Request) {
         const label = mode === "s2s" ? "lipsync" : "voiceover";
         const filePath = `videos/${user.id}/${label}_${Date.now()}.mp4`;
 
-        const dlRes = await fetch(finalVideoUrl);
-        const buffer = Buffer.from(await dlRes.arrayBuffer());
+        let buffer: Buffer;
+        if (finalVideoUrl.startsWith("http")) {
+            // It's a URL (from Fal)
+            const dlRes = await fetch(finalVideoUrl);
+            buffer = Buffer.from(await dlRes.arrayBuffer());
+        } else {
+            // It's a local file path (from our local FFmpeg)
+            const fs = require("fs");
+            buffer = fs.readFileSync(finalVideoUrl);
+            // Clean up the output temp file
+            try { await unlink(finalVideoUrl); } catch (e) { }
+        }
+
         const { error: uploadErr } = await admin.storage.from(BUCKET).upload(filePath, buffer, { contentType: "video/mp4", upsert: false });
         if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`);
 

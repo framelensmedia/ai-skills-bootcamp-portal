@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Mic, Loader2, Download, AlertTriangle, ListMusic, Plus, Trash2, X, AudioLines, Sparkles, Play, Pause } from "lucide-react";
+import { Mic, Loader2, Download, AlertTriangle, ListMusic, Plus, Trash2, X, AudioLines, Sparkles, Play, Pause, Clapperboard, RefreshCw } from "lucide-react";
 import { generateTTS, getVoices } from "@/app/actions/falVoice";
 import { getVoiceGenerations, deleteVoiceGeneration } from "@/app/actions/voiceStudio";
 import WaveformPlayer from "./WaveformPlayer";
 import VoiceCloneWizard from "./VoiceCloneWizard";
 import { supabase } from "@/lib/supabaseClient";
+import MediaPicker from "@/components/MediaPicker";
+import { waitForVideoGeneration } from "@/lib/waitForVideoGeneration";
+import { compressImage } from "@/lib/compressImage";
 
 interface VoiceTabProps {
     userCredits: number | null;
@@ -32,8 +35,37 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
     const [isPlayingPreview, setIsPlayingPreview] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    const [generationMode, setGenerationMode] = useState<"tts" | "video">("tts");
+    const [videoFile, setVideoFile] = useState<string | null>(null);
+
     const VOICE_COST = 5;
-    const hasCredits = isAdmin || (userCredits ?? 0) >= VOICE_COST;
+    const VIDEO_COST = 10;
+    const currentCost = generationMode === "tts" ? VOICE_COST : VIDEO_COST;
+    const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
+
+    const uploadToStorage = async (blobUrl: string): Promise<string> => {
+        const d = await fetch(blobUrl);
+        const blob = await d.blob();
+        let filename = `voice_video_upload_${Date.now()}.mp4`;
+
+        const signRes = await fetch("/api/sign-upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename, fileType: 'video/mp4' })
+        });
+
+        if (!signRes.ok) throw new Error("Failed to get upload signature");
+        const { signedUrl, publicUrl } = await signRes.json();
+
+        const uploadRes = await fetch(signedUrl, {
+            method: "PUT",
+            body: blob,
+            headers: { "Content-Type": 'video/mp4' }
+        });
+
+        if (!uploadRes.ok) throw new Error("Failed to upload video to storage");
+        return publicUrl;
+    };
 
     const fetchData = async () => {
         setLoadingHistory(true);
@@ -111,7 +143,11 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
             return;
         }
         if (!hasCredits) {
-            setError(`You need at least ${VOICE_COST} credits to generate a voiceover.`);
+            setError(`You need at least ${currentCost} credits to generate this.`);
+            return;
+        }
+        if (generationMode === "video" && !videoFile) {
+            setError("Please select a video from your library to replace the voice.");
             return;
         }
 
@@ -122,14 +158,66 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
             const selectedVoiceObj = voices.find(v => v.id === selectedVoice);
             const refAudioUrl = selectedVoiceObj?.ref_audio_url || "";
 
-            const res = await generateTTS(text, selectedVoice, refAudioUrl);
-            if (res.success && res.audioUrl) {
-                if (!isAdmin) onCreditsUsed(VOICE_COST);
-                // Refresh history to show the new generation
-                setText("");
-                fetchData();
+            if (generationMode === "video") {
+                let finalVideoUrl = videoFile;
+                if (videoFile!.startsWith("blob:")) {
+                    finalVideoUrl = await uploadToStorage(videoFile!);
+                }
+
+                const res = await fetch("/api/replace-voice", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        videoUrl: finalVideoUrl,
+                        mode: "voiceover", // Defaulting to Voiceover mode when combining TTS + Video
+                        voiceId: selectedVoice,
+                        script: text
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.status === 202 && data?.status === "pending" && data?.generationId) {
+                    setError("Video processing might take a moment. Feel free to wait here or check your Library later!");
+                    const finalUrl = await waitForVideoGeneration(data.generationId);
+                    setError(null);
+                    if (finalUrl) {
+                        setText("");
+                        setVideoFile(null);
+                        setGenerationMode("tts");
+                        fetchData(); // This will refresh the history if they go back to the library view
+                        if (!isAdmin && data.remainingCredits !== undefined) {
+                            onCreditsUsed(VIDEO_COST);
+                        }
+                    } else {
+                        throw new Error("Generation is still processing in the background. Please check your Library in a few minutes.");
+                    }
+                    return;
+                }
+
+                if (!res.ok) throw new Error(data.error || "Failed to replace voice in video");
+
+                if (data.videoUrl) {
+                    if (!isAdmin) onCreditsUsed(VIDEO_COST);
+                    setText("");
+                    setVideoFile(null);
+                    setGenerationMode("tts");
+                    fetchData(); // We won't show videos in the TTS library, but it updates the user's credits/DB state
+                    alert("Video voice replaced successfully! You can view it in your Library.");
+                } else {
+                    throw new Error("No video URL returned");
+                }
             } else {
-                setError(res.error || "Failed to generate audio");
+                // Standard TTS
+                const res = await generateTTS(text, selectedVoice, refAudioUrl);
+                if (res.success && res.audioUrl) {
+                    if (!isAdmin) onCreditsUsed(VOICE_COST);
+                    // Refresh history to show the new generation
+                    setText("");
+                    fetchData();
+                } else {
+                    setError(res.error || "Failed to generate audio");
+                }
             }
         } catch (err: any) {
             setError(err.message || "An unexpected error occurred.");
@@ -149,7 +237,7 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
             <div className="flex items-end justify-between mb-8">
                 <div>
                     <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                        <AudioLines className="text-primary h-8 w-8" />
+                        <AudioLines className="text-lime-400 h-8 w-8" />
                         Voice Studio
                     </h2>
                     <p className="text-white/50 text-sm font-medium mt-1">
@@ -161,18 +249,45 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Left Drawer: Generation & Cloning */}
                 <div className="lg:col-span-5 space-y-6">
-                    <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl shadow-xl ring-1 ring-white/5 flex flex-col h-full relative overflow-hidden">
+                    <div className="rounded-xl border border-white/10 bg-[#111] p-6 backdrop-blur-2xl shadow-xl ring-1 ring-white/5 flex flex-col h-full relative overflow-hidden">
 
                         {/* Decorative Background Glow */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10 translate-x-1/2 -translate-y-1/2 pointer-events-none" />
 
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col bg-black/50 p-1.5 rounded-xl mb-6 shadow-inner border border-white/5 gap-1.5">
+                            <button
+                                onClick={() => setGenerationMode("tts")}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wide rounded-lg transition-all ${generationMode === "tts" ? "bg-primary text-black shadow-md" : "text-white/40 hover:text-white/70 hover:bg-[#111]"}`}
+                            >
+                                Standard Voiceover
+                            </button>
+                            <button
+                                onClick={() => setGenerationMode("video")}
+                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wide rounded-lg transition-all flex items-center justify-center gap-2 ${generationMode === "video" ? "bg-[#8B5CF6] text-white shadow-md" : "text-white/40 hover:text-white/70 hover:bg-[#111]"}`}
+                            >
+                                Apply to Video
+                            </button>
+                        </div>
+
+                        {generationMode === "video" && (
+                            <div className="mb-6 fade-in">
+                                <MediaPicker
+                                    type="video"
+                                    label="Target Video"
+                                    description="Select a video to apply this generated voice to."
+                                    value={videoFile}
+                                    onChange={setVideoFile}
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between mb-6 mt-2">
                             <label className="text-xs font-bold text-white/50 uppercase tracking-wide">
-                                1. Select Voice
+                                {generationMode === "video" ? "1. Select Voice" : "1. Select Voice"}
                             </label>
                             <button
                                 onClick={() => setIsCloning(true)}
-                                className="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 text-primary hover:text-white bg-primary/10 hover:bg-primary/30 py-1.5 px-3 rounded-full transition-all border border-primary/20"
+                                className="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1.5 text-lime-400 hover:text-white bg-primary/10 hover:bg-primary/30 py-1.5 px-3 rounded-full transition-all border border-primary/20"
                             >
                                 <Plus size={12} strokeWidth={3} />
                                 Clone Voice
@@ -183,7 +298,7 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                             <select
                                 value={selectedVoice || ""}
                                 onChange={(e) => setSelectedVoice(e.target.value)}
-                                className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
+                                className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 shadow-inner"
                                 disabled={generating || voices.length === 0}
                             >
                                 {voices.length === 0 && <option value="">Loading voices...</option>}
@@ -204,7 +319,7 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                             <button
                                 onClick={togglePreview}
                                 disabled={!selectedVoice || !voices.find(v => v.id === selectedVoice)?.ref_audio_url}
-                                className="shrink-0 aspect-square h-[50px] w-[50px] flex justify-center items-center bg-white/5 hover:bg-primary/20 hover:text-primary text-white/50 border border-white/10 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white/50"
+                                className="shrink-0 aspect-square h-[50px] w-[50px] flex justify-center items-center bg-[#111] hover:bg-primary/20 hover:text-lime-400 text-white/50 border border-white/10 rounded-xl transition-all disabled:opacity-30 disabled:hover:bg-[#111] disabled:hover:text-white/50"
                                 title="Preview Voice"
                             >
                                 {isPlayingPreview ? (
@@ -223,7 +338,7 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                             placeholder="Type exactly what you want the AI to say..."
-                            className="w-full flex-grow min-h-[160px] bg-black/50 border border-white/10 rounded-xl p-5 text-[15px] leading-relaxed text-foreground placeholder:text-white/20 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6 shadow-inner font-medium"
+                            className="w-full flex-grow min-h-[160px] bg-black/50 border border-white/10 rounded-xl p-5 text-[15px] leading-relaxed text-white placeholder:text-white/20 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 mb-6 shadow-inner font-medium"
                             disabled={generating}
                         />
 
@@ -241,13 +356,13 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                         >
                             {generating ? (
                                 <>
-                                    <Loader2 size={18} className="animate-spin text-white/70" />
-                                    GENERATING...
+                                    {generationMode === "video" ? <RefreshCw size={18} className="animate-spin text-white/70" /> : <Loader2 size={18} className="animate-spin text-white/70" />}
+                                    {generationMode === "video" ? "PROCESSING VIDEO..." : "GENERATING..."}
                                 </>
                             ) : (
                                 <>
-                                    <Sparkles size={18} className="text-white/70" />
-                                    GENERATE AUDIO ({VOICE_COST}c)
+                                    {generationMode === "video" ? <Clapperboard size={18} className="text-white/70" /> : <Sparkles size={18} className="text-white/70" />}
+                                    {generationMode === "video" ? `REPLACE VIDEO VOICE (${currentCost}c)` : `GENERATE AUDIO (${currentCost}c)`}
                                 </>
                             )}
                         </button>
@@ -263,12 +378,12 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
 
                     <div className="space-y-4 custom-scrollbar pr-2 max-h-[600px] overflow-y-auto">
                         {loadingHistory ? (
-                            <div className="flex flex-col items-center justify-center py-20 bg-white/5 rounded-3xl border border-white/5 ring-1 ring-white/5">
-                                <Loader2 className="animate-spin text-primary mb-4" size={32} />
+                            <div className="flex flex-col items-center justify-center py-20 bg-[#111] rounded-xl border border-white/5 ring-1 ring-white/5">
+                                <Loader2 className="animate-spin text-lime-400 mb-4" size={32} />
                                 <p className="text-sm text-white/40 font-bold uppercase tracking-widest">Loading Library...</p>
                             </div>
                         ) : generations.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-24 bg-white/5 rounded-3xl border border-white/5 ring-1 ring-white/5 backdrop-blur-sm text-center px-8">
+                            <div className="flex flex-col items-center justify-center py-24 bg-[#111] rounded-xl border border-white/5 ring-1 ring-white/5 backdrop-blur-sm text-center px-8">
                                 <div className="w-20 h-20 rounded-full bg-black/40 border border-white/10 flex items-center justify-center mb-6 shadow-inner">
                                     <Mic className="text-white/20" size={32} />
                                 </div>
@@ -279,12 +394,12 @@ export default function VoiceTab({ userCredits, isAdmin, onCreditsUsed }: VoiceT
                             </div>
                         ) : (
                             generations.map(gen => (
-                                <div key={gen.id} className="group relative bg-[#111] border border-white/[0.08] hover:border-white/20 transition-all rounded-3xl p-5 shadow-lg overflow-hidden flex flex-col gap-4">
+                                <div key={gen.id} className="group relative bg-[#111] border border-white/[0.08] hover:border-white/20 transition-all rounded-xl p-5 shadow-lg overflow-hidden flex flex-col gap-4">
                                     {/* Action Header */}
                                     <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2.5 bg-white/5 px-3 py-1.5 rounded-full border border-white/10 w-fit">
+                                        <div className="flex items-center gap-2.5 bg-[#111] px-3 py-1.5 rounded-full border border-white/10 w-fit">
                                             <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(192,132,252,0.8)]" />
-                                            <span className="text-[10px] font-bold tracking-widest text-primary uppercase">{gen.voice_name || 'Voice'}</span>
+                                            <span className="text-[10px] font-bold tracking-widest text-lime-400 uppercase">{gen.voice_name || 'Voice'}</span>
                                         </div>
                                         <div className="flex gap-2">
                                             <a

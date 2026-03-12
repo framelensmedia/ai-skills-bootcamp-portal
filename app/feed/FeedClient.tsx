@@ -439,20 +439,15 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
     };
 
     const handleRemix = (payload: any) => {
-        // Check for Video Type directly from payload (if extended) or we need to pass the whole item?
-        // Since we are calling this from the button where we have 'item', let's update the call site.
-        // OR we can try to detect from the payload if we pass mediaType.
-
-        let href = `/studio?img=${encodeURIComponent(payload.imgUrl)}` +
-            `&remix=${encodeURIComponent(payload.remixPromptText || "")}`;
-
-        if (payload.promptId) {
-            href += `&promptId=${encodeURIComponent(payload.promptId)}`;
-        }
-        if (payload.intent) {
-            href += `&intent=${encodeURIComponent(payload.intent)}`;
-        }
-
+        const imgUrl = payload.imgUrl && payload.imgUrl !== "/orb-neon.gif" ? payload.imgUrl : null;
+        let href = `/studio/prompt`;
+        const params = new URLSearchParams();
+        if (imgUrl) params.set("img", imgUrl);
+        params.set("remix", payload.remixPromptText || "");
+        if (payload.promptId) params.set("promptId", payload.promptId);
+        if (payload.intent) params.set("intent", payload.intent);
+        if (payload.videoUrl) params.set("videoUrl", payload.videoUrl);
+        href += `?${params.toString()}`;
         router.push(href);
     };
 
@@ -482,6 +477,7 @@ export default function FeedClient({ initialItems }: FeedClientProps) {
         setShowVideoOnboarding(false);
         handleRemix({
             imgUrl: pendingVideoRemix.imageUrl,
+            videoUrl: pendingVideoRemix.videoUrl || undefined,
             remixPromptText: pendingVideoRemix.remixPromptText,
             originalPromptText: pendingVideoRemix.originalPromptText,
             combinedPromptText: pendingVideoRemix.combinedPromptText,

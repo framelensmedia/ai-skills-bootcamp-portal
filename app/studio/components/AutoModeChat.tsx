@@ -275,14 +275,14 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                 </div>
                 <div className="h-1 bg-white/10 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-[#B7FF00] transition-all duration-300"
+                        className="h-full bg-lime-400 transition-all duration-300"
                         style={{ width: `${(step / 7) * 100}%` }}
                     />
                 </div>
             </div>
 
             {/* Question Area */}
-            <div className="bg-zinc-900/30 border border-white/10 rounded-2xl p-8 mb-6 min-h-[420px]">
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-8 mb-6 min-h-[420px]">
                 {/* Step 1: Asset Type */}
                 {step === 1 && (
                     <div>
@@ -308,7 +308,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                             onChange={(e) => setData({ ...data, project_name: e.target.value })}
                             disabled={disabled}
                             placeholder={activeConfig.step2_placeholder}
-                            className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white text-lg placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                            className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white text-lg placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                             autoFocus
                         />
                     </div>
@@ -427,7 +427,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                             onChange={(e) => setData({ ...data, color_preferences: e.target.value })}
                             disabled={disabled}
                             placeholder="e.g., Use logo colors, Blue and gold, Warm earth tones..."
-                            className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors"
+                            className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors"
                         />
                         <p className="text-xs text-white/40 mt-2">Leave blank to let the AI choose based on your vibe.</p>
                     </div>
@@ -444,7 +444,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                             disabled={disabled}
                             placeholder="e.g., Include a QR code, Make it look retro, Add sparkles..."
                             rows={4}
-                            className="w-full px-4 py-3 bg-zinc-900/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#B7FF00] transition-colors resize-none"
+                            className="w-full px-4 py-3 bg-[#111]/50 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-lime-400 transition-colors resize-none"
                         />
                     </div>
                 )}
@@ -456,7 +456,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                     type="button"
                     onClick={handleBack}
                     disabled={disabled || step === 1}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#111] border border-white/10 text-white/80 hover:bg-white/10 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                     <ChevronLeft size={20} />
                     Back
@@ -466,7 +466,7 @@ export default function AutoModeChat({ onComplete, disabled, initialReferenceIma
                     type="button"
                     onClick={handleNext}
                     disabled={disabled || !canProceed()}
-                    className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-[#B7FF00] text-black font-bold hover:bg-[#a8e600] transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_20px_-5px_#B7FF00]"
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-lime-400 text-black font-bold hover:bg-lime-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_20px_-5px_rgba(183,255,0,0.3)]"
                 >
                     {step === 7 ? "Generate" : "Continue"}
                     {step < 7 && <ChevronRight size={20} />}

@@ -57,7 +57,13 @@ export default function WaveformPlayer({
         wavesurferRef.current = ws;
 
         return () => {
-            ws.destroy();
+            try {
+                ws.destroy();
+            } catch (error: any) {
+                if (error.name !== 'AbortError') {
+                    console.error('WaveSurfer destroy error:', error);
+                }
+            }
         };
     }, [audioUrl, height, waveColor, progressColor]);
 
