@@ -191,8 +191,8 @@ export async function POST(req: Request) {
 
         if (!veoRes.ok) {
             const errText = await veoRes.text();
-            console.error("Veo Reference-to-Video error:", errText);
-            return NextResponse.json({ error: `Veo failed: ${veoRes.status}`, details: errText }, { status: veoRes.status });
+            console.error("Magic Video error:", errText);
+            return NextResponse.json({ error: `Generation failed: ${veoRes.status}`, details: errText }, { status: veoRes.status });
         }
 
         const { name: operationName } = await veoRes.json();
@@ -249,7 +249,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ videoUrl, remainingCredits: credits - VIDEO_COST });
     } catch (e: any) {
-        console.error("Reference-to-Video Error:", e);
+        console.error("Magic Video API Error:", e);
         return NextResponse.json({ error: e.message || "Internal error" }, { status: 500 });
     }
 }

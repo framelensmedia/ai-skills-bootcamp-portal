@@ -35,7 +35,7 @@ export default function ReferenceVideoPage() {
                         <Wand2 className="w-8 h-8 text-violet-400" />
                         Magic Video
                     </h1>
-                    <p className="text-sm text-white/50">Generate a video guided by reference images using Veo 3.1 Fast</p>
+                    <p className="text-sm text-white/50">Generate a video guided by reference images</p>
                 </div>
                 {userCredits !== null && (
                     <div className="text-xs font-semibold text-white/40 border border-white/10 rounded-lg px-4 py-2">
