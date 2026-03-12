@@ -93,7 +93,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                         <Wand2 className="text-violet-400" size={20} />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-white">Reference to Video</h2>
+                        <h2 className="text-lg font-bold text-white">Magic Video</h2>
                         <p className="text-xs text-white/40">Generate a video guided by reference images · {COST} credits</p>
                     </div>
                 </div>

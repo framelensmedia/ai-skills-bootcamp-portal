@@ -33,7 +33,7 @@ export default function ReferenceVideoPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 mb-1">
                         <Wand2 className="w-8 h-8 text-violet-400" />
-                        Reference to Video
+                        Magic Video
                     </h1>
                     <p className="text-sm text-white/50">Generate a video guided by reference images using Veo 3.1 Fast</p>
                 </div>

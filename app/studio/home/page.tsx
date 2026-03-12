@@ -61,7 +61,7 @@ export default function StudioHomePage() {
     const quickTools = [
         { name: "Image", icon: ImageIcon, href: "/studio/tools", color: "text-amber-400 group-hover:text-amber-300" },
         { name: "Video", icon: Video, href: "/studio/tools?tab=video", color: "text-blue-400 group-hover:text-blue-300" },
-        { name: "Ref to Video", icon: Wand2, href: "/studio/reference-video", color: "text-violet-400 group-hover:text-violet-300" },
+        { name: "Magic Video", icon: Wand2, href: "/studio/reference-video", color: "text-violet-400 group-hover:text-violet-300" },
         { name: "Music", icon: Music, href: "/studio/tools?tab=music", color: "text-emerald-400 group-hover:text-emerald-300" },
         { name: "Voice", icon: AudioWaveform, href: "/studio/tools?tab=voice", color: "text-violet-400 group-hover:text-violet-300" },
         { name: "Sound FX", icon: Activity, href: "/studio/soundfx", color: "text-rose-400 group-hover:text-rose-300" },
