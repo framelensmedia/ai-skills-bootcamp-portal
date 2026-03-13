@@ -5,11 +5,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/video-proxy?url=<supabase-public-video-url>
+ * GET /api/video-proxy?url=<video-url>
  *
- * Proxies videos from Supabase storage and adds Range-request support.
- * This is required for mobile Safari (iPhone) which MUST have byte-range
- * responses to stream / play video.
+ * Strategy:
+ * - Supabase storage URLs: 302 redirect to the raw URL.
+ *   Supabase (via Cloudflare) natively serves Accept-Ranges: bytes + 206 responses.
+ *   Routing bytes through Next.js adds a problematic Vary header that breaks mobile Safari.
+ *
+ * - fal.media / fal.ai CDN URLs: Full byte-range proxy.
+ *   These external CDNs may not be directly accessible by mobile browsers due to
+ *   CORS or missing range-request headers. We proxy the bytes and inject the correct headers.
  */
 export async function GET(req: NextRequest) {
     const rawUrl = req.nextUrl.searchParams.get("url");
@@ -17,8 +22,6 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Missing url param", { status: 400 });
     }
 
-    // Basic safety: only proxy our own Supabase storage URLs
-    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace("https://", "")?.split("/")[0];
     let parsedUrl: URL;
     try {
         parsedUrl = new URL(rawUrl);
@@ -26,10 +29,30 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Invalid url", { status: 400 });
     }
 
-    if (supabaseHost && parsedUrl.hostname !== supabaseHost) {
-        return new NextResponse("Forbidden: only Supabase URLs allowed", { status: 403 });
+    const hostname = parsedUrl.hostname;
+
+    // Allow-list of hosts we'll proxy/redirect
+    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace("https://", "")?.split("/")[0] ?? "";
+    const isSupabase = supabaseHost && hostname === supabaseHost;
+    const isFal = hostname.endsWith("fal.media") || hostname.endsWith("fal.ai") || hostname.endsWith("cdn.fal.ai");
+
+    if (!isSupabase && !isFal) {
+        return new NextResponse("Forbidden: unsupported host", { status: 403 });
     }
 
+    // ── Supabase: simple redirect (it already handles ranges natively) ──
+    if (isSupabase) {
+        return NextResponse.redirect(rawUrl, {
+            status: 302,
+            headers: {
+                // Tell mobile clients this supports ranges — even in redirect response
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=86400",
+            },
+        });
+    }
+
+    // ── fal.media: full byte-range proxy ──
     const rangeHeader = req.headers.get("range") || undefined;
 
     const upstreamHeaders: HeadersInit = {
