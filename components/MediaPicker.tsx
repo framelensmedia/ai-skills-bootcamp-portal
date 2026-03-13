@@ -59,7 +59,10 @@ export default function MediaPicker({
             {value ? (
                 <div className="relative w-full max-w-sm mx-auto rounded-xl overflow-hidden border border-white/10 group bg-[#111] flex flex-col items-center justify-center p-2 min-h-[120px]">
                     {type === "video" && (
-                        <video src={value} className="w-full h-full object-contain max-h-[300px] rounded-lg" muted autoPlay loop playsInline />
+                        <video src={value} className="w-full h-full object-contain max-h-[300px] rounded-lg" muted autoPlay loop playsInline 
+                        // @ts-ignore
+                        webkit-playsinline="true"
+                        />
                     )}
                     {type === "image" && (
                         <img src={value} alt="Selected media" className="w-full h-full object-contain max-h-[300px] rounded-lg" />

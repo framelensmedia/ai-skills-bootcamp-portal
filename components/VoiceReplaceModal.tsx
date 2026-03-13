@@ -270,7 +270,10 @@ export default function VoiceReplaceModal({ isOpen, videoUrl, onClose, onSuccess
                                 <h4 className="text-xl font-bold text-white">Done! Your video is ready.</h4>
                                 <p className="text-white/40 text-sm mt-1">It has been saved to your library.</p>
                             </div>
-                            <video src={resultUrl} controls className="w-full rounded-2xl mt-2 max-h-[280px] bg-black" />
+                            <video src={resultUrl} controls playsInline 
+                            // @ts-ignore
+                            webkit-playsinline="true"
+                            className="w-full rounded-2xl mt-2 max-h-[280px] bg-black" />
                         </div>
                     ) : null}
                 </div>

@@ -9,6 +9,7 @@ import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 import SelectPill from "@/components/SelectPill";
 import RechargeModal from "./RechargeModal";
 import { useRouter } from "next/navigation";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 
 
@@ -41,6 +42,7 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [timer, setTimer] = useState(0);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
@@ -384,10 +386,14 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                         {resultUrl ? (
                             <div className="relative w-full h-full flex items-center justify-center bg-black">
                                 <video
-                                    src={resultUrl}
+                                    ref={videoRef}
+                                    src={proxyVideoUrl(resultUrl)}
                                     controls
                                     autoPlay
                                     loop
+                                    playsInline
+                                    // @ts-ignore
+                                    webkit-playsinline="true"
                                     className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
                                 />
                             </div>
@@ -397,12 +403,15 @@ export default function VideoGeneratorModal({ isOpen, onClose, sourceImage, sour
                                     {/* ... preview logic ... */}
                                     {sourceVideo ? (
                                         <video
-                                            src={sourceVideo}
+                                            ref={videoRef}
+                                            src={proxyVideoUrl(sourceVideo)}
                                             className={`w-full h-full object-contain ${isGenerating ? "opacity-30 blur-sm" : "opacity-100"}`}
                                             muted
                                             loop
                                             autoPlay
                                             playsInline
+                                            // @ts-ignore
+                                            webkit-playsinline="true"
                                         />
                                     ) : sourceImage ? (
                                         <Image

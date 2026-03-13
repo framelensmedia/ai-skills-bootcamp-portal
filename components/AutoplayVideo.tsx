@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 interface AutoplayVideoProps extends React.VideoHTMLAttributes<HTMLVideoElement> {
     src: string;
@@ -16,6 +17,8 @@ export default function AutoplayVideo({
 }: AutoplayVideoProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [hasInteracted, setHasInteracted] = useState(false);
+
+    const proxiedSrc = useMemo(() => proxyVideoUrl(src), [src]);
 
     // iOS requires user interaction before video can play
     // Listen for any interaction on the page
@@ -50,6 +53,12 @@ export default function AutoplayVideo({
 
         const observer = new IntersectionObserver(
             ([entry]) => {
+                // Set the video source to the proxied URL if it's different
+                if (video.src !== proxiedSrc) {
+                    video.src = proxiedSrc;
+                    video.load(); // Load the new source
+                }
+
                 if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
                     // Attempt to play
                     const playPromise = video.play();

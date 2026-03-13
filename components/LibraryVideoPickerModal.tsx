@@ -122,6 +122,8 @@ export default function LibraryVideoPickerModal({ isOpen, onClose, onSelect }: P
                                             muted
                                             loop
                                             playsInline
+                                            // @ts-ignore
+                                            webkit-playsinline="true"
                                             onMouseEnter={(e) => {
                                                 const playPromise = e.currentTarget.play();
                                                 if (playPromise !== undefined) {

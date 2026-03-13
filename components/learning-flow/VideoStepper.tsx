@@ -186,6 +186,8 @@ export default function VideoStepper({ videos, lessonId, onAllWatched }: Props) 
                             }}
                             className="w-full h-full"
                             playsInline
+                            // @ts-ignore
+                            webkit-playsinline="true"
                             autoPlay={currentIndex > 0} // Autoplay subsequent videos
                         />
                     ) : (

@@ -139,7 +139,10 @@ export default function SocialPublisherModal({ isOpen, onClose, assetUrl, assetI
                     {/* Media Preview (Left) */}
                     <div className="md:w-5/12 bg-black border-r border-white/10 flex flex-col p-4 items-center justify-center min-h-[250px] md:min-h-0 relative">
                         {mediaType === "video" ? (
-                            <video src={assetUrl} className="max-h-full max-w-full rounded-lg border border-white/10 object-contain shadow-md" controls autoPlay loop muted playsInline />
+                            <video src={assetUrl} className="max-h-full max-w-full rounded-lg border border-white/10 object-contain shadow-md" controls autoPlay loop muted playsInline 
+                            // @ts-ignore
+                            webkit-playsinline="true"
+                            />
                         ) : (
                             <div className="relative w-full h-full min-h-[200px]">
                                 <Image src={assetUrl} alt="Preview" fill className="object-contain rounded-lg drop-shadow-lg" unoptimized />

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Loader2, Download, Upload, X, Wand2, Plus, Library, Music, ImageIcon } from "lucide-react";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import LibraryAudioPickerModal from "@/components/LibraryAudioPickerModal";
 import { uploadFile } from "@/lib/upload";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 type LipSyncTabProps = {
     userCredits: number | null;
@@ -35,6 +36,7 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
     
     const imgInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     const hasCredits = (userCredits ?? 0) >= COST || isAdmin;
 
@@ -106,6 +108,13 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
             setGenerating(false);
         }
     }
+
+    // Trigger load on source change
+    useEffect(() => {
+        if (videoUrl && videoRef.current) {
+            videoRef.current.load();
+        }
+    }, [videoUrl]);
 
     function handleDownload() {
         if (!videoUrl) return;
@@ -313,7 +322,15 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                             <Download size={14} /> Download
                         </button>
                     </div>
-                    <video controls src={videoUrl} className="w-full rounded-xl shadow-2xl" />
+                    <video 
+                        ref={videoRef}
+                        controls 
+                        src={proxyVideoUrl(videoUrl)} 
+                        className="w-full rounded-xl shadow-2xl" 
+                        playsInline
+                        // @ts-ignore
+                        webkit-playsinline="true"
+                    />
                 </div>
             )}
 

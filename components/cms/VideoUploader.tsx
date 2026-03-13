@@ -152,6 +152,9 @@ export default function VideoUploader({ onUpload, currentUrl }: Props) {
                         <video
                             src={currentUrl}
                             controls
+                            playsInline
+                            // @ts-ignore
+                            webkit-playsinline="true"
                             className="w-full h-full object-contain"
                             preload="metadata"
                         />

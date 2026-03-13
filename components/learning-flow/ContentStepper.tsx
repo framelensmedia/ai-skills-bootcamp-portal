@@ -69,7 +69,12 @@ export default function ContentStepper({ items, lessonId, onAllCompleted, initia
     const totalDuration = orderedItems.reduce((sum, item) => sum + (item.content.duration_seconds || 0), 0);
 
     // Reset loop state on index change
+    const videoRef = useRef<HTMLVideoElement>(null);
+
     useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.load();
+        }
         setShowNextUp(false);
         setCountdown(5);
 
@@ -225,6 +230,8 @@ export default function ContentStepper({ items, lessonId, onAllCompleted, initia
                                 onEnded={handleVideoEnd}
                                 className="w-full h-full"
                                 playsInline
+                                // @ts-ignore
+                                webkit-playsinline="true"
                                 autoPlay={currentIndex > 0}
                             />
                         ) : currentItem.content.video_url ? (

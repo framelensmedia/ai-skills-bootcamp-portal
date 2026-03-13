@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Download, Sparkles, Share2, X, Copy, Check, Loader2, ChevronDown, ChevronUp, Pencil, Trash2, Film, Play, Pause, Volume2, VolumeX, Maximize, ExternalLink, Send } from "lucide-react";
 import { cleanPrompt } from "@/lib/stringUtils";
 import SocialPublisherModal from "./studio/SocialPublisherModal";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 type Props = {
   open: boolean;
@@ -150,7 +151,8 @@ export default function GenerationLightbox({
   const [isMuted, setIsMuted] = useState(true);
 
   const safeUrl = useMemo(() => normalize(url), [url]);
-  const safeVideoUrl = useMemo(() => normalize(videoUrl), [videoUrl]);
+  const rawVideoUrl = normalize(videoUrl);
+  const safeVideoUrl = useMemo(() => proxyVideoUrl(rawVideoUrl), [rawVideoUrl]);
   const isVideo = mediaType === "video" && safeVideoUrl.length > 0;
   const canShow = open && (safeUrl.length > 0 || safeVideoUrl.length > 0);
 
@@ -238,6 +240,7 @@ export default function GenerationLightbox({
         <div className="relative h-full w-full flex items-center justify-center" onClick={() => setIsFullScreen(false)}>
           {isVideo ? (
             <video
+              src={safeVideoUrl}
               className="max-h-full max-w-full object-contain cursor-pointer"
               autoPlay
               loop
@@ -245,13 +248,11 @@ export default function GenerationLightbox({
               // @ts-ignore
               webkit-playsinline="true"
               controls
+              muted={true}
               preload="auto"
-              crossOrigin="anonymous"
               poster={safeUrl || undefined}
               onClick={(e) => e.stopPropagation()}
-            >
-                <source src={safeVideoUrl} type="video/mp4" />
-            </video>
+            />
           ) : (
             <Image src={safeUrl} alt="Full Screen" fill className="object-contain cursor-zoom-out" priority unoptimized />
           )}
@@ -469,6 +470,7 @@ export default function GenerationLightbox({
                 <div className="relative h-full w-full flex items-center justify-center">
                   <video
                     ref={videoRef}
+                    src={safeVideoUrl}
                     className="w-full h-full object-contain drop-shadow-2xl"
                     loop
                     playsInline
@@ -477,7 +479,6 @@ export default function GenerationLightbox({
                     muted={isMuted}
                     autoPlay
                     preload="auto"
-                    crossOrigin="anonymous"
                     poster={safeUrl || undefined}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
@@ -485,9 +486,7 @@ export default function GenerationLightbox({
                       // Force play when data loaded
                       if (isMuted) e.currentTarget.play().catch(() => { });
                     }}
-                  >
-                    <source src={safeVideoUrl} type="video/mp4" />
-                  </video>
+                  />
                   {/* Video Controls */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full">
                     <button
