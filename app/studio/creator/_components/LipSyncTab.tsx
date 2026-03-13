@@ -123,25 +123,19 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                 <div className="rounded-2xl border border-white/10 bg-[#111] p-6 space-y-4 shadow-xl ring-1 ring-white/5">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-white/50 uppercase tracking-wider block">Reference Photo</label>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => setImagePickerOpen(true)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 transition-all" title="From Library">
-                                <Library size={12} />
-                            </button>
-                        </div>
                     </div>
 
                     <div 
-                        onClick={() => !imageUrl && imgInputRef.current?.click()}
-                        className={`group relative aspect-square rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center gap-3
-                            ${imageUrl ? 'border-transparent bg-black' : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-blue-400/30'}
+                        className={`group relative aspect-square rounded-xl overflow-hidden border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3
+                            ${imageUrl ? 'border-transparent bg-black' : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04]'}
                         `}
                     >
                         {imageUrl ? (
                             <>
                                 <Image src={imageUrl} alt="Reference" fill className="object-cover" unoptimized />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); setImageUrl(null); }}
+                                        onClick={() => setImageUrl(null)}
                                         className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md transition-all"
                                     >
                                         <X size={20} />
@@ -149,15 +143,26 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                                 </div>
                             </>
                         ) : (
-                            <>
-                                <div className="w-12 h-12 rounded-full bg-blue-500/5 flex items-center justify-center group-hover:bg-blue-500/10 transition-colors">
-                                    <ImageIcon className="text-blue-400/50 group-hover:text-blue-400 transition-colors" size={24} />
+                            <div className="flex flex-col items-center gap-6 p-4">
+                                <div className="w-16 h-16 rounded-full bg-blue-500/5 flex items-center justify-center">
+                                    <ImageIcon className="text-blue-400/30" size={32} />
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-[11px] font-bold text-white/70">Upload Photo</p>
-                                    <p className="text-[9px] text-white/30 uppercase tracking-tighter mt-1">PNG, JPG up to 10MB</p>
+                                <div className="flex flex-col gap-2 w-full">
+                                    <button 
+                                        onClick={() => imgInputRef.current?.click()}
+                                        className="w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-white transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Upload size={14} /> Upload Photo
+                                    </button>
+                                    <button 
+                                        onClick={() => setImagePickerOpen(true)}
+                                        className="w-full py-2.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-[11px] font-bold text-blue-400 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Library size={14} /> From Library
+                                    </button>
                                 </div>
-                            </>
+                                <p className="text-[9px] text-white/20 uppercase tracking-tighter text-center">PNG, JPG up to 10MB</p>
+                            </div>
                         )}
                     </div>
                     <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -167,30 +172,24 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                 <div className="rounded-2xl border border-white/10 bg-[#111] p-6 space-y-4 shadow-xl ring-1 ring-white/5">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-white/50 uppercase tracking-wider block">Reference Audio</label>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => setAudioPickerOpen(true)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 transition-all" title="From Library">
-                                <Library size={12} />
-                            </button>
-                        </div>
                     </div>
 
                     <div 
-                        onClick={() => !audioUrl && audioInputRef.current?.click()}
-                        className={`group relative aspect-square rounded-xl overflow-hidden border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center gap-3
-                            ${audioUrl ? 'border-blue-500/30 bg-blue-500/5' : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-blue-400/30'}
+                        className={`group relative aspect-square rounded-xl overflow-hidden border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3
+                            ${audioUrl ? 'border-blue-500/30 bg-blue-500/5' : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.04]'}
                         `}
                     >
                         {audioUrl ? (
-                            <div className="flex flex-col items-center gap-4 px-6 w-full">
+                            <div className="flex flex-col items-center gap-4 px-6 w-full text-center">
                                 <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse">
                                     <Music className="text-blue-400" size={32} />
                                 </div>
-                                <div className="text-center w-full">
+                                <div className="w-full">
                                     <p className="text-[11px] font-bold text-blue-400 truncate max-w-full">
                                         {audioFileName || "Audio selected"}
                                     </p>
                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); setAudioUrl(null); setAudioFileName(null); }}
+                                        onClick={() => { setAudioUrl(null); setAudioFileName(null); }}
                                         className="mt-4 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-white/60 transition-all flex items-center justify-center gap-2 mx-auto"
                                     >
                                         <X size={12} /> Remove Audio
@@ -199,15 +198,26 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                                 <audio controls src={audioUrl} className="h-8 w-full mt-4" />
                             </div>
                         ) : (
-                            <>
-                                <div className="w-12 h-12 rounded-full bg-blue-500/5 flex items-center justify-center group-hover:bg-blue-500/10 transition-colors">
-                                    <Music className="text-blue-400/50 group-hover:text-blue-400 transition-colors" size={24} />
+                            <div className="flex flex-col items-center gap-6 p-4">
+                                <div className="w-16 h-16 rounded-full bg-blue-500/5 flex items-center justify-center">
+                                    <Music className="text-blue-400/30" size={32} />
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-[11px] font-bold text-white/70">Upload Audio</p>
-                                    <p className="text-[9px] text-white/30 uppercase tracking-tighter mt-1">MP3, WAV up to 20MB</p>
+                                <div className="flex flex-col gap-2 w-full">
+                                    <button 
+                                        onClick={() => audioInputRef.current?.click()}
+                                        className="w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-bold text-white transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Upload size={14} /> Upload Audio
+                                    </button>
+                                    <button 
+                                        onClick={() => setAudioPickerOpen(true)}
+                                        className="w-full py-2.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-[11px] font-bold text-blue-400 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Library size={14} /> From Library
+                                    </button>
                                 </div>
-                            </>
+                                <p className="text-[9px] text-white/20 uppercase tracking-tighter text-center">MP3, WAV up to 20MB</p>
+                            </div>
                         )}
                     </div>
                     <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
