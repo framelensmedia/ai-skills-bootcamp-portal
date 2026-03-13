@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Loader2, Download, Upload, X, Wand2, Plus, Library, Music, ImageIcon } from "lucide-react";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
 import LibraryAudioPickerModal from "@/components/LibraryAudioPickerModal";
+import { uploadFile } from "@/lib/upload";
 
 type LipSyncTabProps = {
     userCredits: number | null;
@@ -23,8 +24,14 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
     const [audioPickerOpen, setAudioPickerOpen] = useState(false);
     
     const [generating, setGenerating] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [uploadingAudio, setUploadingAudio] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    
+    // New creative controls
+    const [expression, setExpression] = useState<"default" | "happy">("default");
+    const [talkingStyle, setTalkingStyle] = useState<"stable" | "expressive">("stable");
     
     const imgInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -34,36 +41,39 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
     async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 10 * 1024 * 1024) { setError("Image is too large (max 10MB)"); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-            if (typeof reader.result === "string") {
-                setImageUrl(reader.result);
-                setError(null);
-            }
-        };
-        reader.readAsDataURL(file);
-        e.target.value = "";
+        
+        setUploadingImage(true);
+        setError(null);
+
+        try {
+            const url = await uploadFile(file);
+            setImageUrl(url);
+        } catch (err: any) {
+            setError(err.message || "Failed to upload image");
+        } finally {
+            setUploadingImage(false);
+            e.target.value = "";
+        }
     }
 
     async function handleAudioUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 20 * 1024 * 1024) { setError("Audio is too large (max 20MB)"); return; }
         
-        setAudioFileName(file.name);
+        setUploadingAudio(true);
         setError(null);
+        setAudioFileName(file.name);
 
-        // Upload to a temporary place or just use base64 for now? 
-        // Most of our APIs expect a URL. Let's convert to base64 and the API will handle it.
-        const reader = new FileReader();
-        reader.onload = () => {
-            if (typeof reader.result === "string") {
-                setAudioUrl(reader.result);
-            }
-        };
-        reader.readAsDataURL(file);
-        e.target.value = "";
+        try {
+            const url = await uploadFile(file);
+            setAudioUrl(url);
+        } catch (err: any) {
+            setError(err.message || "Failed to upload audio");
+            setAudioFileName(null);
+        } finally {
+            setUploadingAudio(false);
+            e.target.value = "";
+        }
     }
 
     async function handleGenerate() {
@@ -79,7 +89,12 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
             const res = await fetch("/api/generate-lipsync", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ imageUrl, audioUrl }),
+                body: JSON.stringify({ 
+                    imageUrl, 
+                    audioUrl,
+                    expression,
+                    talkingStyle
+                }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -142,6 +157,11 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                                     </button>
                                 </div>
                             </>
+                        ) : uploadingImage ? (
+                            <div className="flex flex-col items-center gap-4 animate-pulse text-blue-400/50">
+                                <Loader2 className="animate-spin" size={32} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                            </div>
                         ) : (
                             <div className="flex flex-col items-center gap-6 p-4">
                                 <div className="w-16 h-16 rounded-full bg-blue-500/5 flex items-center justify-center">
@@ -197,6 +217,11 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                                 </div>
                                 <audio controls src={audioUrl} className="h-8 w-full mt-4" />
                             </div>
+                        ) : uploadingAudio ? (
+                            <div className="flex flex-col items-center gap-4 animate-pulse text-blue-400/50">
+                                <Loader2 className="animate-spin" size={32} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Uploading...</span>
+                            </div>
                         ) : (
                             <div className="flex flex-col items-center gap-6 p-4">
                                 <div className="w-16 h-16 rounded-full bg-blue-500/5 flex items-center justify-center">
@@ -224,7 +249,41 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
+                {/* Advanced Controls */}
+                <div className="rounded-2xl border border-white/10 bg-[#111] p-6 space-y-4 shadow-xl ring-1 ring-white/5">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-wider block mb-2">Facial Expression</label>
+                            <div className="flex flex-wrap gap-2 bg-zinc-900 border border-white/5 p-1 rounded-xl">
+                                {(["default", "happy"] as const).map(exp => (
+                                    <button
+                                        key={exp}
+                                        onClick={() => setExpression(exp)}
+                                        className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${expression === exp ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
+                                    >
+                                        {exp}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-wider block mb-2">Talking Style</label>
+                            <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setTalkingStyle("stable")}
+                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${talkingStyle === "stable" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
+                                >Stable</button>
+                                <button
+                                    onClick={() => setTalkingStyle("expressive")}
+                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${talkingStyle === "expressive" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"}`}
+                                >Expressive</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
 
                 <button

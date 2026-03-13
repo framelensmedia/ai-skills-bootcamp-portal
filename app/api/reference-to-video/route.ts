@@ -247,6 +247,7 @@ export async function POST(req: Request) {
         await admin.from("video_generations").insert({
             user_id: user.id,
             video_url: videoUrl,
+            thumbnail_url: referenceImages[0] || "",
             prompt: prompt.trim(),
             status: "completed",
             is_public: true,

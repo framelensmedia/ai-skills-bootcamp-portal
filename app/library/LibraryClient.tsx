@@ -726,7 +726,7 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                     // Build Video Items
                     const builtVideos = videoRows.map((v: any) => ({
                         id: v.id,
-                        imageUrl: "",
+                        imageUrl: v.thumbnail_url || "",
                         videoUrl: v.video_url,
                         thumbnailUrl: v.thumbnail_url || null,
                         mediaType: "video",

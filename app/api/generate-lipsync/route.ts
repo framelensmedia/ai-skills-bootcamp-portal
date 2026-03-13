@@ -10,7 +10,7 @@ const COST = 30;
 
 export async function POST(req: Request) {
     try {
-        const { imageUrl, audioUrl } = await req.json();
+        const { imageUrl, audioUrl, expression, talkingStyle } = await req.json();
 
         if (!imageUrl || !audioUrl) {
             return NextResponse.json({ error: "Image and Audio URLs are required" }, { status: 400 });
@@ -47,10 +47,16 @@ export async function POST(req: Request) {
         }
 
         // Prepare payload for HeyGen Avatar 4 on Fal.ai
-        const payload = {
+        const payload: any = {
             image_url: imageUrl,
             audio_url: audioUrl,
+            talking_style: talkingStyle || "stable",
         };
+
+        // Only include expression if it's not "default"
+        if (expression && expression !== "default") {
+            payload.expression = expression;
+        }
 
         // Submit to fal queue
         const createRes = await fetch("https://queue.fal.run/fal-ai/heygen/avatar4/image-to-video", {
@@ -146,7 +152,7 @@ export async function POST(req: Request) {
             user_id: user.id,
             video_url: finalVideoUrl,
             thumbnail_url: thumbUrl,
-            prompt: "Lip Sync (Photo to Video)",
+            prompt: `Lip Sync (${expression || "default"})`,
             status: "completed",
             is_public: true,
         }).select().single();

@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { Loader2, Download, Upload, X, Wand2, Plus, Library } from "lucide-react";
 import LibraryImagePickerModal from "@/components/LibraryImagePickerModal";
+import { uploadFile } from "@/lib/upload";
 
 type ReferenceVideoTabProps = {
     userCredits: number | null;
@@ -20,6 +21,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
     const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
     const [stylePreset, setStylePreset] = useState<string | null>(null);
     const [generating, setGenerating] = useState(false);
+    const [uploadingImages, setUploadingImages] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,30 +40,30 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
-        const newImages: { url: string; fromLibrary: boolean }[] = [];
-        let errorMsg: string | null = null;
+        setUploadingImages(true);
+        setError(null);
 
-        for (const file of files) {
-            if (referenceImages.length + newImages.length >= 3) break;
-            
-            if (file.size > 10 * 1024 * 1024) {
-                errorMsg = "Some images were too large (max 10MB)";
-                continue;
-            }
-
-            const url = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(file);
-            });
-            newImages.push({ url, fromLibrary: false });
+        const uploadTasks = [];
+        const limit = 3 - referenceImages.length;
+        
+        for (let i = 0; i < Math.min(files.length, limit); i++) {
+            uploadTasks.push(uploadFile(files[i]));
         }
 
-        if (newImages.length > 0) {
+        try {
+            const urls = await Promise.all(uploadTasks);
+            const newImages = urls.map(url => ({ url, fromLibrary: false }));
             setReferenceImages(prev => [...prev, ...newImages]);
+            
+            if (files.length > limit) {
+                setError(`Added ${limit} images. Only 3 reference images allowed.`);
+            }
+        } catch (err: any) {
+            setError(err.message || "Failed to upload one or more images");
+        } finally {
+            setUploadingImages(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
-        setError(errorMsg);
-        e.target.value = "";
     }
 
     function removeImage(index: number) {
@@ -176,7 +178,13 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                             <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-[9px] font-bold text-white/70">{i + 1}</div>
                         </div>
                     ))}
-                    {canAddMore && (
+                    {uploadingImages && (
+                        <div className="aspect-square rounded-xl border border-violet-400/20 bg-violet-500/5 flex flex-col items-center justify-center gap-2 animate-pulse">
+                            <Loader2 className="animate-spin text-violet-400" size={20} />
+                            <span className="text-[8px] font-bold uppercase text-violet-400/70">Uploading...</span>
+                        </div>
+                    )}
+                    {canAddMore && !uploadingImages && (
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             className="aspect-square rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-violet-400/30 transition-all flex flex-col items-center justify-center gap-2 text-white/30 hover:text-violet-400"
