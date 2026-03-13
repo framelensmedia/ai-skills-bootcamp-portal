@@ -41,7 +41,7 @@ export default async function LibraryPage() {
       .limit(200),
     supabase
       .from("video_generations")
-      .select("id, video_url, created_at, prompt, dialogue, is_public, source_image_id, status")
+      .select("id, video_url, thumbnail_url, created_at, prompt, dialogue, is_public, source_image_id, status")
       .eq("user_id", user.id)
       .eq("status", "completed")
       .order("created_at", { ascending: false })
@@ -116,8 +116,9 @@ export default async function LibraryPage() {
   const videoItems: LibraryItem[] = videoRows.map((v: any) => {
     return {
       id: v.id,
-      imageUrl: "", // No thumbnail for now
+      imageUrl: v.thumbnail_url || "", 
       videoUrl: v.video_url,
+      thumbnailUrl: v.thumbnail_url || null,
       mediaType: "video" as const,
       createdAt: v.created_at,
       createdAtMs: Date.parse(v.created_at || "") || 0,
