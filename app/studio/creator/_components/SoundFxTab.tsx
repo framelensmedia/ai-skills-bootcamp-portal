@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Zap, Download, Loader2, Volume2, Play, Pause, Video, Upload, X, Library } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import LibraryVideoPickerModal from "@/components/LibraryVideoPickerModal";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 type SoundFxTabProps = {
     userCredits: number | null;
@@ -295,7 +296,15 @@ export default function SoundFxTab({ userCredits, isAdmin, onCreditsUsed }: Soun
                     </div>
                     {prompt && <p className="text-xs text-white/50 truncate">"{prompt}"</p>}
                     {resultVideoUrl ? (
-                        <video controls src={resultVideoUrl} className="w-full rounded-xl" />
+                        <video
+                            controls
+                            src={proxyVideoUrl(resultVideoUrl)}
+                            className="w-full rounded-xl"
+                            playsInline
+                            // @ts-ignore
+                            webkit-playsinline="true"
+                            preload="auto"
+                        />
                     ) : audioUrl ? (
                         <audio controls src={audioUrl} className="w-full h-10 rounded-lg opacity-80" />
                     ) : null}

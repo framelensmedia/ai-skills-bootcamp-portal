@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Hunyuan video foley can take several minutes
 
 const FAL_KEY = process.env.FAL_KEY!;
-const COST = 2;
 
 export async function POST(req: Request) {
     try {
@@ -24,8 +24,14 @@ export async function POST(req: Request) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+        // Admin client for storage & DB operations
+        const adminAuth = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
         // Credits check
-        const { data: profile } = await supabase
+        const { data: profile } = await adminAuth
             .from("profiles")
             .select("credits, role")
             .eq("user_id", user.id)
@@ -98,6 +104,42 @@ export async function POST(req: Request) {
             if (!videoUrl) {
                 throw new Error(`No video URL returned: ${JSON.stringify(result).slice(0, 200)}`);
             }
+
+            // ── Persist Hunyuan Foley video to Supabase Storage & DB ──
+            const BUCKET = process.env.NEXT_PUBLIC_GENERATIONS_BUCKET || "generations";
+            const filePath = `videos/${user.id}/soundfx_${Date.now()}.mp4`;
+
+            const videoRes = await fetch(videoUrl);
+            if (!videoRes.ok) throw new Error(`Failed to fetch video from Fal: ${videoRes.status}`);
+            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+
+            const { error: uploadError } = await adminAuth.storage
+                .from(BUCKET)
+                .upload(filePath, videoBuffer, { contentType: "video/mp4", upsert: false });
+
+            if (uploadError) throw new Error(`Upload to storage failed: ${uploadError.message}`);
+
+            const { data: pubUrl } = adminAuth.storage.from(BUCKET).getPublicUrl(filePath);
+            const finalVideoUrl = pubUrl.publicUrl;
+
+            // Save to DB — use source video URL as thumbnail for library display
+            const promptLabel = prompt?.trim()
+                ? `Sound FX: ${prompt.trim().slice(0, 80)}`
+                : "Sound FX (Auto Foley)";
+
+            const { error: dbErr } = await adminAuth.from("video_generations").insert({
+                user_id: user.id,
+                video_url: finalVideoUrl,
+                thumbnail_url: video_url || "", // source video as thumbnail reference
+                prompt: promptLabel,
+                status: "completed",
+                is_public: true,
+            });
+
+            if (dbErr) console.warn("DB insert for soundfx failed:", dbErr.message);
+
+            // Use the persistent URL going forward
+            videoUrl = finalVideoUrl;
         } else {
             audioUrl = result.audio?.url || result.audio_url || result.url || null;
             if (!audioUrl) {
@@ -107,7 +149,7 @@ export async function POST(req: Request) {
 
         // Deduct credits
         if (!isAdmin) {
-            await supabase.rpc("decrement_credits", { x: COST, user_id_param: user.id });
+            await adminAuth.rpc("decrement_credits", { x: COST, user_id_param: user.id });
         }
 
         return NextResponse.json({ audioUrl, videoUrl });

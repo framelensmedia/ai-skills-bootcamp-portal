@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import { Copy, Download, Share2, Sparkles, ArrowLeft, Heart, ChevronDown, ArrowBigUp, Play, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 import GenerationLightbox from "@/components/GenerationLightbox";
 import GalleryBackToTop from "@/components/GalleryBackToTop";
+import { proxyVideoUrl } from "@/lib/videoProxy";
 
 export type RemixDetail = {
     id: string;
@@ -586,12 +587,16 @@ export default function RemixClient({ initialRemix }: Props) {
                     >
                         {remix.mediaType === "video" && remix.video_url ? (
                             <video
-                                src={remix.video_url}
+                                src={proxyVideoUrl(remix.video_url)}
                                 className="w-full h-full object-contain"
                                 controls
                                 autoPlay
                                 loop
+                                muted
                                 playsInline
+                                // @ts-ignore
+                                webkit-playsinline="true"
+                                preload="auto"
                             />
                         ) : remix.image_url ? (
                             <Image
@@ -744,12 +749,15 @@ export default function RemixClient({ initialRemix }: Props) {
                                         {r.mediaType === "video" && r.video_url ? (
                                             <>
                                                 <video
-                                                    src={r.video_url}
+                                                    src={proxyVideoUrl(r.video_url)}
                                                     className="absolute inset-0 w-full h-full object-cover"
                                                     autoPlay
                                                     muted
                                                     loop
                                                     playsInline
+                                                    // @ts-ignore
+                                                    webkit-playsinline="true"
+                                                    preload="auto"
                                                 />
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                     <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
@@ -819,12 +827,15 @@ export default function RemixClient({ initialRemix }: Props) {
                                         {r.mediaType === "video" && r.video_url ? (
                                             <>
                                                 <video
-                                                    src={r.video_url}
+                                                    src={proxyVideoUrl(r.video_url)}
                                                     className="absolute inset-0 w-full h-full object-cover"
                                                     autoPlay
                                                     muted
                                                     loop
                                                     playsInline
+                                                    // @ts-ignore
+                                                    webkit-playsinline="true"
+                                                    preload="auto"
                                                 />
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                     <div className="w-10 h-10 rounded-full border-2 border-white/60 flex items-center justify-center group-hover:scale-110 group-hover:border-white transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]">
