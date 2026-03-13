@@ -697,15 +697,14 @@ export default function RemixChatWizard({
                 </div>
 
                 {/* Right Panel (Template Preview) */}
-                <div className="relative flex h-32 w-full shrink-0 flex-row items-center border-b border-white/10 bg-black/40 p-4 md:h-auto md:w-1/3 md:flex-col md:border-b-0 md:border-l md:p-6">
-                    <div className="mr-4 text-xs font-semibold text-white/80 md:mb-4 md:mr-0 md:text-sm">Template</div>
-                    <div className="relative w-full md:w-full overflow-hidden rounded-lg border border-white/10 bg-black flex-shrink-0">
+                <div className="relative flex h-auto w-full shrink-0 flex-col items-center border-b border-white/10 bg-black/40 p-4 md:h-auto md:w-1/3 md:flex-col md:border-b-0 md:border-l md:p-6">
+                    <div className="mb-2 text-[10px] font-bold text-white/30 uppercase tracking-widest md:mb-4 md:text-sm md:text-white/80">Template</div>
+                    <div className="relative w-full flex justify-center overflow-hidden rounded-xl border border-white/5 bg-black/20 flex-shrink-0">
                         {templatePreviewUrl ? (
                             <img
                                 src={templatePreviewUrl}
                                 alt="Template"
-                                className="w-full h-auto object-contain block"
-                                style={{ maxHeight: "60vh" }}
+                                className="max-w-full max-h-[30vh] md:max-h-[60vh] w-auto h-auto object-contain block shadow-2xl"
                             />
                         ) : (
                             <div className="flex h-32 w-full items-center justify-center text-white/20">
