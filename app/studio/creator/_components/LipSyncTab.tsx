@@ -110,11 +110,11 @@ export default function LipSyncTab({ userCredits, isAdmin, onCreditsUsed }: LipS
                     </div>
                     <div>
                         <h2 className="text-lg font-bold text-white">Lip Sync</h2>
-                        <p className="text-xs text-white/40">Animate a photo with reference audio · HeyGen Avatar 4 · {COST} credits</p>
+                        <p className="text-xs text-white/40">Animate a photo with reference audio · {COST} credits</p>
                     </div>
                 </div>
                 <div className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-wider border border-blue-500/20">
-                    HeyGen AI
+                    AI Studio
                 </div>
             </div>
 

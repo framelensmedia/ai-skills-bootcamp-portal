@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
         if (!createRes.ok) {
             const errText = await createRes.text();
-            throw new Error(`HeyGen API error: ${createRes.status} ${errText}`);
+            throw new Error(`Generation API error: ${createRes.status} ${errText}`);
         }
 
         const createData = await createRes.json();
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
                 break;
             }
             if (data.status === "FAILED") {
-                throw new Error(`HeyGen generation failed: ${JSON.stringify(data.logs)}`);
+                throw new Error(`Generation failed: ${JSON.stringify(data.logs)}`);
             }
         }
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 
         const videoUrl = result.video?.url || result.url;
         if (!videoUrl) {
-            throw new Error(`No video URL returned from HeyGen: ${JSON.stringify(result)}`);
+            throw new Error(`No video URL returned from API: ${JSON.stringify(result)}`);
         }
 
         // Upload to Supabase Storage (Optional but recommended for persistence)
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
         await adminAuth.from("video_generations").insert({
             user_id: user.id,
             video_url: finalVideoUrl,
-            prompt: "Lip Sync (HeyGen Avatar 4)",
+            prompt: "Lip Sync (Photo to Video)",
             status: "completed",
             is_public: true,
         });

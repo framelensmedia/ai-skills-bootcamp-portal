@@ -35,7 +35,7 @@ export default function LipSyncPage() {
                         <Music className="w-8 h-8 text-blue-400" />
                         Lip Sync
                     </h1>
-                    <p className="text-sm text-white/50">Animate your photos with reference audio using HeyGen AI</p>
+                    <p className="text-sm text-white/50">Animate your photos with reference audio using AI</p>
                 </div>
                 {userCredits !== null && (
                     <div className="text-xs font-semibold text-white/40 border border-white/10 rounded-lg px-4 py-2">
