@@ -65,6 +65,7 @@ export default function StudioHomePage() {
         { name: "Music", icon: Music, href: "/studio/tools?tab=music", color: "text-emerald-400 group-hover:text-emerald-300" },
         { name: "Voice", icon: AudioWaveform, href: "/studio/tools?tab=voice", color: "text-violet-400 group-hover:text-violet-300" },
         { name: "Sound FX", icon: Activity, href: "/studio/soundfx", color: "text-rose-400 group-hover:text-rose-300" },
+        { name: "Lip Sync", icon: Music, href: "/studio/lipsync", color: "text-blue-400 group-hover:text-blue-300" },
         { name: "Editor", icon: Scissors, href: "/studio/edit", color: "text-lime-400 group-hover:text-lime-300" },
     ];
 
