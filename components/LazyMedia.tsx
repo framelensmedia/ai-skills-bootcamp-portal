@@ -70,13 +70,11 @@ function VideoPlayer({ src, poster, className }: { src: string, poster?: string 
         const video = videoRef.current;
         if (!video) return;
 
-        // Force play on mount (essential for mobile when injected dynamically)
+        // Explicitly load and play
         const attemptPlay = () => {
+            video.load(); // Force source refresh
             if (video.paused) {
-                video.play().catch(() => {
-                    // Autoplay blocked, maybe muted issue?
-                    // Ensure muted is set (it is in props)
-                });
+                video.play().catch(() => {});
             }
         };
 
@@ -96,7 +94,6 @@ function VideoPlayer({ src, poster, className }: { src: string, poster?: string 
     return (
         <video
             ref={videoRef}
-            src={src}
             poster={poster || undefined}
             className={className}
             autoPlay
@@ -105,6 +102,10 @@ function VideoPlayer({ src, poster, className }: { src: string, poster?: string 
             playsInline
             // @ts-ignore
             webkit-playsinline="true"
-        />
+            preload="auto"
+            crossOrigin="anonymous"
+        >
+            <source src={src} type="video/mp4" />
+        </video>
     );
 }
