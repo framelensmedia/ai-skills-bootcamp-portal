@@ -67,7 +67,7 @@ async function toBase64(input: string): Promise<{ bytes: string; mime: string }>
 
 export async function POST(req: Request) {
     try {
-        const { prompt, referenceImages, aspectRatio = "16:9" } = await req.json();
+        const { prompt, referenceImages, aspectRatio = "16:9", stylePreset } = await req.json();
 
         if (!prompt?.trim()) {
             return NextResponse.json({ error: "A prompt is required" }, { status: 400 });
@@ -161,9 +161,19 @@ export async function POST(req: Request) {
         const outputPath = `veo-output/${user.id}/${Date.now()}.mp4`;
         const storageUri = `gs://${gcsBucket}/${outputPath}`;
 
+        const STYLE_PRESETS: Record<string, string> = {
+            cinematic: "Shot on RED Weapon 8K with Panavision Primo 70mm lens. Cinematic lighting, color graded.",
+            commercial: "Shot on ARRI Alexa Mini with Zeiss Master Prime 50mm. High key lighting, crisp, clean, premium advertisement look.",
+            documentary: "Shot on Canon 5D Mk IV with Sigma 24-70mm f/2.8 lens. Natural lighting, handheld feel, authentic texture.",
+            cartoon: "3D Animation style by Pixar. Vibrant colors, expressive lighting, soft shading, cute characters.",
+        };
+
+        const stylePrompt = stylePreset ? STYLE_PRESETS[stylePreset] : "";
+        const finalPrompt = stylePrompt ? `${prompt.trim()}, ${stylePrompt}` : prompt.trim();
+
         const payload = {
             instances: [{
-                prompt: prompt.trim(),
+                prompt: finalPrompt,
                 referenceImages: refImagePayloads,
             }],
             parameters: {

@@ -18,6 +18,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
     const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
     const [referenceImages, setReferenceImages] = useState<{ url: string; fromLibrary: boolean }[]>([]);
     const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
+    const [stylePreset, setStylePreset] = useState<string | null>(null);
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -26,19 +27,40 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
     const hasCredits = (userCredits ?? 0) >= COST || isAdmin;
     const canAddMore = referenceImages.length < 3;
 
+    const STYLE_PRESETS = [
+        { id: "cinematic", label: "Cinematic", icon: "🎬", prompt: "Shot on RED Weapon 8K with Panavision Primo 70mm lens. Cinematic lighting, color graded." },
+        { id: "commercial", label: "TV Ad", icon: "📺", prompt: "Shot on ARRI Alexa Mini with Zeiss Master Prime 50mm. High key lighting, crisp, clean, premium advertisement look." },
+        { id: "documentary", label: "Docu", icon: "📹", prompt: "Shot on Canon 5D Mk IV with Sigma 24-70mm f/2.8 lens. Natural lighting, handheld feel, authentic texture." },
+        { id: "cartoon", label: "Cartoon", icon: "🎨", prompt: "3D Animation style by Pixar. Vibrant colors, expressive lighting, soft shading, cute characters." }
+    ];
+
     async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.size > 10 * 1024 * 1024) { setError("Image is too large (max 10MB)"); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-            if (typeof reader.result === "string" && canAddMore) {
-                setReferenceImages(prev => [...prev, { url: reader.result as string, fromLibrary: false }]);
-                setError(null);
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+
+        const newImages: { url: string; fromLibrary: boolean }[] = [];
+        let errorMsg: string | null = null;
+
+        for (const file of files) {
+            if (referenceImages.length + newImages.length >= 3) break;
+            
+            if (file.size > 10 * 1024 * 1024) {
+                errorMsg = "Some images were too large (max 10MB)";
+                continue;
             }
-        };
-        reader.readAsDataURL(file);
-        // Reset input so same file can be picked again
+
+            const url = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(file);
+            });
+            newImages.push({ url, fromLibrary: false });
+        }
+
+        if (newImages.length > 0) {
+            setReferenceImages(prev => [...prev, ...newImages]);
+        }
+        setError(errorMsg);
         e.target.value = "";
     }
 
@@ -63,6 +85,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                     prompt: prompt.trim(),
                     referenceImages: referenceImages.map(img => img.url),
                     aspectRatio,
+                    stylePreset,
                 }),
             });
             const data = await res.json();
@@ -98,14 +121,14 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                     </div>
                 </div>
                 {/* Aspect Ratio */}
-                <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-xl self-start">
+                <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-xl self-start w-full md:w-auto">
                     <button
                         onClick={() => setAspectRatio("16:9")}
-                        className={`px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${aspectRatio === "16:9" ? "bg-white/10 text-white" : "text-white/40 hover:text-white"}`}
+                        className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${aspectRatio === "16:9" ? "bg-white/10 text-white" : "text-white/40 hover:text-white"}`}
                     >Landscape</button>
                     <button
                         onClick={() => setAspectRatio("9:16")}
-                        className={`px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${aspectRatio === "9:16" ? "bg-white/10 text-white" : "text-white/40 hover:text-white"}`}
+                        className={`flex-1 md:flex-none px-4 py-1.5 text-[10px] font-bold uppercase rounded-lg transition-all ${aspectRatio === "9:16" ? "bg-white/10 text-white" : "text-white/40 hover:text-white"}`}
                     >Portrait</button>
                 </div>
             </div>
@@ -118,22 +141,22 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                         <p className="text-[10px] text-white/30 mt-0.5">Add up to 3 images — characters, scenes, or objects</p>
                     </div>
                     {canAddMore && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2 justify-end">
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-white/60 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-bold text-white/60 transition-all border border-white/5"
                             >
                                 <Upload size={12} /> Upload
                             </button>
                             <button
                                 onClick={() => setLibraryPickerOpen(true)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-[10px] font-bold text-violet-400 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-[10px] font-bold text-violet-400 transition-all border border-violet-500/10"
                             >
                                 <Library size={12} /> From Library
                             </button>
                         </div>
                     )}
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
                 </div>
 
                 {/* Image Slots */}
@@ -166,6 +189,26 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                     {Array.from({ length: Math.max(0, 2 - referenceImages.length) }).map((_, i) => (
                         <div key={`empty-${i}`} className="aspect-square rounded-xl border border-white/5 bg-white/[0.01]" />
                     ))}
+                </div>
+
+                {/* Style Presets */}
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-white/50 uppercase tracking-wider block">Style Preset</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {STYLE_PRESETS.map((style) => (
+                            <button
+                                key={style.id}
+                                onClick={() => setStylePreset(stylePreset === style.id ? null : style.id)}
+                                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${stylePreset === style.id
+                                    ? "bg-violet-500/20 border-violet-500/50 text-white"
+                                    : "bg-white/5 border-white/5 text-white/50 hover:border-white/10 hover:bg-white/[0.07]"
+                                    }`}
+                            >
+                                <span className="text-base">{style.icon}</span>
+                                {style.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Prompt */}
