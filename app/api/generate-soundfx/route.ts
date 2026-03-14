@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
+import { mp4Faststart } from "@/lib/mp4Faststart";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Hunyuan video foley can take several minutes
@@ -111,7 +112,8 @@ export async function POST(req: Request) {
 
             const videoRes = await fetch(videoUrl);
             if (!videoRes.ok) throw new Error(`Failed to fetch video from Fal: ${videoRes.status}`);
-            const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+            const rawBuffer = Buffer.from(await videoRes.arrayBuffer());
+            const videoBuffer = mp4Faststart(rawBuffer); // move moov atom to front for iOS
 
             const { error: uploadError } = await adminAuth.storage
                 .from(BUCKET)

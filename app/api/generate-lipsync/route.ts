@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createClient } from "@supabase/supabase-js";
+import { mp4Faststart } from "@/lib/mp4Faststart";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -106,13 +107,14 @@ export async function POST(req: Request) {
             throw new Error(`No video URL returned from API: ${JSON.stringify(result)}`);
         }
 
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage (with faststart so iOS can stream without full download)
         const videoRes = await fetch(videoUrl);
         if (!videoRes.ok) throw new Error(`Failed to fetch video from Fal: ${videoRes.status}`);
-        const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+        const rawBuffer = Buffer.from(await videoRes.arrayBuffer());
+        const videoBuffer = mp4Faststart(rawBuffer); // move moov atom to front for iOS
 
         const BUCKET = process.env.NEXT_PUBLIC_GENERATIONS_BUCKET || "generations";
-        const filePath = `videos/${user.id}/lipsync_${Date.now()}.mp4`; // Changed from lipsync/ to videos/
+        const filePath = `videos/${user.id}/lipsync_${Date.now()}.mp4`;
 
         const { error: uploadError } = await adminAuth.storage
             .from(BUCKET)
