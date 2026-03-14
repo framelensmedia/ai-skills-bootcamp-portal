@@ -746,8 +746,11 @@ export default function LibraryClient({ initialFolders, initialRemixItems, isPro
                         fullQualityUrl: null,
                     } as LibraryItem));
 
-                    // Merge & Sort
+                    // Merge & Sort — character sheets pinned to top
                     const allItems = [...builtImages, ...builtVideos].sort((a, b) => {
+                        const aIsChar = a.prompt?.startsWith("[CHARACTER SHEET]") ? 1 : 0;
+                        const bIsChar = b.prompt?.startsWith("[CHARACTER SHEET]") ? 1 : 0;
+                        if (bIsChar !== aIsChar) return bIsChar - aIsChar; // pinned first
                         return sortMode === "oldest"
                             ? a.createdAtMs - b.createdAtMs
                             : b.createdAtMs - a.createdAtMs;
