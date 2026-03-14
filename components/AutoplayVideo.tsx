@@ -85,7 +85,7 @@ export default function AutoplayVideo({
     return (
         <video
             ref={videoRef}
-            src={src}
+            src={proxiedSrc}
             className={className}
             autoPlay
             muted

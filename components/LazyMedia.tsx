@@ -67,6 +67,7 @@ export default function LazyMedia({ src, poster, alt = "", type, className, unop
 
 function VideoPlayer({ src, poster, className }: { src: string, poster?: string | null, className?: string }) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const proxiedSrc = proxyVideoUrl(src);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -96,7 +97,7 @@ function VideoPlayer({ src, poster, className }: { src: string, poster?: string 
     return (
         <video
             ref={videoRef}
-            src={src}
+            src={proxiedSrc}
             poster={poster || undefined}
             className={className}
             autoPlay

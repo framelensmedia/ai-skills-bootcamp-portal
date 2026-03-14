@@ -491,12 +491,21 @@ export default function GenerationLightbox({
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/70 backdrop-blur-md px-4 py-2 rounded-full">
                     <button
                       onClick={() => {
-                        if (videoRef.current) {
-                          if (isPlaying) {
-                            videoRef.current.pause();
-                          } else {
-                            videoRef.current.play();
-                          }
+                        const vid = videoRef.current;
+                        if (!vid) return;
+                        if (isPlaying) {
+                          vid.pause();
+                        } else {
+                          // iOS requires unmute + play in the SAME user gesture
+                          // to unlock audio. Merging both here satisfies that.
+                          vid.muted = false;
+                          setIsMuted(false);
+                          vid.play().catch(() => {
+                            // Autoplay policy blocked unmuted play — stay muted
+                            vid.muted = true;
+                            setIsMuted(true);
+                            vid.play().catch(() => {});
+                          });
                         }
                       }}
                       className="text-white hover:text-lime-400 transition"
@@ -506,9 +515,14 @@ export default function GenerationLightbox({
                     </button>
                     <button
                       onClick={() => {
-                        setIsMuted(!isMuted);
+                        const newMuted = !isMuted;
+                        setIsMuted(newMuted);
                         if (videoRef.current) {
-                          videoRef.current.muted = !isMuted;
+                          videoRef.current.muted = newMuted;
+                          // If unmuting a paused video, kick off play in same gesture
+                          if (!newMuted && videoRef.current.paused) {
+                            videoRef.current.play().catch(() => {});
+                          }
                         }
                       }}
                       className="text-white hover:text-lime-400 transition"
