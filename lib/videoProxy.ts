@@ -1,13 +1,12 @@
 /**
  * Wraps a video URL to route through our /api/video-proxy endpoint.
  *
- * - Supabase storage URLs → pass through DIRECTLY.
- *   Supabase natively supports Accept-Ranges: bytes + 206 range responses.
- *   Routing through the proxy (even with a 302 redirect) breaks iOS Safari,
- *   which does NOT reliably follow 302 redirects for <video> src byte-range requests.
+ * - Supabase storage URLs → proxied and STREAMED by our server.
+ *   iOS Safari/Chrome (WebKit) drops byte-range headers on cross-origin 302
+ *   redirects, causing videos to stall on the poster frame. Streaming through
+ *   our own server eliminates the cross-origin issue entirely.
  *
- * - fal.media / fal.ai CDN URLs → proxy streams the bytes with correct range
- *   headers (mobile Safari can't reliably access these cross-origin CDNs).
+ * - fal.media / fal.ai CDN URLs → same streaming proxy.
  *
  * - All other URLs (blob:, data:, etc.) → pass through unchanged.
  */
@@ -26,14 +25,13 @@ export function proxyVideoUrl(url: string | null | undefined): string {
 
     const hostname = parsed.hostname;
 
-    // Only proxy fal.ai/fal.media — these CDNs lack proper CORS/range headers
-    // for cross-origin mobile browser access.
+    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace("https://", "").split("/")[0] ?? "";
+    const isSupabase = !!(supabaseHost && hostname === supabaseHost) || hostname.endsWith("supabase.co");
     const isFal = hostname.endsWith("fal.media") || hostname.endsWith("fal.ai");
 
-    if (isFal) {
+    if (isSupabase || isFal) {
         return `/api/video-proxy?url=${encodeURIComponent(url)}`;
     }
 
-    // Everything else (Supabase, etc.) — pass through directly.
     return url;
 }

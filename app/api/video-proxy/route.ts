@@ -7,14 +7,16 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/video-proxy?url=<video-url>
  *
- * Strategy:
- * - Supabase storage URLs: 302 redirect to the raw URL.
- *   Supabase (via Cloudflare) natively serves Accept-Ranges: bytes + 206 responses.
- *   Routing bytes through Next.js adds a problematic Vary header that breaks mobile Safari.
+ * Streams bytes for ALL video sources (Supabase + fal.ai).
  *
- * - fal.media / fal.ai CDN URLs: Full byte-range proxy.
- *   These external CDNs may not be directly accessible by mobile browsers due to
- *   CORS or missing range-request headers. We proxy the bytes and inject the correct headers.
+ * iOS Safari/Chrome (WebKit) does NOT reliably follow 302 redirects
+ * for <video> byte-range requests. When crossing origins via redirect,
+ * the Range headers are dropped and the video stalls on the poster frame.
+ *
+ * By streaming server-side we:
+ * - Fetch from the upstream origin (no CORS issues, server-to-server)
+ * - Return bytes to iOS with explicit Accept-Ranges/Content-Range headers
+ * - iOS sees a same-origin response it can range-request normally
  */
 export async function GET(req: NextRequest) {
     const rawUrl = req.nextUrl.searchParams.get("url");
@@ -31,28 +33,16 @@ export async function GET(req: NextRequest) {
 
     const hostname = parsedUrl.hostname;
 
-    // Allow-list of hosts we'll proxy/redirect
+    // Allow-list of hosts we'll proxy
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace("https://", "")?.split("/")[0] ?? "";
-    const isSupabase = supabaseHost && hostname === supabaseHost;
+    const isSupabase = !!(supabaseHost && hostname === supabaseHost) || hostname.endsWith("supabase.co");
     const isFal = hostname.endsWith("fal.media") || hostname.endsWith("fal.ai") || hostname.endsWith("cdn.fal.ai");
 
     if (!isSupabase && !isFal) {
         return new NextResponse("Forbidden: unsupported host", { status: 403 });
     }
 
-    // ── Supabase: simple redirect (it already handles ranges natively) ──
-    if (isSupabase) {
-        return NextResponse.redirect(rawUrl, {
-            status: 302,
-            headers: {
-                // Tell mobile clients this supports ranges — even in redirect response
-                "Accept-Ranges": "bytes",
-                "Cache-Control": "public, max-age=86400",
-            },
-        });
-    }
-
-    // ── fal.media: full byte-range proxy ──
+    // Pass through the Range header so the upstream returns a 206 partial response
     const rangeHeader = req.headers.get("range") || undefined;
 
     const upstreamHeaders: HeadersInit = {
@@ -62,7 +52,12 @@ export async function GET(req: NextRequest) {
         upstreamHeaders["Range"] = rangeHeader;
     }
 
-    const upstream = await fetch(rawUrl, { headers: upstreamHeaders });
+    let upstream: Response;
+    try {
+        upstream = await fetch(rawUrl, { headers: upstreamHeaders });
+    } catch (err) {
+        return new NextResponse("Failed to fetch upstream: " + String(err), { status: 502 });
+    }
 
     if (!upstream.ok && upstream.status !== 206) {
         return new NextResponse("Upstream error: " + upstream.status, { status: 502 });
