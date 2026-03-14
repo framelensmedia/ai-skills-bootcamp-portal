@@ -53,8 +53,12 @@ export async function POST(req: Request) {
         // Build image reference array — pass all views as reference images
         const imageUrls = [frontUrl, leftUrl, rightUrl, ...(fullBodyUrl ? [fullBodyUrl] : [])];
 
+        // Derive base URL from the incoming request so this works on Vercel, staging, and localhost
+        const reqUrl = new URL(req.url);
+        const baseUrl = `${reqUrl.protocol}//${reqUrl.host}`;
+
         // Call the existing creator-generate endpoint internally
-        const generateRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/creator-generate`, {
+        const generateRes = await fetch(`${baseUrl}/api/creator-generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
