@@ -151,19 +151,18 @@ function CreatorContent() {
     const VIDEO_COST = 30;
     const IMAGE_COST = 3;
     const VOICE_COST = 5; // placeholder cost for voice
-    const ANIMATE_COST = 5;
-    const AUDIO2VIDEO_COST = 10;
-    const VEO_COST = 15;
+    const MAGIC_MOVIE_COST = 20; // Example cost for Magic Movie
+    const CHARACTER_COST = 50;   // Example cost for Character Sheet
 
     // Derived costs depending on active tab
     const getActiveCost = () => {
         if (activeTab === "video") return VIDEO_COST;
-        if (activeTab === "animate") return ANIMATE_COST;
-        if (activeTab === "audio2video") return AUDIO2VIDEO_COST;
+        if (activeTab === "magicmovie") return MAGIC_MOVIE_COST;
+        if (activeTab === "character") return CHARACTER_COST;
         if (activeTab === "voice") return VOICE_COST;
         if (activeTab === "music") return 10; // Music cost
-        if (activeTab === "edit") return 0;
-        return IMAGE_COST; // Default for 'image' tab
+        if (activeTab === "editor") return 0;
+        return IMAGE_COST; // Default for 'image' and 'soundfx' tabs (placeholder)
     };
     const currentCost = getActiveCost();
     const hasCredits = isAdmin || (userCredits ?? 0) >= currentCost;
@@ -193,19 +192,20 @@ function CreatorContent() {
         const intent = searchParams?.get("intent");
 
         if (tab) {
-            const validTabs = ["image", "video", "animate", "audio2video", "voice", "music", "soundfx", "edit"];
+            const validTabs = ["magicmovie", "image", "video", "music", "voice", "soundfx", "character", "editor"];
 
             if (validTabs.includes(tab)) {
                 setActiveTab(tab as any);
             }
         } else if (pathname) {
-            // Named tool routes: /studio/image, /studio/video, /studio/motion, etc.
+            // Named tool routes: /studio/image, /studio/video, /studio/magic-movie, etc.
             if (pathname.endsWith("/video")) setActiveTab("video");
-            else if (pathname.endsWith("/motion")) setActiveTab("animate");
-            else if (pathname.endsWith("/audio-to-video")) setActiveTab("audio2video");
+            else if (pathname.endsWith("/magic-movie") || pathname.endsWith("/motion")) setActiveTab("magicmovie");
             else if (pathname.endsWith("/voice")) setActiveTab("voice");
             else if (pathname.endsWith("/music")) setActiveTab("music");
-            else if (pathname.endsWith("/edit")) setActiveTab("edit");
+            else if (pathname.endsWith("/editor") || pathname.endsWith("/edit")) setActiveTab("editor");
+            else if (pathname.endsWith("/character")) setActiveTab("character");
+            else if (pathname.endsWith("/soundfx")) setActiveTab("soundfx");
             else if (pathname.endsWith("/image") || pathname === "/studio" || pathname === "/studio/creator") setActiveTab("image");
             else if (intent === "video") setActiveTab("video");
         } else if (intent === "video") {
@@ -248,7 +248,7 @@ function CreatorContent() {
     }, [aspectRatio, previewImage]);
 
     useEffect(() => {
-        if (activeTab === "video" || activeTab === "animate" || activeTab === "audio2video" || activeTab === "voice") {
+        if (activeTab === "video" || activeTab === "magicmovie" || activeTab === "voice") {
             setSelectedModel(DEFAULT_VIDEO_MODEL_ID);
         } else setSelectedModel(DEFAULT_MODEL_ID);
     }, [activeTab]);
@@ -1254,7 +1254,11 @@ function CreatorContent() {
                     </>
                 ) : activeTab === "magicmovie" ? (
                     <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <ReferenceVideoTab />
+                        <ReferenceVideoTab 
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
+                        />
                     </div>
                 ) : activeTab === "character" ? (
                     <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
@@ -1273,7 +1277,7 @@ function CreatorContent() {
             </div>
 
             {/* Global Modals for Image/Video */}
-            {activeTab !== "voice" && activeTab !== "music" && activeTab !== "soundfx" && (
+            {activeTab !== "voice" && activeTab !== "music" && activeTab !== "soundfx" && activeTab !== "magicmovie" && activeTab !== "character" && activeTab !== "editor" && (
 
                 <>
                     {/* Video Modal is only used for Remix Cards / Library items now, 
