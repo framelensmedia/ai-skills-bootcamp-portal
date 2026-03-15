@@ -114,11 +114,11 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                        <Wand2 className="text-violet-400" size={20} />
+                    <div className="w-10 h-10 rounded-xl bg-lime-500/10 flex items-center justify-center border border-lime-500/20 shadow-[0_0_15px_rgba(163,230,53,0.2)]">
+                        <Wand2 className="text-lime-400" size={20} />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-white">Magic Video</h2>
+                        <h2 className="text-lg font-bold text-white">Magic Movie</h2>
                         <p className="text-xs text-white/40">Generate a video guided by reference images · {COST} credits</p>
                     </div>
                 </div>
@@ -152,7 +152,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                             </button>
                             <button
                                 onClick={() => setLibraryPickerOpen(true)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-[10px] font-bold text-violet-400 transition-all border border-violet-500/10"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-500/10 hover:bg-lime-500/20 text-[10px] font-bold text-lime-400 transition-all border border-lime-500/10"
                             >
                                 <Library size={12} /> From Library
                             </button>
@@ -173,21 +173,21 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                                 <X size={12} />
                             </button>
                             {img.fromLibrary && (
-                                <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-violet-500 text-[7px] font-bold text-white uppercase">Library</div>
+                                <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-lime-500 text-[7px] font-bold text-black uppercase">Library</div>
                             )}
                             <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-[9px] font-bold text-white/70">{i + 1}</div>
                         </div>
                     ))}
                     {uploadingImages && (
-                        <div className="aspect-square rounded-xl border border-violet-400/20 bg-violet-500/5 flex flex-col items-center justify-center gap-2 animate-pulse">
-                            <Loader2 className="animate-spin text-violet-400" size={20} />
-                            <span className="text-[8px] font-bold uppercase text-violet-400/70">Uploading...</span>
+                        <div className="aspect-square rounded-xl border border-lime-400/20 bg-lime-500/5 flex flex-col items-center justify-center gap-2 animate-pulse">
+                            <Loader2 className="animate-spin text-lime-400" size={20} />
+                            <span className="text-[8px] font-bold uppercase text-lime-400/70">Uploading...</span>
                         </div>
                     )}
                     {canAddMore && !uploadingImages && (
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="aspect-square rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-violet-400/30 transition-all flex flex-col items-center justify-center gap-2 text-white/30 hover:text-violet-400"
+                            className="aspect-square rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] hover:bg-white/[0.04] hover:border-lime-400/30 transition-all flex flex-col items-center justify-center gap-2 text-white/30 hover:text-lime-400"
                         >
                             <Plus size={20} />
                             <span className="text-[9px] font-bold uppercase">Add Image</span>
@@ -208,7 +208,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                                 key={style.id}
                                 onClick={() => setStylePreset(stylePreset === style.id ? null : style.id)}
                                 className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${stylePreset === style.id
-                                    ? "bg-violet-500/20 border-violet-500/50 text-white"
+                                    ? "bg-lime-500/20 border-lime-500/50 text-white"
                                     : "bg-white/5 border-white/5 text-white/50 hover:border-white/10 hover:bg-white/[0.07]"
                                     }`}
                             >
@@ -227,7 +227,7 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                         value={prompt}
                         onChange={e => setPrompt(e.target.value)}
                         placeholder="Describe what happens in the video — actions, environment, mood..."
-                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none focus:border-violet-400/50 focus:ring-1 focus:ring-violet-400/20 resize-none leading-relaxed"
+                        className="w-full rounded-xl border border-white/10 bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none focus:border-lime-400/50 focus:ring-1 focus:ring-lime-400/20 resize-none leading-relaxed"
                     />
                 </div>
 
@@ -236,22 +236,22 @@ export default function ReferenceVideoTab({ userCredits, isAdmin, onCreditsUsed 
                 <button
                     onClick={handleGenerate}
                     disabled={generating || !hasCredits || !prompt.trim() || !referenceImages.length}
-                    className="w-full py-4 rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20"
+                    className="w-full py-4 rounded-xl font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-lime-400 hover:bg-lime-300 text-black flex items-center justify-center gap-2 shadow-lg shadow-lime-500/20"
                 >
                     {generating ? (
-                        <><Loader2 size={18} className="animate-spin" /> Generating Video… (this can take ~2-3 min)</>
+                        <><Loader2 size={18} className="animate-spin" /> Generating Movie… (this can take ~2-3 min)</>
                     ) : (
-                        <><Wand2 size={18} /> Generate Video ({isAdmin ? "∞" : COST} Cr)</>
+                        <><Wand2 size={18} /> Generate Movie ({isAdmin ? "∞" : COST} Cr)</>
                     )}
                 </button>
             </div>
 
             {/* Result */}
             {videoUrl && (
-                <div className="rounded-2xl border border-violet-400/20 bg-violet-500/5 p-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="rounded-2xl border border-lime-400/20 bg-lime-500/5 p-6 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
-                            <Wand2 size={16} className="text-violet-400" /> Generated Video
+                            <Wand2 size={16} className="text-lime-400" /> Generated Movie
                         </span>
                         <button
                             onClick={handleDownload}

@@ -25,6 +25,7 @@ export default function WaveformPlayer({
     const [isReady, setIsReady] = useState(false);
 
     useEffect(() => {
+        let isMounted = true;
         if (!containerRef.current) return;
 
         const ws = WaveSurfer.create({
@@ -41,29 +42,48 @@ export default function WaveformPlayer({
 
         // Event listeners
         ws.on('ready', () => {
+            if (!isMounted) return;
             setIsReady(true);
             const totalSeconds = ws.getDuration();
             setDuration(formatTime(totalSeconds));
         });
 
         ws.on('audioprocess', () => {
+            if (!isMounted) return;
             setCurrentTime(formatTime(ws.getCurrentTime()));
         });
 
-        ws.on('play', () => setIsPlaying(true));
-        ws.on('pause', () => setIsPlaying(false));
-        ws.on('finish', () => setIsPlaying(false));
+        ws.on('play', () => {
+            if (!isMounted) return;
+            setIsPlaying(true);
+        });
+
+        ws.on('pause', () => {
+            if (!isMounted) return;
+            setIsPlaying(false);
+        });
+
+        ws.on('finish', () => {
+            if (!isMounted) return;
+            setIsPlaying(false);
+        });
 
         wavesurferRef.current = ws;
 
         return () => {
+            isMounted = false;
             try {
-                ws.destroy();
+                if (ws) {
+                    ws.unAll();
+                    ws.destroy();
+                }
             } catch (error: any) {
-                if (error.name !== 'AbortError') {
+                // Silently handle AbortError and other cleanup errors
+                if (error.name !== 'AbortError' && error.message !== 'signal is aborted without reason') {
                     console.error('WaveSurfer destroy error:', error);
                 }
             }
+            wavesurferRef.current = null;
         };
     }, [audioUrl, height, waveColor, progressColor]);
 

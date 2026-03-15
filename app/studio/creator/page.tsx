@@ -10,7 +10,7 @@ import { compressImage } from "@/lib/compressImage";
 import AutoModeChat from "../components/AutoModeChat";
 import RemixChatWizard, { RemixAnswers, TemplateConfig } from "@/components/RemixChatWizard";
 import ImageUploader from "@/components/ImageUploader";
-import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download, Image as ImageIcon, Film, Activity, Music, Scissors, Zap } from "lucide-react";
+import { Smartphone, Monitor, Square, RectangleVertical, ChevronLeft, Clapperboard, Download, Image as ImageIcon, Film, Activity, Music, Scissors, Zap, Wand2, UserCircle2 } from "lucide-react";
 
 import LoadingHourglass from "@/components/LoadingHourglass";
 import LoadingOrb from "@/components/LoadingOrb";
@@ -31,12 +31,15 @@ import MusicTab from "./_components/MusicTab";
 import AnimateTab from "./_components/AnimateTab";
 import AudioVideoTab from "./_components/AudioVideoTab";
 import SoundFxTab from "./_components/SoundFxTab";
+import ReferenceVideoTab from "./_components/ReferenceVideoTab";
+import CharacterTab from "./_components/CharacterTab";
+import EditorTab from "./_components/EditorTab";
 
 import { getVoiceGenerations } from "@/app/actions/voiceStudio";
 import { GENERATION_MODELS, VIDEO_MODELS, DEFAULT_MODEL_ID, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-config";
 
 type AspectRatio = "9:16" | "16:9" | "1:1" | "4:5";
-type TabType = "image" | "video" | "animate" | "audio2video" | "voice" | "music" | "soundfx" | "edit";
+type TabType = "magicmovie" | "image" | "video" | "music" | "voice" | "soundfx" | "character" | "editor";
 
 
 function TypeWriter({ text }: { text: string }) {
@@ -141,7 +144,7 @@ function CreatorContent() {
     const [manualPrompt, setManualPrompt] = useState("");
     const [uploads, setUploads] = useState<File[]>([]);
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
-    const [activeTab, setActiveTab] = useState<TabType>("image");
+    const [activeTab, setActiveTab] = useState<TabType>("magicmovie");
 
     // Credits
     const [userCredits, setUserCredits] = useState<number | null>(null);
@@ -765,19 +768,18 @@ function CreatorContent() {
         }
     ];
 
-    const headerInfo = useMemo(() => {
-        switch (activeTab) {
-            case "image": return { title: "Image Studio", icon: ImageIcon, desc: "Generate stunning high-fidelity images" };
-            case "video": return { title: "Video Studio", icon: Film, desc: "Create and extend cinematic video shots" };
-            case "animate": return { title: "Motion Capture", icon: Activity, desc: "Animate your subjects with lifelike motion" };
-            case "audio2video": return { title: "Audio-to-Video", icon: Mic, desc: "Drive character lip-sync and expressions with audio" };
-            case "voice": return { title: "Voice Studio", icon: Mic, desc: "Clone voices and generate lifelike speech" };
-            case "music": return { title: "Music Studio", icon: Music, desc: "Produce professional royalty-free music tracks" };
-            case "soundfx": return { title: "Sound Effects", icon: Zap, desc: "Generate cinematic sound effects from a text description" };
-            case "edit": return { title: "NLE Editor", icon: Scissors, desc: "Non-linear multi-track media editor" };
-            default: return { title: "Creator Studio", icon: Clapperboard, desc: "The complete AI Media Production engine" };
-
-        }
+    const currentHeader = useMemo(() => {
+        const info: Record<string, { icon: any; title: string, subtitle: string }> = {
+            magicmovie: { icon: Wand2, title: "Magic Movie", subtitle: "Transform references into cinematic scenes" },
+            image: { icon: ImageIcon, title: "Image Studio", subtitle: "Generate stunning high-fidelity images" },
+            video: { icon: Film, title: "Video Studio", subtitle: "Create high-end cinematic AI video" },
+            music: { icon: Music, title: "Music Studio", subtitle: "Compose original soundtracks and beats" },
+            voice: { icon: Mic, title: "Voice Studio", subtitle: "Clone voices and generate dialogue" },
+            soundfx: { icon: Activity, title: "Sound Effects", subtitle: "Generate cinematic sound effects" },
+            character: { icon: UserCircle2, title: "Character Sheet", subtitle: "Design consistent AI characters" },
+            editor: { icon: Scissors, title: "NLE Editor", subtitle: "Professional multi-track video editing" },
+        };
+        return info[activeTab] || { icon: Clapperboard, title: "Creator Studio", subtitle: "The complete AI Media Production engine" };
     }, [activeTab]);
 
     return (
@@ -787,16 +789,16 @@ function CreatorContent() {
             <div className="mb-8 flex flex-col md:flex-row gap-4 md:items-end md:justify-between border-b border-white/10 pb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 mb-1">
-                        <headerInfo.icon className="w-8 h-8 text-[#B7FF00]" />
-                        {headerInfo.title}
+                        <currentHeader.icon className="w-8 h-8 text-[#B7FF00]" />
+                        {currentHeader.title}
                     </h1>
-                    <p className="text-sm text-white/50">{headerInfo.desc}</p>
+                    <p className="text-sm text-white/50">{currentHeader.subtitle}</p>
                 </div>
 
                 {/* Master Tabs */}
                 <div className="relative max-w-full mx-4 sm:mx-0">
                     <div className="flex bg-zinc-900/50 backdrop-blur-md border border-white/5 p-1 rounded-xl self-start overflow-x-auto scrollbar-none [mask-image:linear-gradient(to_right,white_85%,transparent_100%)] sm:[mask-image:none]">
-                        {(["image", "video", "voice", "music", "soundfx"] as const).map((tab) => (
+                        {(["magicmovie", "image", "video", "music", "voice", "soundfx", "character", "editor"] as const).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -805,16 +807,9 @@ function CreatorContent() {
                                     : "text-white/40 hover:text-white hover:bg-white/5"
                                     }`}
                             >
-                                {tab === "soundfx" ? "Sound FX" : tab}
+                                {tab === "magicmovie" ? "Magic Movie" : tab === "soundfx" ? "Sound FX" : tab === "character" ? "Character" : tab === "editor" ? "Editor" : tab}
                             </button>
                         ))}
-
-                        <Link
-                            href="/studio/edit"
-                            className="px-4 py-2 text-[10px] font-bold uppercase rounded-lg whitespace-nowrap transition-all text-white/40 hover:text-white hover:bg-white/5 ml-2 border-l border-white/10"
-                        >
-                            EDIT
-                        </Link>
                     </div>
                 </div>
             </div>
@@ -840,29 +835,31 @@ function CreatorContent() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {activeTab === "animate" ? (
-                    <div className="col-span-12">
-                        <AnimateTab
-                            isAdmin={isAdmin}
-                            hasCredits={hasCredits}
+                {activeTab === "voice" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <VoiceTab
                             userCredits={userCredits}
-                            creditError={creditError}
-                            ANIMATE_COST={ANIMATE_COST}
-                            onCreditsUpdate={setUserCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
-                ) : activeTab === "audio2video" ? (
-                    <div className="col-span-12">
-                        <AudioVideoTab
-                            isAdmin={isAdmin}
-                            hasCredits={hasCredits}
+                ) : activeTab === "music" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <MusicTab
                             userCredits={userCredits}
-                            creditError={creditError}
-                            COST={AUDIO2VIDEO_COST}
-                            onCreditsUpdate={setUserCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
-                ) : activeTab !== "voice" && activeTab !== "music" ? (
+                ) : activeTab === "soundfx" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <SoundFxTab
+                            userCredits={userCredits}
+                            isAdmin={isAdmin}
+                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
+                        />
+                    </div>
+                ) : (activeTab === "image" || activeTab === "video") ? (
                     <>
                         {/* LEFT COLUMN: Controls */}
                         <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
@@ -1255,29 +1252,21 @@ function CreatorContent() {
                             </div>
                         </div>
                     </>
-                ) : activeTab === "voice" ? (
+                ) : activeTab === "magicmovie" ? (
                     <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <VoiceTab
+                        <ReferenceVideoTab />
+                    </div>
+                ) : activeTab === "character" ? (
+                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
+                        <CharacterTab
                             userCredits={userCredits}
                             isAdmin={isAdmin}
                             onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
                         />
                     </div>
-                ) : activeTab === "music" ? (
+                ) : activeTab === "editor" ? (
                     <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <MusicTab
-                            userCredits={userCredits}
-                            isAdmin={isAdmin}
-                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
-                        />
-                    </div>
-                ) : activeTab === "soundfx" ? (
-                    <div className="lg:col-span-12 animate-in fade-in zoom-in-95 duration-300">
-                        <SoundFxTab
-                            userCredits={userCredits}
-                            isAdmin={isAdmin}
-                            onCreditsUsed={(amount) => setUserCredits((prev) => (prev ?? 0) - amount)}
-                        />
+                        <EditorTab />
                     </div>
                 ) : null}
 

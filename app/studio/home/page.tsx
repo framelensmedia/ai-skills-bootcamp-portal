@@ -61,9 +61,9 @@ export default function StudioHomePage() {
     };
 
     const quickTools = [
+        { name: "Magic Movie", icon: Wand2, href: "/studio/reference-video", color: "text-lime-400 group-hover:text-lime-300", featured: true },
         { name: "Image", icon: ImageIcon, href: "/studio/tools", color: "text-amber-400 group-hover:text-amber-300" },
         { name: "Video", icon: Video, href: "/studio/tools?tab=video", color: "text-blue-400 group-hover:text-blue-300" },
-        { name: "Magic Video", icon: Wand2, href: "/studio/reference-video", color: "text-violet-400 group-hover:text-violet-300" },
         { name: "Music", icon: Music, href: "/studio/tools?tab=music", color: "text-emerald-400 group-hover:text-emerald-300" },
         { name: "Voice", icon: AudioWaveform, href: "/studio/tools?tab=voice", color: "text-violet-400 group-hover:text-violet-300" },
         { name: "Sound FX", icon: Activity, href: "/studio/soundfx", color: "text-rose-400 group-hover:text-rose-300" },
@@ -103,12 +103,17 @@ export default function StudioHomePage() {
                             <Link
                                 key={tool.name}
                                 href={tool.href}
-                                className="group flex flex-col items-center justify-center transition-all hover:-translate-y-1 cursor-pointer w-[80px] sm:w-[100px]"
+                                className={`group flex flex-col items-center justify-center transition-all hover:-translate-y-1 cursor-pointer w-[80px] sm:w-[100px] ${tool.featured ? 'scale-110 sm:scale-115' : ''}`}
                             >
-                                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#111] border border-white/5 flex items-center justify-center mb-4 transition-all group-hover:bg-[#161616] group-hover:border-white/10 shadow-lg`}>
-                                    <tool.icon size={28} className={`transition-colors ${tool.color}`} />
+                                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#111] border flex items-center justify-center mb-4 transition-all group-hover:bg-[#161616] group-hover:border-white/10 shadow-lg relative ${tool.featured ? 'border-lime-500/50 bg-lime-500/10 shadow-[0_0_25px_rgba(163,230,53,0.3)] ring-2 ring-lime-500/20' : 'border-white/5 shadow-black/20'}`}>
+                                    <tool.icon size={tool.featured ? 32 : 28} className={`transition-colors ${tool.color} ${tool.featured ? 'drop-shadow-[0_0_8px_rgba(163,230,53,0.8)]' : ''}`} />
+                                    {tool.featured && (
+                                        <div className="absolute -top-1 -right-1 bg-black border border-lime-500/30 w-7 h-7 rounded-full flex items-center justify-center shadow-lg text-sm animate-bounce group-hover:animate-none group-hover:scale-110 transition-transform">
+                                            🔥
+                                        </div>
+                                    )}
                                 </div>
-                                <span className="text-[10px] font-bold text-white/50 text-center tracking-widest group-hover:text-white transition-colors uppercase leading-tight">
+                                <span className={`text-[10px] font-bold text-center tracking-widest group-hover:text-white transition-colors uppercase leading-tight ${tool.featured ? 'text-lime-300' : 'text-white/50'}`}>
                                     {tool.name}
                                 </span>
                             </Link>

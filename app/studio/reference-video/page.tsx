@@ -32,8 +32,8 @@ export default function ReferenceVideoPage() {
             <div className="mb-8 flex flex-col md:flex-row gap-4 md:items-end md:justify-between border-b border-white/10 pb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 mb-1">
-                        <Wand2 className="w-8 h-8 text-violet-400" />
-                        Magic Video
+                        <Wand2 className="w-8 h-8 text-lime-400" />
+                        Magic Movie
                     </h1>
                     <p className="text-sm text-white/50">Generate a video guided by reference images</p>
                 </div>

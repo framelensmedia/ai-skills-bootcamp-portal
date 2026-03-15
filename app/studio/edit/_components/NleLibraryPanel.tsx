@@ -17,18 +17,36 @@ export default function NleLibraryPanel({ onClipAdded }: { onClipAdded?: () => v
     const [voiceLimit, setVoiceLimit] = useState(12);
     const [musicLimit, setMusicLimit] = useState(12);
 
-    const { addClipToTrack, activeTrackId, isFullscreen } = useNle();
+    const { addClipToTrack, activeTrackId, isFullscreen, playheadRef } = useNle();
 
     const videoInputRef = useRef<HTMLInputElement>(null);
     const audioInputRef = useRef<HTMLInputElement>(null);
+
+    /** Probe real duration from a URL by loading a transient media element */
+    const getMediaDuration = (url: string, type: 'video' | 'audio'): Promise<number> =>
+        new Promise(resolve => {
+            const el = document.createElement(type === 'video' ? 'video' : 'audio');
+            el.preload = 'metadata';
+            el.onloadedmetadata = () => resolve(el.duration || 5);
+            el.onerror = () => resolve(5);
+            el.src = url;
+        });
 
     useEffect(() => {
         async function fetchAssets() {
             const supabase = createSupabaseBrowserClient();
 
+            // Get current user — only show their own media
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { setLoading(false); return; }
+
             const [vRes, s2sRes, mRes] = await Promise.all([
-                supabase.from("video_generations").select("*").order("created_at", { ascending: false }),
-                supabase.from("voice_generations").select("*").order("created_at", { ascending: false }),
+                supabase.from("video_generations").select("*")
+                    .eq('user_id', user.id)
+                    .order("created_at", { ascending: false }),
+                supabase.from("voice_generations").select("*")
+                    .eq('user_id', user.id)
+                    .order("created_at", { ascending: false }),
                 getMusicGenerations()
             ]);
 
@@ -41,23 +59,26 @@ export default function NleLibraryPanel({ onClipAdded }: { onClipAdded?: () => v
         fetchAssets();
     }, []);
 
-    const handleAddAsset = (asset: any, type: MediaType) => {
-        const defaultDuration = 5;
-
-        // Extract the public URL
+    const handleAddAsset = async (asset: any, type: MediaType) => {
         let url = "";
         if (type === 'video') url = asset.video_url;
         if (type === 'voice') url = asset.audio_url;
         if (type === 'music') url = asset.audio_url;
 
+        if (!url) return;
+
+        const isAudio = type === 'voice' || type === 'music' || type === 'audio';
+        const dur = await getMediaDuration(url, isAudio ? 'audio' : 'video');
+        const startTime = playheadRef.current;
+
         const newClip: Omit<TimelineClip, 'id'> = {
             assetId: asset.id,
             mediaType: type,
-            url: url,
-            duration: defaultDuration,
-            startTime: 0,
+            url,
+            duration: dur,
+            startTime,
             inPoint: 0,
-            outPoint: defaultDuration,
+            outPoint: dur,
             volume: 1.0,
             x: 0, y: 0, width: 100, height: 100, opacity: 1.0
         };
@@ -66,23 +87,26 @@ export default function NleLibraryPanel({ onClipAdded }: { onClipAdded?: () => v
         onClipAdded?.();
     };
 
-    const handleLocalUpload = (e: React.ChangeEvent<HTMLInputElement>, type: MediaType) => {
-        if (e.target.files && e.target.files[0]) {
-            const url = URL.createObjectURL(e.target.files[0]);
-            const newClip: Omit<TimelineClip, 'id'> = {
-                assetId: Math.random().toString(36).substr(2, 9),
-                mediaType: type,
-                url: url,
-                duration: 5, // Default duration, could read file metadata ideally
-                startTime: 0,
-                inPoint: 0,
-                outPoint: 5,
-                volume: 1.0,
-                x: 0, y: 0, width: 100, height: 100, opacity: 1.0
-            };
-            addClipToTrack(activeTrackId, newClip);
-            onClipAdded?.();
-        }
+    const handleLocalUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: MediaType) => {
+        if (!e.target.files?.[0]) return;
+        const url = URL.createObjectURL(e.target.files[0]);
+        const isAudio = type === 'voice' || type === 'music' || type === 'audio';
+        const dur = await getMediaDuration(url, isAudio ? 'audio' : 'video');
+        const startTime = playheadRef.current;
+
+        const newClip: Omit<TimelineClip, 'id'> = {
+            assetId: Math.random().toString(36).substr(2, 9),
+            mediaType: type,
+            url,
+            duration: dur,
+            startTime,
+            inPoint: 0,
+            outPoint: dur,
+            volume: 1.0,
+            x: 0, y: 0, width: 100, height: 100, opacity: 1.0
+        };
+        addClipToTrack(activeTrackId, newClip);
+        onClipAdded?.();
     };
 
     return (

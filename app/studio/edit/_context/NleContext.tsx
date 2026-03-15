@@ -38,22 +38,32 @@ export interface TimelineTrack {
     clips: TimelineClip[];
 }
 
+export type ActiveTool = 'select' | 'razor';
+
 // === NLE State Interface ===
 
 interface NleState {
     // Timeline State
     tracks: TimelineTrack[];
-    duration: number; // Total length of the project in seconds
-    playhead: number; // Current playback position in seconds
+    duration: number;
+    playhead: number;
     isPlaying: boolean;
+
+    // Tool Mode
+    activeTool: ActiveTool;
+    setActiveTool: (tool: ActiveTool) => void;
+
+    // Playback options
+    isLooping: boolean;
+    setIsLooping: (v: boolean) => void;
 
     // Selection
     selectedClipId: string | null;
     selectedTrackId: string | null;
-    activeTrackId: string; // The track where new media from the library will be placed
+    activeTrackId: string;
 
     // Zoom
-    zoomLevel: number; // Pixels per second
+    zoomLevel: number;
 
     // Settings
     isFullscreen: boolean;
@@ -82,9 +92,16 @@ interface NleState {
     addClipToTrack: (trackId: string, clip: Omit<TimelineClip, 'id'>) => void;
     updateClip: (trackId: string, clipId: string, updates: Partial<TimelineClip>) => void;
     removeClip: (trackId: string, clipId: string) => void;
+    splitClip: (trackId: string, clipId: string, splitTime: number) => void;
 
     // Calculated Getters
     getClipsAtTime: (time: number) => { track: TimelineTrack, clip: TimelineClip }[];
+
+    // History
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
 
     // Project Persistence
     projectId: string | null;
@@ -112,9 +129,49 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
     // Default Initial State: 3 Generic Tracks
     const [tracks, setTracks] = useState<TimelineTrack[]>(DEFAULT_TRACKS);
 
+    // === Undo / Redo History ===
+    const undoStack = useRef<TimelineTrack[][]>([]);
+    const redoStack = useRef<TimelineTrack[][]>([]);
+    const [historySize, setHistorySize] = useState({ undo: 0, redo: 0 }); // for re-render trigger only
+
+    /** Call this instead of setTracks for any mutation that should be undoable */
+    const setTracksWithHistory = useCallback((updater: TimelineTrack[] | ((prev: TimelineTrack[]) => TimelineTrack[])) => {
+        setTracks(prev => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            undoStack.current.push(prev);
+            if (undoStack.current.length > 50) undoStack.current.shift(); // cap history
+            redoStack.current = []; // clear redo on new mutation
+            setHistorySize({ undo: undoStack.current.length, redo: 0 });
+            return next;
+        });
+    }, []);
+
+    const undo = useCallback(() => {
+        const prev = undoStack.current.pop();
+        if (!prev) return;
+        setTracks(current => {
+            redoStack.current.push(current);
+            setHistorySize({ undo: undoStack.current.length, redo: redoStack.current.length });
+            return prev;
+        });
+    }, []);
+
+    const redo = useCallback(() => {
+        const next = redoStack.current.pop();
+        if (!next) return;
+        setTracks(current => {
+            undoStack.current.push(current);
+            setHistorySize({ undo: undoStack.current.length, redo: redoStack.current.length });
+            return next;
+        });
+    }, []);
+
     const [playhead, setPlayhead] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [zoomLevel, setZoomLevel] = useState(50); // 50px per second by default
+    const [zoomLevel, setZoomLevel] = useState(50);
+
+    const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+    const [isLooping, setIsLooping] = useState(false);
 
     const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
     const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
@@ -156,75 +213,78 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
             volume: 1.0,
             clips: []
         };
-        setTracks(prev => [newTrack, ...prev]);
+        setTracksWithHistory(prev => [newTrack, ...prev]);
     };
 
     const removeTrack = (trackId: string) => {
-        setTracks(prev => prev.filter(t => t.id !== trackId));
+        setTracksWithHistory(prev => prev.filter(t => t.id !== trackId));
     };
 
     const duplicateTrack = (trackId: string) => {
-        setTracks(prev => {
+        setTracksWithHistory(prev => {
             const trackToCopy = prev.find(t => t.id === trackId);
             if (!trackToCopy) return prev;
-
             const newTrack: TimelineTrack = {
                 ...trackToCopy,
                 id: Math.random().toString(36).substr(2, 9),
                 name: `${trackToCopy.name} (Copy)`,
-                clips: trackToCopy.clips.map(c => ({
-                    ...c,
-                    id: Math.random().toString(36).substr(2, 9)
-                }))
+                clips: trackToCopy.clips.map(c => ({ ...c, id: Math.random().toString(36).substr(2, 9) }))
             };
-
             const index = prev.findIndex(t => t.id === trackId);
-            const newTracks = [...prev];
-            newTracks.splice(index + 1, 0, newTrack);
-            return newTracks;
+            const next = [...prev];
+            next.splice(index + 1, 0, newTrack);
+            return next;
         });
     };
 
     const toggleTrackMute = (trackId: string) => {
-        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, muted: !t.muted } : t));
+        setTracksWithHistory(prev => prev.map(t => t.id === trackId ? { ...t, muted: !t.muted } : t));
     };
 
     const toggleTrackVisibility = (trackId: string) => {
-        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, visible: !t.visible } : t));
+        setTracksWithHistory(prev => prev.map(t => t.id === trackId ? { ...t, visible: !t.visible } : t));
     };
 
     const setTrackVolume = (trackId: string, volume: number) => {
+        // Volume changes don't push to undo stack — too granular
         setTracks(prev => prev.map(t => t.id === trackId ? { ...t, volume } : t));
     };
 
     const addClipToTrack = (trackId: string, clip: Omit<TimelineClip, 'id'>) => {
         const newClip: TimelineClip = { ...clip, id: Math.random().toString(36).substr(2, 9) };
-        setTracks(prev => prev.map(t => {
-            if (t.id === trackId) {
-                return { ...t, clips: [...t.clips, newClip] };
-            }
+        setTracksWithHistory(prev => prev.map(t => {
+            if (t.id === trackId) return { ...t, clips: [...t.clips, newClip] };
             return t;
         }));
     };
 
     const updateClip = (trackId: string, clipId: string, updates: Partial<TimelineClip>) => {
+        // Clip drags/trims don't push undo (too high frequency) — only on pointer up ideally
         setTracks(prev => prev.map(t => {
-            if (t.id === trackId) {
-                return {
-                    ...t,
-                    clips: t.clips.map(c => c.id === clipId ? { ...c, ...updates } : c)
-                };
-            }
+            if (t.id === trackId) return { ...t, clips: t.clips.map(c => c.id === clipId ? { ...c, ...updates } : c) };
             return t;
         }));
     };
 
     const removeClip = (trackId: string, clipId: string) => {
-        setTracks(prev => prev.map(t => {
-            if (t.id === trackId) {
-                return { ...t, clips: t.clips.filter(c => c.id !== clipId) };
-            }
+        setTracksWithHistory(prev => prev.map(t => {
+            if (t.id === trackId) return { ...t, clips: t.clips.filter(c => c.id !== clipId) };
             return t;
+        }));
+    };
+
+    const splitClip = (trackId: string, clipId: string, splitTime: number) => {
+        setTracksWithHistory(prev => prev.map(t => {
+            if (t.id !== trackId) return t;
+            const clip = t.clips.find(c => c.id === clipId);
+            if (!clip) return t;
+            const clipDuration = clip.outPoint - clip.inPoint;
+            const clipEnd = clip.startTime + clipDuration;
+            if (splitTime <= clip.startTime || splitTime >= clipEnd) return t;
+            const splitOffset = splitTime - clip.startTime;
+            const leftClip: TimelineClip = { ...clip, id: Math.random().toString(36).substr(2, 9), outPoint: clip.inPoint + splitOffset };
+            const rightClip: TimelineClip = { ...clip, id: Math.random().toString(36).substr(2, 9), startTime: splitTime, inPoint: clip.inPoint + splitOffset };
+            return { ...t, clips: t.clips.flatMap(c => c.id === clipId ? [leftClip, rightClip] : [c]) };
         }));
     };
 
@@ -345,10 +405,12 @@ export function NleProvider({ children }: { children: React.ReactNode }) {
     return (
         <NleContext.Provider value={{
             tracks, duration, playhead, isPlaying, zoomLevel,
+            activeTool, setActiveTool, isLooping, setIsLooping,
+            canUndo: historySize.undo > 0, canRedo: historySize.redo > 0, undo, redo,
             selectedClipId, selectedTrackId, activeTrackId, isFullscreen, aspectRatio, playheadRef,
             projectId, projectName, setProjectName, isDraft, hasUnsavedChanges, saveStatus, saveProject, loadProject, newProject, setTracks,
             setPlayhead, setIsPlaying, setZoomLevel, setSelectedClipId, setSelectedTrackId, setActiveTrackId, setIsFullscreen, setAspectRatio,
-            addTrack, duplicateTrack, removeTrack, toggleTrackMute, toggleTrackVisibility, setTrackVolume, addClipToTrack, updateClip, removeClip, getClipsAtTime
+            addTrack, duplicateTrack, removeTrack, toggleTrackMute, toggleTrackVisibility, setTrackVolume, addClipToTrack, updateClip, removeClip, splitClip, getClipsAtTime
         }}>
             {children}
         </NleContext.Provider>

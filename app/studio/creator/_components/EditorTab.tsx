@@ -1,18 +1,18 @@
 "use client";
 
-import { NleProvider } from "./_context/NleContext";
+import { NleProvider } from "../../edit/_context/NleContext";
 import { ArrowLeft, MonitorPlay, Save, Loader2, Check, AlertCircle, FolderOpen, Trash2, Plus, Maximize, Minimize, Sparkles, Wand2, Library, X, Image as ImageIcon, Upload } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 
-import NleTimeline from "./_components/NleTimeline";
-import NlePlaybackEngine from "./_components/NlePlaybackEngine";
-import NleLibraryPanel from "./_components/NleLibraryPanel";
-import NleTransportBar from "./_components/NleTransportBar";
+import NleTimeline from "../../edit/_components/NleTimeline";
+import NlePlaybackEngine from "../../edit/_components/NlePlaybackEngine";
+import NleLibraryPanel from "../../edit/_components/NleLibraryPanel";
+import NleTransportBar from "../../edit/_components/NleTransportBar";
 
-import { useNle, TimelineClip } from "./_context/NleContext";
+import { useNle, TimelineClip } from "../../edit/_context/NleContext";
 
 function EditorWorkspace() {
     const {
@@ -140,13 +140,10 @@ function EditorWorkspace() {
     };
 
     return (
-        <div className={`bg-[#0A0A0A] text-white flex flex-col ${isFullscreen ? "fixed inset-0 z-50 w-full h-full" : "h-[calc(100vh-8rem)] min-h-[600px] rounded-xl border border-white/10 shadow-2xl"}`}>
+        <div className={`bg-[#0A0A0A] text-white flex flex-col ${isFullscreen ? "fixed inset-0 z-50 w-full h-full" : "h-[calc(100vh-16rem)] min-h-[600px] rounded-xl border border-white/10 shadow-2xl"}`}>
             {/* Top Navigation Bar - Always visible, changes slightly in Fullscreen */}
             <header className="h-14 border-b border-white/10 bg-black/50 flex items-center justify-between px-4 shrink-0 transition-all z-[999] relative">
                 <div className="flex items-center gap-3">
-                    <Link href="/studio/creator" className={`${isFullscreen ? 'hidden' : 'flex'} text-white/50 hover:text-white transition p-2 rounded-lg hover:bg-white/5`}>
-                        <ArrowLeft size={18} />
-                    </Link>
                     <div className="flex items-center gap-2">
                         <MonitorPlay className="text-lime-400" size={18} />
                         {editingName ? (
@@ -217,7 +214,7 @@ function EditorWorkspace() {
                                                     setShowProjects(false);
                                                     loadProject(p.id);
                                                     didLoad.current = p.id;
-                                                    window.history.replaceState(null, '', `/studio/edit?project=${p.id}`);
+                                                    // window.history.replaceState(null, '', `/studio/creator?tab=edit&project=${p.id}`);
                                                 }}
                                             >
                                                 <div className="flex-1 text-left min-w-0">
@@ -438,10 +435,10 @@ function EditorWorkspace() {
     );
 }
 
-export default function NlePage() {
+export default function EditorTab() {
     return (
         <NleProvider>
-            <Suspense fallback={<div className="h-screen bg-black flex items-center justify-center text-white/30">Loading Editor...</div>}>
+            <Suspense fallback={<div className="h-full bg-black flex items-center justify-center text-white/30">Loading Editor...</div>}>
                 <EditorWorkspace />
             </Suspense>
         </NleProvider>

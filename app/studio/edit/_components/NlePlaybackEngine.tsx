@@ -1,107 +1,191 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useNle, TimelineClip } from "../_context/NleContext";
+import { useNle, TimelineClip, TimelineTrack } from "../_context/NleContext";
 
 /**
- * High-Performance NLE Playback Engine
- * 
- * During playback: Updates shared playheadRef (from context) on every rAF frame.
- * Syncs back to React state every ~250ms for UI updates (timecode, playhead line).
- * Media elements self-manage via native .play() — no per-frame seeking.
+ * NLE Playback Engine — Persistent Media Pool Edition
+ *
+ * All clips from all tracks are rendered as hidden <video>/<audio> elements
+ * at all times so they stay buffered (preloaded). During playback:
+ *   - We compute which clips are "active" at the current playhead.
+ *   - Active clips get display:block / .play(), inactive ones get display:none / .pause().
+ *   - Every 150ms we nudge currentTime if drift > 80ms so audio/video stay in sync.
+ *   - Clip entries/exits happen silently — no mount/unmount, no stutter.
  */
 export default function NlePlaybackEngine({ isFullscreen = false }: { isFullscreen?: boolean }) {
-    const { playhead, setPlayhead, isPlaying, setIsPlaying, duration, tracks, aspectRatio, playheadRef } = useNle();
+    const {
+        playhead, setPlayhead,
+        isPlaying, setIsPlaying,
+        duration, tracks, aspectRatio,
+        playheadRef, isLooping,
+    } = useNle();
 
-    const isPlayingRef = useRef(isPlaying);
-    const durationRef = useRef(duration);
-    const tracksRef = useRef(tracks);
-    const requestRef = useRef<number | undefined>(undefined);
+    const isPlayingRef   = useRef(isPlaying);
+    const durationRef    = useRef(duration);
+    const tracksRef      = useRef(tracks);
+    const isLoopingRef   = useRef(isLooping);
+
+    useEffect(() => { isPlayingRef.current = isPlaying; },   [isPlaying]);
+    useEffect(() => { durationRef.current  = duration; },    [duration]);
+    useEffect(() => { tracksRef.current    = tracks; },      [tracks]);
+    useEffect(() => { isLoopingRef.current = isLooping; },   [isLooping]);
+
+    // ── Master rAF loop refs ──
+    const requestRef       = useRef<number | undefined>(undefined);
     const lastFrameTimeRef = useRef<number | undefined>(undefined);
-    const lastSyncRef = useRef<number>(0);
+    const lastSyncRef      = useRef<number>(0);
 
-    // Sync refs with React state
-    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-    useEffect(() => { durationRef.current = duration; }, [duration]);
-    useEffect(() => { tracksRef.current = tracks; }, [tracks]);
+    // ── Media element pools: keyed by clip.id ──
+    const mediaPoolRef = useRef<Map<string, HTMLVideoElement | HTMLAudioElement>>(new Map());
+    const imagePoolRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
-    // Active media clips (recalculated on play/stop/scrub + periodic sync)
-    const [activeMedia, setActiveMedia] = useState<{ id: string, clip: TimelineClip, trackVolume: number }[]>([]);
+    const registerMedia = useCallback((id: string, el: HTMLVideoElement | HTMLAudioElement | null) => {
+        if (el) { mediaPoolRef.current.set(id, el); } else { mediaPoolRef.current.delete(id); }
+    }, []);
 
-    const getClipsAtTimeLocal = useCallback((time: number) => {
-        const activeClips: { id: string, clip: TimelineClip, trackVolume: number }[] = [];
-        tracksRef.current.forEach(t => {
-            if (!t.visible) return;
-            t.clips.forEach(c => {
-                const clipDuration = c.outPoint - c.inPoint;
-                if (time >= c.startTime && time <= c.startTime + clipDuration) {
-                    activeClips.push({ id: c.id, clip: c, trackVolume: t.muted ? 0 : t.volume });
+    const registerImage = useCallback((id: string, el: HTMLImageElement | null) => {
+        if (el) { imagePoolRef.current.set(id, el); } else { imagePoolRef.current.delete(id); }
+    }, []);
+
+    // ── Helpers ──
+    const isClipActive = (clip: TimelineClip, time: number) => {
+        const clipDuration = clip.outPoint - clip.inPoint;
+        return time >= clip.startTime && time < clip.startTime + clipDuration;
+    };
+
+    /**
+     * Sync every media element to the master clock.
+     * - Active clips: visible, playing, time-corrected if drifted.
+     * - Inactive clips: paused + hidden (still buffered).
+     */
+    const syncAllMedia = useCallback((currentTime: number, playing: boolean) => {
+        tracksRef.current.forEach(track => {
+            if (!track.visible) {
+                // Track hidden — pause & hide everything
+                track.clips.forEach(clip => {
+                    const el = mediaPoolRef.current.get(clip.id);
+                    if (el) { if (!el.paused) el.pause(); (el as HTMLElement).style.display = 'none'; }
+                    const img = imagePoolRef.current.get(clip.id);
+                    if (img) img.style.display = 'none';
+                });
+                return;
+            }
+
+            track.clips.forEach(clip => {
+                const active = isClipActive(clip, currentTime);
+
+                // ── Image clips ──
+                if (clip.mediaType === 'image') {
+                    const img = imagePoolRef.current.get(clip.id);
+                    if (img) img.style.display = active ? '' : 'none';
+                    return;
+                }
+
+                // ── Audio / Video clips ──
+                const el = mediaPoolRef.current.get(clip.id);
+                if (!el) return;
+
+                const vol = Math.min(clip.volume * (track.muted ? 0 : track.volume), 1.0);
+
+                if (active) {
+                    (el as HTMLElement).style.display = '';
+                    el.volume = vol;
+                    el.muted  = vol === 0;
+                    const expectedTime = (currentTime - clip.startTime) + clip.inPoint;
+                    const drift = Math.abs(el.currentTime - expectedTime);
+                    const threshold = playing ? 0.08 : 0.02;
+                    if (drift > threshold) el.currentTime = expectedTime;
+                    if (playing && el.paused)  el.play().catch(() => {});
+                    if (!playing && !el.paused) el.pause();
+                } else {
+                    (el as HTMLElement).style.display = 'none';
+                    if (!el.paused) el.pause();
                 }
             });
         });
-        return activeClips;
     }, []);
 
-    // Update active media when NOT playing (scrubbing / track changes)
-    useEffect(() => {
-        if (!isPlaying) {
-            setActiveMedia(getClipsAtTimeLocal(playhead));
-        }
-    }, [playhead, isPlaying, tracks, getClipsAtTimeLocal]);
-
-    // === Master Playback Loop ===
+    // ── Master rAF Loop ──
     const animate = useCallback((timestamp: number) => {
         if (!isPlayingRef.current) return;
 
         if (lastFrameTimeRef.current !== undefined) {
-            const deltaTime = (timestamp - lastFrameTimeRef.current) / 1000;
-            playheadRef.current += deltaTime;
+            const delta = (timestamp - lastFrameTimeRef.current) / 1000;
+            playheadRef.current = Math.min(playheadRef.current + delta, durationRef.current);
 
             if (playheadRef.current >= durationRef.current) {
-                playheadRef.current = 0;
-                setPlayhead(0);
-                setIsPlaying(false);
-                return;
+                if (isLoopingRef.current) {
+                    // Loop: reset to 0 and continue
+                    playheadRef.current = 0;
+                    setPlayhead(0);
+                    syncAllMedia(0, true);
+                } else {
+                    // Stop
+                    playheadRef.current = 0;
+                    setPlayhead(0);
+                    setIsPlaying(false);
+                    syncAllMedia(0, false);
+                    return;
+                }
             }
 
-            // Periodic React state sync every ~250ms (for UI updates like timecode)
-            if (timestamp - lastSyncRef.current > 250) {
+            // Every 150ms: sync React state + drift-correct all media
+            if (timestamp - lastSyncRef.current > 150) {
                 lastSyncRef.current = timestamp;
-                setPlayhead(playheadRef.current);
+                setPlayhead(playheadRef.current); // update timecode/playhead line
+                syncAllMedia(playheadRef.current, true);
             }
         }
 
         lastFrameTimeRef.current = timestamp;
         requestRef.current = requestAnimationFrame(animate);
-    }, [setPlayhead, setIsPlaying, playheadRef]);
+    }, [setPlayhead, setIsPlaying, playheadRef, syncAllMedia]);
 
-    // Start / Stop
+    // ── Play / Pause ──
     useEffect(() => {
         if (isPlaying) {
-            playheadRef.current = playhead;
             lastFrameTimeRef.current = undefined;
             lastSyncRef.current = 0;
-            setActiveMedia(getClipsAtTimeLocal(playhead));
+            // Immediately snap all media to correct positions before starting rAF
+            syncAllMedia(playheadRef.current, true);
             requestRef.current = requestAnimationFrame(animate);
         } else {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
-            // Final sync
             setPlayhead(playheadRef.current);
-            setActiveMedia(getClipsAtTimeLocal(playheadRef.current));
+            // Pause + show correct frame at playhead
+            syncAllMedia(playheadRef.current, false);
         }
         return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPlaying]);
 
-    // === Dynamic Sizing Logic ===
+    // ── Scrubbing while paused ──
+    useEffect(() => {
+        if (!isPlaying) {
+            syncAllMedia(playhead, false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [playhead, tracks]);
+
+    // ── Track mute/volume changes during playback ──
+    useEffect(() => {
+        if (isPlaying) {
+            syncAllMedia(playheadRef.current, true);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tracks]);
+
+    // ── Canvas Sizing ──
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const obs = new ResizeObserver((entries) => {
+        const obs = new ResizeObserver(entries => {
             if (!entries[0]) return;
             setContainerSize({
-                width: entries[0].contentRect.width,
-                height: entries[0].contentRect.height
+                width:  entries[0].contentRect.width,
+                height: entries[0].contentRect.height,
             });
         });
         if (containerRef.current) obs.observe(containerRef.current);
@@ -109,101 +193,108 @@ export default function NlePlaybackEngine({ isFullscreen = false }: { isFullscre
     }, []);
 
     const ratio = aspectRatio === '16:9' ? 16 / 9 : aspectRatio === '1:1' ? 1 : 9 / 16;
-    let canvasWidth = containerSize.width;
+    let canvasWidth  = containerSize.width;
     let canvasHeight = canvasWidth / ratio;
-
     if (canvasHeight > containerSize.height) {
         canvasHeight = containerSize.height;
-        canvasWidth = canvasHeight * ratio;
+        canvasWidth  = canvasHeight * ratio;
     }
 
+    // ── Flatten all clips for the persistent media pool render ──
+    const allClips: { clip: TimelineClip; track: TimelineTrack }[] = [];
+    tracks.forEach(track => {
+        track.clips.forEach(clip => {
+            allClips.push({ clip, track });
+        });
+    });
+
+    const hasAnyMedia = allClips.length > 0;
+
     return (
-        <div ref={containerRef} className="flex-1 w-full h-full bg-black relative flex items-center justify-center p-2 lg:p-4 min-h-0 min-w-0">
+        <div
+            ref={containerRef}
+            className="flex-1 w-full h-full bg-black relative flex items-center justify-center p-2 lg:p-4 min-h-0 min-w-0"
+        >
             <div
                 style={{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }}
                 className="bg-[#090909] rounded-xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden flex items-center justify-center flex-shrink-0"
             >
-                {activeMedia.length === 0 && (
-                    <p className="text-white/20 font-mono text-sm uppercase tracking-widest z-0">No Media at Playhead</p>
+                {!hasAnyMedia && (
+                    <p className="text-white/20 font-mono text-sm uppercase tracking-widest z-0">
+                        No Media at Playhead
+                    </p>
                 )}
 
-                {activeMedia.map(({ id, clip, trackVolume }) => (
-                    <div key={id} className="absolute inset-0">
-                        {clip.mediaType === 'video' ? (
-                            <VideoRenderer clip={clip} isPlaying={isPlaying} trackVolume={trackVolume} playheadRef={playheadRef} />
-                        ) : clip.mediaType === 'image' ? (
-                            <img src={clip.url} alt="" style={{
-                                position: 'absolute', left: `${clip.x ?? 0}%`, top: `${clip.y ?? 0}%`,
-                                width: `${clip.width ?? 100}%`, height: `${clip.height ?? 100}%`,
-                                opacity: clip.opacity ?? 1.0, objectFit: 'contain'
-                            }} />
-                        ) : (
-                            <AudioRenderer clip={clip} isPlaying={isPlaying} trackVolume={trackVolume} playheadRef={playheadRef} />
-                        )}
-                    </div>
+                {/* Persistent media pool — always mounted, shown/hidden via CSS */}
+                {allClips.map(({ clip, track }) => (
+                    <PersistentClipRenderer
+                        key={clip.id}
+                        clip={clip}
+                        trackVisible={track.visible}
+                        registerMedia={registerMedia}
+                        registerImage={registerImage}
+                    />
                 ))}
             </div>
         </div>
     );
 }
 
-// === Sub-Renderers ===
+// ─────────────────────────────────────────────────────────────────────────────
+// PersistentClipRenderer
+// Mounts once per clip and never unmounts until the clip is removed from the
+// track. The syncAllMedia() function above drives visibility/play/pause.
+// ─────────────────────────────────────────────────────────────────────────────
 
-interface MediaRendererProps {
+interface PersistentClipRendererProps {
     clip: TimelineClip;
-    isPlaying: boolean;
-    trackVolume: number;
-    playheadRef: React.MutableRefObject<number>;
+    trackVisible: boolean;
+    registerMedia: (id: string, el: HTMLVideoElement | HTMLAudioElement | null) => void;
+    registerImage: (id: string, el: HTMLImageElement | null) => void;
 }
 
-function VideoRenderer({ clip, isPlaying, trackVolume, playheadRef }: MediaRendererProps) {
-    const videoRef = useRef<HTMLVideoElement>(null);
+function PersistentClipRenderer({ clip, trackVisible, registerMedia, registerImage }: PersistentClipRendererProps) {
+    const sharedStyle: React.CSSProperties = {
+        position:  'absolute',
+        left:      `${clip.x      ?? 0}%`,
+        top:       `${clip.y      ?? 0}%`,
+        width:     `${clip.width  ?? 100}%`,
+        height:    `${clip.height ?? 100}%`,
+        opacity:   clip.opacity ?? 1.0,
+        objectFit: 'contain',
+        display:   'none', // syncAllMedia() controls visibility
+    };
 
-    useEffect(() => {
-        if (!videoRef.current) return;
-        const video = videoRef.current;
-        video.volume = Math.min(clip.volume * trackVolume, 1.0);
+    if (clip.mediaType === 'video') {
+        return (
+            <video
+                ref={el => registerMedia(clip.id, el)}
+                src={clip.url}
+                playsInline
+                preload="auto"
+                style={sharedStyle}
+            />
+        );
+    }
 
-        const mediaTime = (playheadRef.current - clip.startTime) + clip.inPoint;
-        video.currentTime = mediaTime;
+    if (clip.mediaType === 'image') {
+        return (
+            <img
+                ref={el => registerImage(clip.id, el)}
+                src={clip.url}
+                alt=""
+                style={sharedStyle}
+            />
+        );
+    }
 
-        if (isPlaying) {
-            video.play().catch(() => { });
-        } else {
-            video.pause();
-        }
-    }, [isPlaying, clip.volume, trackVolume]);
-
+    // audio / voice / music
     return (
-        <video ref={videoRef} src={clip.url} muted={clip.volume === 0 || trackVolume === 0} playsInline
-            style={{
-                position: 'absolute', left: `${clip.x ?? 0}%`, top: `${clip.y ?? 0}%`,
-                width: `${clip.width ?? 100}%`, height: `${clip.height ?? 100}%`,
-                opacity: clip.opacity ?? 1.0, objectFit: 'contain'
-            }}
+        <audio
+            ref={el => registerMedia(clip.id, el)}
+            src={clip.url}
+            preload="auto"
+            style={{ display: 'none' }}
         />
-    );
-}
-
-function AudioRenderer({ clip, isPlaying, trackVolume, playheadRef }: MediaRendererProps) {
-    const audioRef = useRef<HTMLAudioElement>(null);
-
-    useEffect(() => {
-        if (!audioRef.current) return;
-        const audio = audioRef.current;
-        audio.volume = Math.min(clip.volume * trackVolume, 1.0);
-
-        const mediaTime = (playheadRef.current - clip.startTime) + clip.inPoint;
-        audio.currentTime = mediaTime;
-
-        if (isPlaying) {
-            audio.play().catch(() => { });
-        } else {
-            audio.pause();
-        }
-    }, [isPlaying, clip.volume, trackVolume]);
-
-    return (
-        <audio ref={audioRef} src={clip.url} muted={clip.volume === 0 || trackVolume === 0} className="hidden" />
     );
 }
